@@ -1,0 +1,31 @@
+version: "3.9"
+
+# Production Overrides für Homeserver / Proxmox
+# Nutzung: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      target: production
+    volumes: []
+    environment:
+      NODE_ENV: production
+    restart: always
+
+  frontend:
+    build:
+      target: production
+    volumes: []
+    ports: []
+    restart: always
+
+  postgres:
+    ports: []
+    restart: always
+
+  redis:
+    ports: []
+    restart: always
+
+  nginx:
+    restart: always

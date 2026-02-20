@@ -1,0 +1,26 @@
+{
+  "name": "finanzguru",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Finanzguru-ähnliche persönliche Finanzmanagement Web-App",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:migrate": "cd packages/backend && npx prisma migrate dev",
+    "db:seed": "cd packages/backend && npx prisma db seed",
+    "db:studio": "cd packages/backend && npx prisma studio",
+    "docker:dev": "docker compose up --build",
+    "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d",
+    "docker:down": "docker compose down -v"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
