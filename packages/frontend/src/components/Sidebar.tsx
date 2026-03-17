@@ -45,7 +45,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <span className="text-lg font-bold text-white">Finanzguru</span>
         </div>
-        <button onClick={onClose} className="lg:hidden text-surface-400 hover:text-white">
+        <button onClick={onClose} aria-label="Menü schließen" className="lg:hidden text-surface-400 hover:text-white">
           <X className="h-5 w-5" />
         </button>
       </div>

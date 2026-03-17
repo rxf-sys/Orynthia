@@ -1,34 +1,43 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsBoolean } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
+  @Transform(({ value }) => value?.trim().toLowerCase())
   email: string;
 
   @ApiProperty({ example: 'sicheresPasswort123!' })
   @IsString()
   @MinLength(8)
+  @MaxLength(128)
   password: string;
 
   @ApiProperty({ example: 'Max', required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => value?.trim())
   firstName?: string;
 
   @ApiProperty({ example: 'Mustermann', required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => value?.trim())
   lastName?: string;
 }
 
 export class LoginDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
+  @Transform(({ value }) => value?.trim().toLowerCase())
   email: string;
 
   @ApiProperty({ example: 'sicheresPasswort123!' })
   @IsString()
+  @MaxLength(128)
   password: string;
 
   @ApiProperty({ required: false })
@@ -44,8 +53,10 @@ export class RefreshTokenDto {
 }
 
 export class Enable2FADto {
-  @ApiProperty()
+  @ApiProperty({ example: '123456' })
   @IsString()
+  @MinLength(6)
+  @MaxLength(6)
   code: string;
 }
 

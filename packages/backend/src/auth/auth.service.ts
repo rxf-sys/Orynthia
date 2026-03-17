@@ -38,21 +38,21 @@ export class AuthService {
       },
     });
 
-    // System-Kategorien für User kopieren
+    // System-Kategorien für User kopieren (Batch-Insert)
     const systemCategories = await this.prisma.category.findMany({
       where: { isSystem: true },
     });
 
-    for (const cat of systemCategories) {
-      await this.prisma.category.create({
-        data: {
+    if (systemCategories.length > 0) {
+      await this.prisma.category.createMany({
+        data: systemCategories.map((cat) => ({
           userId: user.id,
           name: cat.name,
           icon: cat.icon,
           color: cat.color,
           keywords: cat.keywords,
           isSystem: false,
-        },
+        })),
       });
     }
 
@@ -111,6 +111,15 @@ export class AuthService {
     }
 
     return this.generateTokens(user.id, user.email);
+  }
+
+  async refreshFromCookie(refreshToken: string): Promise<TokenResponseDto> {
+    // Refresh Token verifizieren und User-ID extrahieren
+    const payload = await this.jwtService.verifyAsync(refreshToken, {
+      secret: this.config.get('JWT_REFRESH_SECRET'),
+    });
+
+    return this.refreshTokens(payload.sub, refreshToken);
   }
 
   async logout(userId: string): Promise<void> {

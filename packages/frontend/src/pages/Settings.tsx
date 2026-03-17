@@ -347,6 +347,7 @@ function SecurityTab() {
                   {totpSecret}
                 </code>
                 <button
+                  aria-label="Secret in Zwischenablage kopieren"
                   onClick={() => {
                     navigator.clipboard.writeText(totpSecret);
                     toast.success('Secret kopiert');
@@ -487,6 +488,9 @@ function NotificationsTab() {
               <p className="text-xs text-surface-500 mt-0.5">{opt.description}</p>
             </div>
             <button
+              role="switch"
+              aria-checked={settings[opt.key]}
+              aria-label={opt.label}
               onClick={() => toggleSetting(opt.key)}
               className={cn(
                 'relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4',

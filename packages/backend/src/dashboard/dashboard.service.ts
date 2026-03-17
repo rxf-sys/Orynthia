@@ -95,6 +95,7 @@ export class DashboardService {
       accounts,
       recentTransactions,
       expensesByCategory: expensesByCategory.map(e => ({
+        categoryId: e.categoryId,
         category: e.categoryId ? catMap.get(e.categoryId) : { name: 'Unkategorisiert', icon: '❓', color: '#94a3b8' },
         amount: Math.abs(Number(e._sum.amount)),
       })).sort((a, b) => b.amount - a.amount),

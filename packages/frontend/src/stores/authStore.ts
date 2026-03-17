@@ -6,6 +6,7 @@ interface User {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  twoFactorEnabled?: boolean;
   isActive: boolean;
 }
 
@@ -21,23 +22,18 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  isAuthenticated: !!localStorage.getItem('accessToken'),
+  isAuthenticated: false,
   isLoading: true,
 
   login: async (email, password, twoFactorCode) => {
-    const { data } = await authApi.login({ email, password, twoFactorCode });
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-
+    await authApi.login({ email, password, twoFactorCode });
+    // Cookies werden automatisch vom Browser gesetzt
     const { data: user } = await authApi.me();
     set({ user, isAuthenticated: true, isLoading: false });
   },
 
   register: async (email, password, firstName, lastName) => {
-    const { data } = await authApi.register({ email, password, firstName, lastName });
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-
+    await authApi.register({ email, password, firstName, lastName });
     const { data: user } = await authApi.me();
     set({ user, isAuthenticated: true, isLoading: false });
   },
@@ -48,24 +44,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       // Ignore errors on logout
     }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
   checkAuth: async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      set({ user: null, isAuthenticated: false, isLoading: false });
-      return;
-    }
-
     try {
       const { data: user } = await authApi.me();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
