@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { User, Shield, Bell, Palette, Loader2, Check, Eye, EyeOff, Copy } from 'lucide-react';
+import { User, Shield, Bell, Loader2, Check, Eye, EyeOff, Copy } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 

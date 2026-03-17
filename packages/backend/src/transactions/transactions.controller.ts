@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
@@ -13,49 +14,49 @@ export class TransactionsController {
 
   @Post()
   @ApiOperation({ summary: 'Transaktion erstellen' })
-  async create(@Req() req: any, @Body() dto: CreateTransactionDto) {
-    return this.transactionsService.create(req.user.id, dto);
+  async create(@Req() req: Request, @Body() dto: CreateTransactionDto) {
+    return this.transactionsService.create((req.user as any).id, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Transaktionen auflisten (mit Filtern)' })
-  async findAll(@Req() req: any, @Query() filters: TransactionFilterDto) {
-    return this.transactionsService.findAll(req.user.id, filters);
+  async findAll(@Req() req: Request, @Query() filters: TransactionFilterDto) {
+    return this.transactionsService.findAll((req.user as any).id, filters);
   }
 
   @Get('expenses-by-category')
   @ApiOperation({ summary: 'Ausgaben nach Kategorie' })
   async getExpensesByCategory(
-    @Req() req: any,
+    @Req() req: Request,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
     const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate) : new Date();
-    return this.transactionsService.getExpensesByCategory(req.user.id, start, end);
+    return this.transactionsService.getExpensesByCategory((req.user as any).id, start, end);
   }
 
   @Get('monthly-overview')
   @ApiOperation({ summary: 'Monatliche Einnahmen/Ausgaben Übersicht' })
-  async getMonthlyOverview(@Req() req: any, @Query('months') months?: number) {
-    return this.transactionsService.getMonthlyOverview(req.user.id, months || 6);
+  async getMonthlyOverview(@Req() req: Request, @Query('months') months?: number) {
+    return this.transactionsService.getMonthlyOverview((req.user as any).id, months || 6);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Einzelne Transaktion' })
-  async findById(@Req() req: any, @Param('id') id: string) {
-    return this.transactionsService.findById(req.user.id, id);
+  async findById(@Req() req: Request, @Param('id') id: string) {
+    return this.transactionsService.findById((req.user as any).id, id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Transaktion aktualisieren' })
-  async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateTransactionDto) {
-    return this.transactionsService.update(req.user.id, id, dto);
+  async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateTransactionDto) {
+    return this.transactionsService.update((req.user as any).id, id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Transaktion löschen' })
-  async remove(@Req() req: any, @Param('id') id: string) {
-    return this.transactionsService.remove(req.user.id, id);
+  async remove(@Req() req: Request, @Param('id') id: string) {
+    return this.transactionsService.remove((req.user as any).id, id);
   }
 }

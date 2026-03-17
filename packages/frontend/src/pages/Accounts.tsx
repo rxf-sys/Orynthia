@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Building2, CreditCard, PiggyBank, TrendingUp } from 'lucide-react';
 import { accountsApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
+import type { BankAccount, CreateAccountData } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 const accountTypeConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -28,7 +29,7 @@ export function AccountsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => accountsApi.create(data),
+    mutationFn: (data: CreateAccountData) => accountsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
@@ -116,7 +117,7 @@ export function AccountsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts?.map((acc: any) => {
+          {accounts?.map((acc: BankAccount) => {
             const config = accountTypeConfig[acc.accountType] || accountTypeConfig.CHECKING;
             return (
               <div key={acc.id} className="card-hover group">
