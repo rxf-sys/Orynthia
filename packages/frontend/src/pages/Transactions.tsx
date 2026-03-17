@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { transactionsApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
-import type { Transaction, Category } from '@/lib/types';
+import type { Transaction, Category, CreateTransactionData } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 export function TransactionsPage() {
@@ -29,7 +29,7 @@ export function TransactionsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Transaction> }) => transactionsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransactionData> }) => transactionsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success('Transaktion aktualisiert');
@@ -104,7 +104,7 @@ export function TransactionsPage() {
                   {/* Category Selector */}
                   <select
                     value={tx.categoryId || ''}
-                    onChange={(e) => updateMutation.mutate({ id: tx.id, data: { categoryId: e.target.value || null } })}
+                    onChange={(e) => updateMutation.mutate({ id: tx.id, data: { categoryId: e.target.value || undefined } })}
                     className="hidden md:block text-xs bg-surface-800 border border-surface-700 rounded-lg px-2 py-1 text-surface-300 max-w-[140px]"
                   >
                     <option value="">Unkategorisiert</option>

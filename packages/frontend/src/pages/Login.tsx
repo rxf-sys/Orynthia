@@ -17,8 +17,10 @@ export function LoginPage() {
     try {
       await login(email, password);
       toast.success('Willkommen zurück!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Anmeldung fehlgeschlagen');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen';
+      const axiosMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(axiosMessage || message);
     } finally {
       setLoading(false);
     }

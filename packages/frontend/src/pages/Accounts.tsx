@@ -69,7 +69,7 @@ export function AccountsPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              createMutation.mutate({ ...form, balance: Number(form.balance) || 0 });
+              createMutation.mutate({ ...form, balance: Number(form.balance) || 0, accountType: form.accountType as CreateAccountData['accountType'] });
             }}
             className="grid grid-cols-1 sm:grid-cols-2 gap-4"
           >

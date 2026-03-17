@@ -19,8 +19,10 @@ export function RegisterPage() {
     try {
       await register(form.email, form.password, form.firstName, form.lastName);
       toast.success('Konto erfolgreich erstellt!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Registrierung fehlgeschlagen');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Registrierung fehlgeschlagen';
+      const axiosMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(axiosMessage || message);
     } finally {
       setLoading(false);
     }
