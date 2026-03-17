@@ -104,12 +104,12 @@ export function DashboardPage() {
         {/* Pie Chart - Ausgaben nach Kategorie */}
         <div className="card">
           <h3 className="text-lg font-semibold text-white mb-4">Ausgaben nach Kategorie</h3>
-          {dashboard?.expensesByCategory?.length > 0 ? (
+          {(dashboard?.expensesByCategory?.length ?? 0) > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
-                    data={dashboard.expensesByCategory}
+                    data={dashboard!.expensesByCategory}
                     dataKey="amount"
                     nameKey="category.name"
                     cx="50%"
@@ -118,7 +118,7 @@ export function DashboardPage() {
                     outerRadius={80}
                     paddingAngle={2}
                   >
-                    {dashboard.expensesByCategory.map((entry: { categoryId?: string }, i: number) => (
+                    {dashboard!.expensesByCategory.map((entry: { categoryId?: string }, i: number) => (
                       <Cell key={entry.categoryId || i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
@@ -129,7 +129,7 @@ export function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-3 space-y-2">
-                {dashboard.expensesByCategory.slice(0, 5).map((item: { categoryId?: string; category?: { name?: string; icon?: string }; amount: number }, i: number) => (
+                {dashboard!.expensesByCategory.slice(0, 5).map((item: { categoryId?: string; category?: { name?: string; icon?: string }; amount: number }, i: number) => (
                   <div key={item.categoryId || i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
@@ -152,8 +152,8 @@ export function DashboardPage() {
         <div className="card lg:col-span-2">
           <h3 className="text-lg font-semibold text-white mb-4">Letzte Transaktionen</h3>
           <div className="space-y-1">
-            {dashboard?.recentTransactions?.length > 0 ? (
-              dashboard.recentTransactions.map((tx: { id: string; category?: { name?: string; icon?: string }; counterpartName?: string; purpose?: string; amount: number | string; date: string }) => (
+            {(dashboard?.recentTransactions?.length ?? 0) > 0 ? (
+              dashboard!.recentTransactions.map((tx: { id: string; category?: { name?: string; icon?: string }; counterpartName?: string; purpose?: string; amount: number | string; date: string }) => (
                 <div key={tx.id} className="flex items-center justify-between py-3 border-b border-surface-800 last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-800 text-lg">

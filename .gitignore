@@ -10,6 +10,9 @@ coverage/
 .prisma/
 prisma/*.db
 
+# Build artifacts
+*.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db
