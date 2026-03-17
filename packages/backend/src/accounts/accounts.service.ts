@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AccountType } from '@prisma/client';
+import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 
 @Injectable()
 export class AccountsService {
@@ -30,14 +30,7 @@ export class AccountsService {
     return { totalBalance: total, currency: 'EUR', accountCount: accounts.length };
   }
 
-  async create(userId: string, data: {
-    bankName: string;
-    accountName: string;
-    iban?: string;
-    bic?: string;
-    accountType?: AccountType;
-    balance?: number;
-  }) {
+  async create(userId: string, data: CreateAccountDto) {
     return this.prisma.bankAccount.create({
       data: {
         userId,
@@ -51,7 +44,7 @@ export class AccountsService {
     });
   }
 
-  async update(userId: string, id: string, data: any) {
+  async update(userId: string, id: string, data: UpdateAccountDto) {
     const account = await this.prisma.bankAccount.findFirst({ where: { id, userId } });
     if (!account) throw new NotFoundException('Konto nicht gefunden');
     return this.prisma.bankAccount.update({ where: { id }, data });

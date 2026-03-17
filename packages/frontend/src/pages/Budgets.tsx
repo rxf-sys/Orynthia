@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2 } from 'lucide-react';
 import { budgetsApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
+import type { Budget, Category, CreateBudgetData } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 export function BudgetsPage() {
@@ -21,7 +22,7 @@ export function BudgetsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => budgetsApi.create(data),
+    mutationFn: (data: CreateBudgetData) => budgetsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
       setShowForm(false);
@@ -70,7 +71,7 @@ export function BudgetsPage() {
               required
             >
               <option value="">Kategorie wählen</option>
-              {categories?.filter((c: any) => !c.isSystem).map((cat: any) => (
+              {categories?.filter((c: Category) => !c.isSystem).map((cat: Category) => (
                 <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
               ))}
             </select>
@@ -103,7 +104,7 @@ export function BudgetsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgets?.map((budget: any) => (
+          {budgets?.map((budget: Budget) => (
             <BudgetCard
               key={budget.id}
               budget={budget}
@@ -116,7 +117,7 @@ export function BudgetsPage() {
   );
 }
 
-function BudgetCard({ budget, onDelete }: { budget: any; onDelete: () => void }) {
+function BudgetCard({ budget, onDelete }: { budget: Budget; onDelete: () => void }) {
   const percentage = Math.min(budget.percentage, 100);
   const isOverBudget = budget.percentage > 100;
   const isWarning = budget.percentage > 80 && budget.percentage <= 100;

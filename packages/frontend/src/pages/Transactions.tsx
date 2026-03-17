@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { transactionsApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import type { Transaction, Category } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 export function TransactionsPage() {
@@ -28,7 +29,7 @@ export function TransactionsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => transactionsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Transaction> }) => transactionsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success('Transaktion aktualisiert');
@@ -65,7 +66,7 @@ export function TransactionsPage() {
           className="input w-full sm:w-48"
         >
           <option value="">Alle Kategorien</option>
-          {categories?.map((cat: any) => (
+          {categories?.map((cat: Category) => (
             <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
           ))}
         </select>
@@ -83,7 +84,7 @@ export function TransactionsPage() {
           </div>
         ) : (
           <div className="divide-y divide-surface-800">
-            {transactions.map((tx: any) => (
+            {transactions.map((tx: Transaction) => (
               <div key={tx.id} className="flex items-center justify-between px-6 py-4 hover:bg-surface-800/30 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-800 text-lg shrink-0">
@@ -107,7 +108,7 @@ export function TransactionsPage() {
                     className="hidden md:block text-xs bg-surface-800 border border-surface-700 rounded-lg px-2 py-1 text-surface-300 max-w-[140px]"
                   >
                     <option value="">Unkategorisiert</option>
-                    {categories?.map((cat: any) => (
+                    {categories?.map((cat: Category) => (
                       <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
                     ))}
                   </select>

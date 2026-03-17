@@ -1,4 +1,17 @@
 import axios from 'axios';
+import type {
+  BankAccount,
+  Budget,
+  Category,
+  CreateAccountData,
+  CreateBudgetData,
+  CreateTransactionData,
+  DashboardData,
+  MonthlyOverview,
+  PaginatedResult,
+  Transaction,
+  TransactionFilters,
+} from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -63,37 +76,41 @@ export const authApi = {
 };
 
 export const dashboardApi = {
-  getData: () => api.get('/dashboard'),
+  getData: () => api.get<DashboardData>('/dashboard'),
 };
 
 export const accountsApi = {
-  getAll: () => api.get('/accounts'),
-  getBalance: () => api.get('/accounts/balance'),
-  create: (data: any) => api.post('/accounts', data),
-  update: (id: string, data: any) => api.patch(`/accounts/${id}`, data),
+  getAll: () => api.get<BankAccount[]>('/accounts'),
+  getBalance: () => api.get<{ totalBalance: number; currency: string; accountCount: number }>('/accounts/balance'),
+  create: (data: CreateAccountData) => api.post<BankAccount>('/accounts', data),
+  update: (id: string, data: Partial<CreateAccountData>) => api.patch<BankAccount>(`/accounts/${id}`, data),
   remove: (id: string) => api.delete(`/accounts/${id}`),
 };
 
 export const transactionsApi = {
-  getAll: (params?: any) => api.get('/transactions', { params }),
-  getById: (id: string) => api.get(`/transactions/${id}`),
-  create: (data: any) => api.post('/transactions', data),
-  update: (id: string, data: any) => api.patch(`/transactions/${id}`, data),
+  getAll: (params?: TransactionFilters) => api.get<PaginatedResult<Transaction>>('/transactions', { params }),
+  getById: (id: string) => api.get<Transaction>(`/transactions/${id}`),
+  create: (data: CreateTransactionData) => api.post<Transaction>('/transactions', data),
+  update: (id: string, data: Partial<CreateTransactionData>) => api.patch<Transaction>(`/transactions/${id}`, data),
   remove: (id: string) => api.delete(`/transactions/${id}`),
-  getExpensesByCategory: (params?: any) => api.get('/transactions/expenses-by-category', { params }),
-  getMonthlyOverview: (months?: number) => api.get('/transactions/monthly-overview', { params: { months } }),
+  getExpensesByCategory: (params?: { startDate?: string; endDate?: string }) =>
+    api.get('/transactions/expenses-by-category', { params }),
+  getMonthlyOverview: (months?: number) =>
+    api.get<MonthlyOverview[]>('/transactions/monthly-overview', { params: { months } }),
 };
 
 export const categoriesApi = {
-  getAll: () => api.get('/categories'),
-  create: (data: any) => api.post('/categories', data),
-  update: (id: string, data: any) => api.patch(`/categories/${id}`, data),
+  getAll: () => api.get<Category[]>('/categories'),
+  create: (data: { name: string; icon?: string; color?: string; keywords?: string[] }) =>
+    api.post<Category>('/categories', data),
+  update: (id: string, data: { name?: string; icon?: string; color?: string; keywords?: string[] }) =>
+    api.patch<Category>(`/categories/${id}`, data),
   remove: (id: string) => api.delete(`/categories/${id}`),
 };
 
 export const budgetsApi = {
-  getAll: () => api.get('/budgets'),
-  create: (data: any) => api.post('/budgets', data),
-  update: (id: string, data: any) => api.patch(`/budgets/${id}`, data),
+  getAll: () => api.get<Budget[]>('/budgets'),
+  create: (data: CreateBudgetData) => api.post<Budget>('/budgets', data),
+  update: (id: string, data: Partial<CreateBudgetData>) => api.patch<Budget>(`/budgets/${id}`, data),
   remove: (id: string) => api.delete(`/budgets/${id}`),
 };

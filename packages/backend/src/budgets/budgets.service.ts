@@ -13,36 +13,41 @@ export class BudgetsService {
       orderBy: { category: { name: 'asc' } },
     });
 
-    // Aktuelle Ausgaben pro Budget berechnen
+    // Aktuelle Ausgaben pro Budget in einer einzigen Query berechnen
     const now = new Date();
-    const results = await Promise.all(
-      budgets.map(async (budget) => {
-        const { start, end } = this.getPeriodRange(budget.period, now);
-        
-        const spent = await this.prisma.transaction.aggregate({
-          where: {
-            bankAccount: { userId },
-            categoryId: budget.categoryId,
-            amount: { lt: 0 },
-            date: { gte: start, lte: end },
-          },
-          _sum: { amount: true },
-        });
+    if (budgets.length === 0) return [];
 
-        const spentAmount = Math.abs(Number(spent._sum.amount || 0));
-        const budgetAmount = Number(budget.amount);
+    // Frühesten Start und spätestes Ende über alle Budgets ermitteln
+    const ranges = budgets.map((b) => ({ ...this.getPeriodRange(b.period, now), categoryId: b.categoryId }));
+    const earliestStart = new Date(Math.min(...ranges.map((r) => r.start.getTime())));
+    const latestEnd = new Date(Math.max(...ranges.map((r) => r.end.getTime())));
 
-        return {
-          ...budget,
-          amount: budgetAmount,
-          spent: spentAmount,
-          remaining: budgetAmount - spentAmount,
-          percentage: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0,
-        };
-      }),
-    );
+    // Alle relevanten Ausgaben gruppiert nach Kategorie in einer Query laden
+    const spentByCategory = await this.prisma.transaction.groupBy({
+      by: ['categoryId'],
+      where: {
+        bankAccount: { userId },
+        categoryId: { in: budgets.map((b) => b.categoryId) },
+        amount: { lt: 0 },
+        date: { gte: earliestStart, lte: latestEnd },
+      },
+      _sum: { amount: true },
+    });
 
-    return results;
+    const spentMap = new Map(spentByCategory.map((s) => [s.categoryId, Math.abs(Number(s._sum.amount || 0))]));
+
+    return budgets.map((budget) => {
+      const spentAmount = spentMap.get(budget.categoryId) || 0;
+      const budgetAmount = Number(budget.amount);
+
+      return {
+        ...budget,
+        amount: budgetAmount,
+        spent: spentAmount,
+        remaining: budgetAmount - spentAmount,
+        percentage: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0,
+      };
+    });
   }
 
   async create(userId: string, data: { categoryId: string; amount: number; period?: BudgetPeriod }) {

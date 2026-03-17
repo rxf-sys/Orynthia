@@ -96,22 +96,22 @@ async function main() {
       { amount: -29.99, type: 'EXPENSE', purpose: 'Fitnessstudio', counterpartName: 'McFit', categoryName: 'Gesundheit & Fitness', daysAgo: 12 },
     ];
 
-    for (const tx of demoTransactions) {
-      const txDate = new Date(now);
-      txDate.setDate(txDate.getDate() - tx.daysAgo);
-
-      await prisma.transaction.create({
-        data: {
+    await prisma.transaction.createMany({
+      data: demoTransactions.map((tx) => {
+        const txDate = new Date(now);
+        txDate.setDate(txDate.getDate() - tx.daysAgo);
+        return {
           bankAccountId: demoAccount.id,
           categoryId: catMap.get(tx.categoryName) || null,
           amount: tx.amount,
           date: txDate,
           purpose: tx.purpose,
           counterpartName: tx.counterpartName,
-          type: tx.type as any,
-        },
-      });
-    }
+          type: tx.type as 'INCOME' | 'EXPENSE',
+        };
+      }),
+      skipDuplicates: true,
+    });
 
     console.log(`✅ Demo-User: demo@finanzguru.local / demo1234`);
     console.log(`✅ ${demoTransactions.length} Demo-Transaktionen erstellt`);

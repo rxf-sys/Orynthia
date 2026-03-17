@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid
 } from 'recharts';
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Wallet, PiggyBank, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { dashboardApi, transactionsApi } from '@/lib/api';
 import { formatCurrency, formatDateRelative, cn } from '@/lib/utils';
+import type { MonthlyOverview } from '@/lib/types';
 
 export function DashboardPage() {
   const { data: dashboard, isLoading } = useQuery({
@@ -31,7 +32,7 @@ export function DashboardPage() {
     '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Okt', '11': 'Nov', '12': 'Dez',
   };
 
-  const chartData = monthlyData?.map((m: any) => ({
+  const chartData = monthlyData?.map((m: MonthlyOverview) => ({
     name: monthNames[m.month.split('-')[1]] || m.month,
     Einnahmen: m.income,
     Ausgaben: m.expenses,
@@ -117,7 +118,7 @@ export function DashboardPage() {
                     outerRadius={80}
                     paddingAngle={2}
                   >
-                    {dashboard.expensesByCategory.map((_: any, i: number) => (
+                    {dashboard.expensesByCategory.map((_: unknown, i: number) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
@@ -128,7 +129,7 @@ export function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-3 space-y-2">
-                {dashboard.expensesByCategory.slice(0, 5).map((item: any, i: number) => (
+                {dashboard.expensesByCategory.slice(0, 5).map((item: { category?: { name?: string; icon?: string }; amount: number }, i: number) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
@@ -152,7 +153,7 @@ export function DashboardPage() {
           <h3 className="text-lg font-semibold text-white mb-4">Letzte Transaktionen</h3>
           <div className="space-y-1">
             {dashboard?.recentTransactions?.length > 0 ? (
-              dashboard.recentTransactions.map((tx: any) => (
+              dashboard.recentTransactions.map((tx: { id: string; category?: { name?: string; icon?: string }; counterpartName?: string; purpose?: string; amount: number | string; date: string }) => (
                 <div key={tx.id} className="flex items-center justify-between py-3 border-b border-surface-800 last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-800 text-lg">
@@ -185,7 +186,7 @@ export function DashboardPage() {
         <div className="card">
           <h3 className="text-lg font-semibold text-white mb-4">Meine Konten</h3>
           <div className="space-y-3">
-            {dashboard?.accounts?.map((acc: any) => (
+            {dashboard?.accounts?.map((acc: { id: string; accountName: string; bankName: string; balance: number | string }) => (
               <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-800/50">
                 <div>
                   <p className="text-sm font-medium text-surface-200">{acc.accountName}</p>
