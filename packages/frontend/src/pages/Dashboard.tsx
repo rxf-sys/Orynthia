@@ -118,8 +118,8 @@ export function DashboardPage() {
                     outerRadius={80}
                     paddingAngle={2}
                   >
-                    {dashboard.expensesByCategory.map((_: unknown, i: number) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    {dashboard.expensesByCategory.map((entry: { categoryId?: string }, i: number) => (
+                      <Cell key={entry.categoryId || i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -129,8 +129,8 @@ export function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-3 space-y-2">
-                {dashboard.expensesByCategory.slice(0, 5).map((item: { category?: { name?: string; icon?: string }; amount: number }, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
+                {dashboard.expensesByCategory.slice(0, 5).map((item: { categoryId?: string; category?: { name?: string; icon?: string }; amount: number }, i: number) => (
+                  <div key={item.categoryId || i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                       <span className="text-surface-300">{item.category?.icon} {item.category?.name}</span>

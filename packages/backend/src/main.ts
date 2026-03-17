@@ -1,7 +1,8 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -9,6 +10,9 @@ async function bootstrap() {
 
   // Global Prefix
   app.setGlobalPrefix('api');
+
+  // Cookie Parser
+  app.use(cookieParser());
 
   // CORS
   app.enableCors({

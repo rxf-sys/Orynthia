@@ -15,6 +15,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-4">
         <button
           onClick={onMenuClick}
+          aria-label="Menü öffnen"
           className="rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white lg:hidden"
         >
           <Menu className="h-5 w-5" />
@@ -26,6 +27,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <input
             type="text"
             placeholder="Transaktionen suchen..."
+            aria-label="Transaktionen suchen"
             className="bg-transparent text-sm text-surface-200 placeholder-surface-500 outline-none w-full"
           />
         </div>
@@ -33,7 +35,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right */}
       <div className="flex items-center gap-3">
-        <button className="relative rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors">
+        <button aria-label="Benachrichtigungen" className="relative rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors">
           <Bell className="h-5 w-5" />
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand-500" />
         </button>
