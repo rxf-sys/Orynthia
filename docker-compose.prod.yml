@@ -7,7 +7,7 @@ services:
   backend:
     build:
       target: production
-    volumes: []
+    volumes: !reset []
     environment:
       NODE_ENV: production
     restart: always
@@ -15,16 +15,16 @@ services:
   frontend:
     build:
       target: production
-    volumes: []
-    ports: []
+    volumes: !reset []
+    ports: !reset []
     restart: always
 
   postgres:
-    ports: []
+    ports: !reset []
     restart: always
 
   redis:
-    ports: []
+    ports: !reset []
     restart: always
 
   nginx:
