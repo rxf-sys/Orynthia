@@ -41,6 +41,7 @@ model User {
   budgets        Budget[]
   savingsGoals   SavingsGoal[]
   notifications  Notification[]
+  bankConnections BankConnection[]
 
   @@map("users")
 }
@@ -304,4 +305,29 @@ enum NotificationType {
   SAVINGS_MILESTONE  // Sparziel Meilenstein
   SYNC_ERROR         // Bank-Sync Fehler
   SYSTEM             // System-Nachricht
+}
+
+// ---------- Bank-Verbindungen (Open Banking) ----------
+model BankConnection {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+
+  provider              String    // "gocardless" | "finapi"
+  externalConnectionId  String    @map("external_connection_id")
+  institutionId         String    @map("institution_id")
+  institutionName       String?   @map("institution_name")
+  institutionLogo       String?   @map("institution_logo")
+
+  status                String    @default("CREATED") // CREATED, LINKED, EXPIRED, etc.
+
+  // Timestamps
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  expiresAt             DateTime? @map("expires_at")
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("bank_connections")
 }

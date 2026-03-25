@@ -111,6 +111,16 @@ export const categoriesApi = {
   remove: (id: string) => api.delete(`/categories/${id}`),
 };
 
+export const bankingApi = {
+  getInstitutions: (country: string = 'DE') => api.get<{ id: string; name: string; bic?: string; logo?: string }[]>(`/banking/institutions?country=${country}`),
+  connectBank: (institutionId: string) => api.post<{ connectionId: string; authUrl: string }>('/banking/connect', { institutionId }),
+  handleCallback: (connectionId: string) => api.post(`/banking/callback/${connectionId}`),
+  syncAccount: (accountId: string, dateFrom?: string) => api.post(`/banking/sync/${accountId}`, { dateFrom }),
+  syncAll: () => api.post('/banking/sync-all'),
+  getConnections: () => api.get('/banking/connections'),
+  removeConnection: (connectionId: string) => api.delete(`/banking/connections/${connectionId}`),
+};
+
 export const budgetsApi = {
   getAll: () => api.get<Budget[]>('/budgets'),
   create: (data: CreateBudgetData) => api.post<Budget>('/budgets', data),
