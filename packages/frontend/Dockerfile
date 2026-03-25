@@ -17,6 +17,8 @@ CMD ["pnpm", "run", "dev"]
 
 # --- Builder ---
 FROM base AS builder
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
 COPY package.json pnpm-lock.yaml* ./
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 RUN pnpm install --frozen-lockfile || pnpm install

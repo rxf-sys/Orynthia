@@ -1,9 +1,9 @@
-import { Controller, Get, Patch, Delete, Body, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Patch, Post, Delete, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
-import { UpdateProfileDto } from './dto/user.dto';
+import { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -20,6 +20,13 @@ export class UsersController {
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile((req.user as any).id, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Passwort ändern' })
+  async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
+    return this.usersService.changePassword((req.user as any).id, dto.currentPassword, dto.newPassword);
   }
 
   @Delete('account')
