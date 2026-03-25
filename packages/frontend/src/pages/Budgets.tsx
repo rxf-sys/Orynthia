@@ -60,7 +60,9 @@ export function BudgetsPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              createMutation.mutate({ categoryId: newBudget.categoryId, amount: Number(newBudget.amount) });
+              const amount = Number(newBudget.amount);
+              if (!amount || amount <= 0) { toast.error('Bitte gültigen Betrag eingeben'); return; }
+              createMutation.mutate({ categoryId: newBudget.categoryId, amount });
             }}
             className="flex flex-col sm:flex-row gap-3"
           >
@@ -71,7 +73,7 @@ export function BudgetsPage() {
               required
             >
               <option value="">Kategorie wählen</option>
-              {categories?.filter((c: Category) => !c.isSystem).map((cat: Category) => (
+              {categories?.map((cat: Category) => (
                 <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
               ))}
             </select>
