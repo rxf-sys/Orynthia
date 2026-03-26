@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BankingService } from './banking.service';
-import { ConnectBankDto, SyncAccountDto } from './dto/banking.dto';
+import { ConnectBankDto, SyncAccountDto, BankCallbackDto } from './dto/banking.dto';
 
 @ApiTags('Banking')
 @ApiBearerAuth()
@@ -27,8 +27,12 @@ export class BankingController {
 
   @Post('callback/:connectionId')
   @ApiOperation({ summary: 'Bank-Verbindung abschließen und Konten importieren' })
-  async handleCallback(@Req() req: Request, @Param('connectionId') connectionId: string) {
-    return this.bankingService.handleCallback((req.user as any).id, connectionId);
+  async handleCallback(
+    @Req() req: Request,
+    @Param('connectionId') connectionId: string,
+    @Body() dto: BankCallbackDto,
+  ) {
+    return this.bankingService.handleCallback((req.user as any).id, connectionId, dto.code);
   }
 
   @Post('sync/:accountId')

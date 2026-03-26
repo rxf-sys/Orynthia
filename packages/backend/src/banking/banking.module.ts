@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
 import { BankingController } from './banking.controller';
 import { BankingService } from './banking.service';
-import { GoCardlessProvider } from './providers/gocardless.provider';
-import { FinApiProvider } from './providers/finapi.provider';
+import { EnableBankingProvider } from './providers/enable-banking.provider';
 
 @Module({
   controllers: [BankingController],
-  providers: [BankingService, GoCardlessProvider, FinApiProvider],
+  providers: [BankingService, EnableBankingProvider],
   exports: [BankingService],
 })
 export class BankingModule {}

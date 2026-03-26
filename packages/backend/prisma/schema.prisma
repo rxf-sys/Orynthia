@@ -312,11 +312,12 @@ model BankConnection {
   id                    String    @id @default(uuid())
   userId                String    @map("user_id")
 
-  provider              String    // "gocardless" | "finapi"
+  provider              String    // "enablebanking" | "finapi"
   externalConnectionId  String    @map("external_connection_id")
   institutionId         String    @map("institution_id")
   institutionName       String?   @map("institution_name")
   institutionLogo       String?   @map("institution_logo")
+  sessionId             String?   @map("session_id") // Enable Banking Session ID
 
   status                String    @default("CREATED") // CREATED, LINKED, EXPIRED, etc.
 

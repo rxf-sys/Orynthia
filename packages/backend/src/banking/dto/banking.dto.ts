@@ -2,9 +2,15 @@ import { IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ConnectBankDto {
-  @ApiProperty({ example: 'SPARKASSE_DE_SPKADE5HXXX', description: 'Institution ID vom Provider' })
+  @ApiProperty({ example: 'Sparkasse:::DE', description: 'Bank-Name:::Land aus der Institutionen-Liste' })
   @IsString()
   institutionId: string;
+}
+
+export class BankCallbackDto {
+  @ApiProperty({ description: 'Authorization-Code aus dem Bank-Redirect' })
+  @IsString()
+  code: string;
 }
 
 export class SyncAccountDto {

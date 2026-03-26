@@ -114,7 +114,7 @@ export const categoriesApi = {
 export const bankingApi = {
   getInstitutions: (country: string = 'DE') => api.get<{ id: string; name: string; bic?: string; logo?: string }[]>(`/banking/institutions?country=${country}`),
   connectBank: (institutionId: string) => api.post<{ connectionId: string; authUrl: string }>('/banking/connect', { institutionId }),
-  handleCallback: (connectionId: string) => api.post(`/banking/callback/${connectionId}`),
+  handleCallback: (connectionId: string, code?: string) => api.post(`/banking/callback/${connectionId}`, { code }),
   syncAccount: (accountId: string, dateFrom?: string) => api.post(`/banking/sync/${accountId}`, { dateFrom }),
   syncAll: () => api.post('/banking/sync-all'),
   getConnections: () => api.get('/banking/connections'),

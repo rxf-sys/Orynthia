@@ -42,15 +42,16 @@ export function AccountsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Callback nach Bank-Authentifizierung
+  // Callback nach Bank-Authentifizierung (Enable Banking sendet ?code=... zurück)
   useEffect(() => {
+    const code = searchParams.get('code');
     const bankConnected = searchParams.get('bankConnected');
-    if (bankConnected === 'true') {
-      // Letzte Verbindung laden und Callback auslösen
+    if (code || bankConnected === 'true') {
+      // Letzte Verbindung laden und Callback mit dem Authorization-Code auslösen
       bankingApi.getConnections().then((r) => {
         const latest = r.data?.[0];
         if (latest?.externalConnectionId) {
-          bankingApi.handleCallback(latest.externalConnectionId).then((res) => {
+          bankingApi.handleCallback(latest.externalConnectionId, code || undefined).then((res) => {
             toast.success(res.data?.message || 'Konten importiert');
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
             queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });

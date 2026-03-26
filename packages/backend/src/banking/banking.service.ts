@@ -2,27 +2,24 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { GoCardlessProvider } from './providers/gocardless.provider';
-import { BankingProvider, Institution } from './providers/banking-provider.interface';
+import { EnableBankingProvider } from './providers/enable-banking.provider';
+import { Institution } from './providers/banking-provider.interface';
 
 @Injectable()
 export class BankingService {
   private readonly logger = new Logger(BankingService.name);
-  private readonly provider: BankingProvider;
 
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
-    private goCardless: GoCardlessProvider,
+    private enableBanking: EnableBankingProvider,
   ) {
-    // Provider auswählen (aktuell nur GoCardless)
-    this.provider = this.goCardless;
-    this.logger.log(`Banking-Provider: ${this.provider.name}`);
+    this.logger.log(`Banking-Provider: ${this.enableBanking.name}`);
   }
 
   /** Verfügbare Banken für ein Land abrufen */
   async getInstitutions(countryCode: string = 'DE'): Promise<Institution[]> {
-    return this.provider.getInstitutions(countryCode.toUpperCase());
+    return this.enableBanking.getInstitutions(countryCode.toUpperCase());
   }
 
   /** Bank-Verbindung starten - gibt Auth-URL zurück */
@@ -30,7 +27,7 @@ export class BankingService {
     const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:5173';
     const redirectUrl = `${frontendUrl}/accounts?bankConnected=true`;
 
-    const result = await this.provider.createConnection({
+    const result = await this.enableBanking.createConnection({
       institutionId,
       redirectUrl,
       referenceId: userId,
@@ -40,7 +37,7 @@ export class BankingService {
     await this.prisma.bankConnection.create({
       data: {
         userId,
-        provider: this.provider.name,
+        provider: this.enableBanking.name,
         externalConnectionId: result.connectionId,
         institutionId,
         status: 'CREATED',
@@ -53,8 +50,8 @@ export class BankingService {
     };
   }
 
-  /** Callback nach Bank-Authentifizierung - Konten importieren */
-  async handleCallback(userId: string, connectionId: string) {
+  /** Callback nach Bank-Authentifizierung - Session erstellen und Konten importieren */
+  async handleCallback(userId: string, connectionId: string, code?: string) {
     const connection = await this.prisma.bankConnection.findFirst({
       where: { userId, externalConnectionId: connectionId },
     });
@@ -63,26 +60,26 @@ export class BankingService {
       throw new NotFoundException('Verbindung nicht gefunden');
     }
 
-    // Status prüfen
-    const status = await this.provider.getConnectionStatus(connectionId);
-
-    await this.prisma.bankConnection.update({
-      where: { id: connection.id },
-      data: { status: status.status },
-    });
-
-    if (status.status !== 'LINKED' && status.status !== 'GIVING_CONSENT') {
-      // Manche Banken gehen direkt auf LINKED, manche brauchen einen Zwischenschritt
-      if (status.accountIds.length === 0) {
-        return { status: status.status, message: 'Bank-Authentifizierung noch nicht abgeschlossen', accounts: [] };
-      }
+    if (!code) {
+      throw new BadRequestException('Authorization-Code fehlt. Bitte erneut mit der Bank verbinden.');
     }
 
+    // Enable Banking: Session mit dem Authorization-Code erstellen
+    const session = await this.enableBanking.createSession(code);
+
+    // Session-ID in der Verbindung speichern
+    await this.prisma.bankConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: 'LINKED',
+        sessionId: session.sessionId,
+      },
+    });
+
     // Konten importieren
-    const externalAccounts = await this.provider.getAccounts(connectionId);
     const importedAccounts = [];
 
-    for (const ext of externalAccounts) {
+    for (const ext of session.accounts) {
       // Prüfen ob Konto schon existiert
       const existing = await this.prisma.bankAccount.findFirst({
         where: { userId, externalId: ext.id },
@@ -96,7 +93,7 @@ export class BankingService {
       // Kontostand abrufen
       let balance = 0;
       try {
-        const balanceData = await this.provider.getBalances(ext.id);
+        const balanceData = await this.enableBanking.getBalances(ext.id);
         balance = balanceData.current;
       } catch (e) {
         this.logger.warn(`Kontostand für ${ext.id} nicht abrufbar: ${e}`);
@@ -147,7 +144,7 @@ export class BankingService {
 
     // Kontostand aktualisieren
     try {
-      const balance = await this.provider.getBalances(account.externalId);
+      const balance = await this.enableBanking.getBalances(account.externalId);
       await this.prisma.bankAccount.update({
         where: { id: accountId },
         data: { balance: balance.current, lastSynced: new Date() },
@@ -158,7 +155,7 @@ export class BankingService {
 
     // Transaktionen abrufen (letzte 30 Tage als Standard)
     const from = dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const transactions = await this.provider.getTransactions(account.externalId, from);
+    const transactions = await this.enableBanking.getTransactions(account.externalId, from);
 
     let newCount = 0;
     let updatedCount = 0;
@@ -279,7 +276,7 @@ export class BankingService {
   private guessAccountType(product?: string): 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'DEPOT' | 'OTHER' {
     if (!product) return 'CHECKING';
     const lower = product.toLowerCase();
-    if (lower.includes('giro') || lower.includes('checking')) return 'CHECKING';
+    if (lower.includes('giro') || lower.includes('checking') || lower.includes('cacc')) return 'CHECKING';
     if (lower.includes('spar') || lower.includes('tagesgeld') || lower.includes('saving')) return 'SAVINGS';
     if (lower.includes('kredit') || lower.includes('credit')) return 'CREDIT_CARD';
     if (lower.includes('depot') || lower.includes('wertpapier')) return 'DEPOT';
