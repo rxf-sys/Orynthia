@@ -180,6 +180,44 @@ export class TransactionsService {
       .reverse();
   }
 
+  // CSV-Export aller Transaktionen
+  async exportCsv(userId: string, filters: TransactionFilterDto): Promise<string> {
+    const where: Prisma.TransactionWhereInput = {
+      bankAccount: { userId },
+    };
+
+    if (filters.bankAccountId) where.bankAccountId = filters.bankAccountId;
+    if (filters.categoryId) where.categoryId = filters.categoryId;
+    if (filters.type) where.type = filters.type;
+
+    if (filters.startDate || filters.endDate) {
+      where.date = {};
+      if (filters.startDate) where.date.gte = new Date(filters.startDate);
+      if (filters.endDate) where.date.lte = new Date(filters.endDate);
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        bankAccount: { select: { accountName: true, bankName: true, iban: true } },
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    const header = 'Datum;Betrag;Währung;Typ;Kategorie;Verwendungszweck;Gegenpartei;IBAN Gegenpartei;Konto;Bank;IBAN';
+    const rows = transactions.map((tx) => {
+      const date = tx.date.toISOString().split('T')[0];
+      const amount = Number(tx.amount).toFixed(2).replace('.', ',');
+      const category = tx.category?.name || '';
+      const purpose = (tx.purpose || '').replace(/;/g, ',').replace(/\n/g, ' ');
+      const counterpart = (tx.counterpartName || '').replace(/;/g, ',');
+      return `${date};${amount};${tx.currency};${tx.type};${category};${purpose};${counterpart};${tx.counterpartIban || ''};${tx.bankAccount.accountName};${tx.bankAccount.bankName};${tx.bankAccount.iban || ''}`;
+    });
+
+    return [header, ...rows].join('\n');
+  }
+
   // --- Private Helpers ---
 
   private async verifyAccountOwnership(userId: string, accountId: string) {

@@ -39,6 +39,7 @@ model User {
   bankAccounts   BankAccount[]
   categories     Category[]
   budgets        Budget[]
+  recurringPayments RecurringPayment[]
   savingsGoals   SavingsGoal[]
   notifications  Notification[]
   bankConnections BankConnection[]
@@ -168,6 +169,7 @@ model Category {
   children     Category[]   @relation("CategoryHierarchy")
   transactions Transaction[]
   budgets      Budget[]
+  recurringPayments RecurringPayment[]
 
   @@unique([userId, name])
   @@map("categories")
@@ -212,27 +214,32 @@ enum BudgetPeriod {
 // ---------- Wiederkehrende Zahlungen (Abos) ----------
 model RecurringPayment {
   id          String    @id @default(uuid())
-  
+  userId      String    @map("user_id")
+  categoryId  String?   @map("category_id")
+
   name        String
   amount      Decimal   @db.Decimal(12, 2)
   currency    String    @default("EUR")
   frequency   PaymentFrequency @default(MONTHLY)
-  
+
   // Details
   counterpartName String? @map("counterpart_name")
   nextDueDate DateTime?  @map("next_due_date")
   lastChargeDate DateTime? @map("last_charge_date")
-  
+
   // Status
   isActive    Boolean   @default(true) @map("is_active")
-  
+
   // Timestamps
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-  
+
   // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category? @relation(fields: [categoryId], references: [id])
   transactions Transaction[]
 
+  @@index([userId])
   @@map("recurring_payments")
 }
 

@@ -5,10 +5,14 @@ import type {
   Category,
   CreateAccountData,
   CreateBudgetData,
+  CreateRecurringPaymentData,
+  CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
   MonthlyOverview,
   PaginatedResult,
+  RecurringPayment,
+  SavingsGoal,
   Transaction,
   TransactionFilters,
 } from './types';
@@ -100,6 +104,8 @@ export const transactionsApi = {
     api.get('/transactions/expenses-by-category', { params }),
   getMonthlyOverview: (months?: number) =>
     api.get<MonthlyOverview[]>('/transactions/monthly-overview', { params: { months } }),
+  exportCsv: (params?: TransactionFilters) =>
+    api.get('/transactions/export/csv', { params, responseType: 'blob' }),
 };
 
 export const categoriesApi = {
@@ -126,4 +132,20 @@ export const budgetsApi = {
   create: (data: CreateBudgetData) => api.post<Budget>('/budgets', data),
   update: (id: string, data: Partial<CreateBudgetData>) => api.patch<Budget>(`/budgets/${id}`, data),
   remove: (id: string) => api.delete(`/budgets/${id}`),
+};
+
+export const recurringPaymentsApi = {
+  getAll: () => api.get<{ payments: RecurringPayment[]; monthlyTotal: number; yearlyTotal: number }>('/recurring-payments'),
+  create: (data: CreateRecurringPaymentData) => api.post<RecurringPayment>('/recurring-payments', data),
+  update: (id: string, data: Partial<CreateRecurringPaymentData & { isActive?: boolean }>) =>
+    api.patch<RecurringPayment>(`/recurring-payments/${id}`, data),
+  remove: (id: string) => api.delete(`/recurring-payments/${id}`),
+};
+
+export const savingsGoalsApi = {
+  getAll: () => api.get<SavingsGoal[]>('/savings-goals'),
+  create: (data: CreateSavingsGoalData) => api.post<SavingsGoal>('/savings-goals', data),
+  update: (id: string, data: Partial<CreateSavingsGoalData>) => api.patch<SavingsGoal>(`/savings-goals/${id}`, data),
+  addAmount: (id: string, amount: number) => api.post<SavingsGoal>(`/savings-goals/${id}/add`, { amount }),
+  remove: (id: string) => api.delete(`/savings-goals/${id}`),
 };

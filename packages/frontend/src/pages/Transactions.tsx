@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Plus, X, Trash2, Download } from 'lucide-react';
 import { transactionsApi, categoriesApi, accountsApi } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import type { Transaction, Category, CreateTransactionData, BankAccount } from '@/lib/types';
@@ -119,10 +119,31 @@ export function TransactionsPage() {
           <h1 className="text-2xl font-bold text-white">Transaktionen</h1>
           <p className="text-surface-400 mt-1">{meta.total} Transaktionen</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? 'Abbrechen' : 'Neue Transaktion'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              try {
+                const res = await transactionsApi.exportCsv({ categoryId: categoryFilter || undefined, search: debouncedSearch || undefined });
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `transaktionen_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                toast.success('CSV exportiert');
+              } catch { toast.error('Export fehlgeschlagen'); }
+            }}
+            className="btn-ghost"
+            title="Als CSV exportieren"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </button>
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? 'Abbrechen' : 'Neue Transaktion'}
+          </button>
+        </div>
       </div>
 
       {/* Create Form */}

@@ -7,6 +7,8 @@ import {
   Settings,
   LogOut,
   TrendingUp,
+  Repeat,
+  Target,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,6 +18,8 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/transactions', icon: ArrowLeftRight, label: 'Transaktionen' },
   { to: '/budgets', icon: PiggyBank, label: 'Budgets' },
+  { to: '/recurring', icon: Repeat, label: 'Abos & Verträge' },
+  { to: '/savings', icon: Target, label: 'Sparziele' },
   { to: '/accounts', icon: Wallet, label: 'Konten' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];

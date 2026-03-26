@@ -8,6 +8,8 @@ import { DashboardPage } from '@/pages/Dashboard';
 import { TransactionsPage } from '@/pages/Transactions';
 import { BudgetsPage } from '@/pages/Budgets';
 import { AccountsPage } from '@/pages/Accounts';
+import { RecurringPaymentsPage } from '@/pages/RecurringPayments';
+import { SavingsGoalsPage } from '@/pages/SavingsGoals';
 import { SettingsPage } from '@/pages/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="budgets" element={<BudgetsPage />} />
         <Route path="accounts" element={<AccountsPage />} />
+        <Route path="recurring" element={<RecurringPaymentsPage />} />
+        <Route path="savings" element={<SavingsGoalsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
