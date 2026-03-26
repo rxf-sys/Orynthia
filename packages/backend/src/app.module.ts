@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { BankingModule } from './banking/banking.module';
 import { RecurringPaymentsModule } from './recurring-payments/recurring-payments.module';
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
     BankingModule,
     RecurringPaymentsModule,
     SavingsGoalsModule,
+    ContractsModule,
   ],
 })
 export class AppModule {}

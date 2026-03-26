@@ -10,6 +10,7 @@ import { BudgetsPage } from '@/pages/Budgets';
 import { AccountsPage } from '@/pages/Accounts';
 import { RecurringPaymentsPage } from '@/pages/RecurringPayments';
 import { SavingsGoalsPage } from '@/pages/SavingsGoals';
+import { ContractsPage } from '@/pages/Contracts';
 import { SettingsPage } from '@/pages/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="recurring" element={<RecurringPaymentsPage />} />
         <Route path="savings" element={<SavingsGoalsPage />} />
+        <Route path="contracts" element={<ContractsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

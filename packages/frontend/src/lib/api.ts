@@ -3,14 +3,18 @@ import type {
   BankAccount,
   Budget,
   Category,
+  Contract,
   CreateAccountData,
   CreateBudgetData,
+  CreateContractData,
   CreateRecurringPaymentData,
   CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
+  DetectedContract,
   MonthlyOverview,
   PaginatedResult,
+  ProviderComparison,
   RecurringPayment,
   SavingsGoal,
   Transaction,
@@ -148,4 +152,18 @@ export const savingsGoalsApi = {
   update: (id: string, data: Partial<CreateSavingsGoalData>) => api.patch<SavingsGoal>(`/savings-goals/${id}`, data),
   addAmount: (id: string, amount: number) => api.post<SavingsGoal>(`/savings-goals/${id}/add`, { amount }),
   remove: (id: string) => api.delete(`/savings-goals/${id}`),
+};
+
+export const contractsApi = {
+  getAll: () => api.get<{ contracts: Contract[]; totalMonthly: number; totalYearly: number }>('/contracts'),
+  create: (data: CreateContractData) => api.post<Contract>('/contracts', data),
+  update: (id: string, data: Partial<CreateContractData & { isActive?: boolean }>) =>
+    api.patch<Contract>(`/contracts/${id}`, data),
+  remove: (id: string) => api.delete(`/contracts/${id}`),
+  detect: () => api.get<DetectedContract[]>('/contracts/detect'),
+  createFromDetection: (data: {
+    counterpartName: string; counterpartIban?: string; avgAmount: number;
+    frequency: string; contractType: string; name?: string; provider?: string;
+  }) => api.post<Contract>('/contracts/from-detection', data),
+  compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
 };

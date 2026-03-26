@@ -43,6 +43,7 @@ model User {
   savingsGoals   SavingsGoal[]
   notifications  Notification[]
   bankConnections BankConnection[]
+  contracts      Contract[]
 
   @@map("users")
 }
@@ -279,6 +280,87 @@ model SavingsGoal {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("savings_goals")
+}
+
+// ---------- Verträge ----------
+model Contract {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+
+  // Vertragsdaten
+  name            String    // z.B. "Haftpflichtversicherung", "Strom Vattenfall"
+  provider        String    // z.B. "Allianz", "Vattenfall", "Telekom"
+  contractType    ContractType @map("contract_type")
+
+  // Kosten
+  monthlyCost     Decimal?  @map("monthly_cost") @db.Decimal(12, 2)
+  yearlyCost      Decimal?  @map("yearly_cost") @db.Decimal(12, 2)
+  billingCycle    BillingCycle @default(MONTHLY) @map("billing_cycle")
+
+  // Vertragsdetails
+  contractNumber  String?   @map("contract_number")
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+  cancellationDate DateTime? @map("cancellation_date") // Kündigungsfrist
+  noticePeriod    String?   @map("notice_period") // z.B. "3 Monate"
+  autoRenewal     Boolean   @default(true) @map("auto_renewal")
+
+  // Provider-spezifisch (Versicherung, Strom etc.)
+  details         Json?     // Flexible Zusatzinfos (kWh-Preis, Deckungssumme, Tarif etc.)
+
+  // Erkennungsmuster
+  counterpartName String?   @map("counterpart_name") // Für Auto-Erkennung
+  counterpartIban String?   @map("counterpart_iban")
+
+  // Durchschnitt aus Transaktionen
+  avgMonthlyAmount Decimal? @map("avg_monthly_amount") @db.Decimal(12, 2)
+  transactionCount Int      @default(0) @map("transaction_count")
+  lastChargeDate  DateTime? @map("last_charge_date")
+
+  // Status
+  isActive        Boolean   @default(true) @map("is_active")
+  isAutoDetected  Boolean   @default(false) @map("is_auto_detected")
+
+  // Timestamps
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("contracts")
+}
+
+enum ContractType {
+  INSURANCE_LIABILITY     // Haftpflicht
+  INSURANCE_HOUSEHOLD     // Hausrat
+  INSURANCE_HEALTH        // Krankenversicherung
+  INSURANCE_DENTAL        // Zahnzusatzversicherung
+  INSURANCE_LIFE          // Lebensversicherung
+  INSURANCE_CAR           // KFZ-Versicherung
+  INSURANCE_LEGAL         // Rechtsschutz
+  INSURANCE_DISABILITY    // Berufsunfähigkeit
+  INSURANCE_OTHER         // Sonstige Versicherung
+  ENERGY_ELECTRICITY      // Strom
+  ENERGY_GAS              // Gas
+  TELECOM_MOBILE          // Mobilfunk
+  TELECOM_INTERNET        // Internet/DSL
+  TELECOM_LANDLINE        // Festnetz
+  STREAMING               // Netflix, Spotify etc.
+  GYM                     // Fitnessstudio
+  SUBSCRIPTION            // Sonstige Abos
+  RENT                    // Miete
+  LEASE                   // Leasing
+  LOAN                    // Kredit/Darlehen
+  OTHER                   // Sonstige
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  BIANNUALLY
+  YEARLY
 }
 
 // ---------- Benachrichtigungen ----------
