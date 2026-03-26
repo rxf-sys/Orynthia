@@ -1,7 +1,7 @@
 version: "3.9"
 
 # ===================================================
-# Finanzguru - Docker Compose (Homeserver / Proxmox)
+# Orynthia - Docker Compose (Homeserver / Proxmox)
 # ===================================================
 # Nutzung:
 #   docker compose up --build        (Entwicklung)
@@ -11,28 +11,28 @@ services:
   # ---------- PostgreSQL ----------
   postgres:
     image: postgres:16-alpine
-    container_name: finanzguru-postgres
+    container_name: orynthia-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-finanzguru}
+      POSTGRES_USER: ${POSTGRES_USER:-orynthia}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_DB: ${POSTGRES_DB:-finanzguru}
+      POSTGRES_DB: ${POSTGRES_DB:-orynthia}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finanzguru}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orynthia}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - finanzguru-net
+      - orynthia-net
 
   # ---------- Redis ----------
   redis:
     image: redis:7-alpine
-    container_name: finanzguru-redis
+    container_name: orynthia-redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
     volumes:
@@ -45,7 +45,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - finanzguru-net
+      - orynthia-net
 
   # ---------- Backend (NestJS) ----------
   backend:
@@ -53,13 +53,13 @@ services:
       context: ./packages/backend
       dockerfile: Dockerfile
       target: development
-    container_name: finanzguru-backend
+    container_name: orynthia-backend
     restart: unless-stopped
     env_file:
       - .env
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://${POSTGRES_USER:-finanzguru}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-finanzguru}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
@@ -74,7 +74,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - finanzguru-net
+      - orynthia-net
 
   # ---------- Frontend (React + Vite) ----------
   frontend:
@@ -82,7 +82,7 @@ services:
       context: ./packages/frontend
       dockerfile: Dockerfile
       target: development
-    container_name: finanzguru-frontend
+    container_name: orynthia-frontend
     restart: unless-stopped
     environment:
       VITE_API_URL: ${VITE_API_URL:-/api}
@@ -94,12 +94,12 @@ services:
     depends_on:
       - backend
     networks:
-      - finanzguru-net
+      - orynthia-net
 
   # ---------- NGINX (Reverse Proxy) ----------
   nginx:
     image: nginx:alpine
-    container_name: finanzguru-nginx
+    container_name: orynthia-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -111,7 +111,7 @@ services:
       - frontend
       - backend
     networks:
-      - finanzguru-net
+      - orynthia-net
 
 volumes:
   postgres_data:
@@ -120,5 +120,5 @@ volumes:
     driver: local
 
 networks:
-  finanzguru-net:
+  orynthia-net:
     driver: bridge

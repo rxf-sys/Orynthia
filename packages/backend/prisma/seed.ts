@@ -49,10 +49,10 @@ async function main() {
     const hashedPassword = await bcrypt.hash('demo1234', 12);
     
     const demoUser = await prisma.user.upsert({
-      where: { email: 'demo@finanzguru.local' },
+      where: { email: 'demo@orynthia.local' },
       update: {},
       create: {
-        email: 'demo@finanzguru.local',
+        email: 'demo@orynthia.local',
         passwordHash: hashedPassword,
         firstName: 'Demo',
         lastName: 'Benutzer',
@@ -111,7 +111,7 @@ async function main() {
       skipDuplicates: true,
     });
 
-    console.log(`✅ Demo-User: demo@finanzguru.local / demo1234`);
+    console.log(`✅ Demo-User: demo@orynthia.local / demo1234`);
     console.log(`✅ ${demoTransactions.length} Demo-Transaktionen erstellt`);
   }
 

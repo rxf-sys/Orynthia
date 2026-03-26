@@ -38,7 +38,7 @@ async function bootstrap() {
   // Swagger API Documentation
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('Finanzguru API')
+      .setTitle('Orynthia API')
       .setDescription('Persönliche Finanzmanagement API')
       .setVersion('1.0')
       .addBearerAuth()
@@ -50,7 +50,7 @@ async function bootstrap() {
 
   const port = process.env.APP_PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Finanzguru API läuft auf Port ${port}`);
+  console.log(`🚀 Orynthia API läuft auf Port ${port}`);
   console.log(`📚 API Docs: http://localhost:${port}/api/docs`);
 }
 

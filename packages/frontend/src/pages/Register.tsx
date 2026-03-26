@@ -37,7 +37,7 @@ export function RegisterPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-white">Finanzguru</span>
+          <span className="text-xl font-bold text-white">Orynthia</span>
         </div>
 
         <div>

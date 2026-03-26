@@ -134,7 +134,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException();
 
     const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(user.email, 'Finanzguru', secret);
+    const otpauthUrl = authenticator.keyuri(user.email, 'Orynthia', secret);
 
     await this.prisma.user.update({
       where: { id: userId },
