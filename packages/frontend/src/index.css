@@ -11,6 +11,29 @@
     @apply bg-surface-950 text-surface-100;
   }
 
+  /* Light theme overrides */
+  html.light body {
+    @apply bg-surface-50 text-surface-900;
+  }
+  html.light .card, html.light .card-hover {
+    @apply bg-white border-surface-200;
+  }
+  html.light .input {
+    @apply bg-white border-surface-300 text-surface-900 placeholder-surface-400;
+  }
+  html.light .btn-secondary {
+    @apply bg-surface-100 text-surface-700 border-surface-300 hover:bg-surface-200;
+  }
+  html.light .btn-ghost {
+    @apply text-surface-600 hover:text-surface-900 hover:bg-surface-100;
+  }
+  html.light aside {
+    @apply bg-white border-surface-200;
+  }
+  html.light .label {
+    @apply text-surface-600;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

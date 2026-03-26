@@ -1,24 +1,36 @@
 import axios from 'axios';
 import type {
+  Asset,
   BankAccount,
   Budget,
+  CashflowForecast,
+  CategorizationRule,
   Category,
   Contract,
   CreateAccountData,
+  CreateAssetData,
   CreateBudgetData,
   CreateContractData,
+  CreateHoldingData,
   CreateRecurringPaymentData,
+  CreateRuleData,
   CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
   DetectedContract,
+  Household,
   MonthlyOverview,
+  MonthlyReport,
+  NetWorthSummary,
+  Notification,
   PaginatedResult,
+  PortfolioSummary,
   ProviderComparison,
   RecurringPayment,
   SavingsGoal,
   Transaction,
   TransactionFilters,
+  YearlyReport,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -166,4 +178,71 @@ export const contractsApi = {
     frequency: string; contractType: string; name?: string; provider?: string;
   }) => api.post<Contract>('/contracts/from-detection', data),
   compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
+};
+
+export const notificationsApi = {
+  getAll: (unreadOnly?: boolean) => api.get<Notification[]>('/notifications', { params: { unreadOnly } }),
+  getUnreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
+  markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.post('/notifications/mark-all-read'),
+  check: () => api.post('/notifications/check'),
+  remove: (id: string) => api.delete(`/notifications/${id}`),
+};
+
+export const rulesApi = {
+  getAll: () => api.get<CategorizationRule[]>('/categorization-rules'),
+  create: (data: CreateRuleData) => api.post<CategorizationRule>('/categorization-rules', data),
+  update: (id: string, data: Partial<CreateRuleData & { isActive?: boolean }>) =>
+    api.patch<CategorizationRule>(`/categorization-rules/${id}`, data),
+  remove: (id: string) => api.delete(`/categorization-rules/${id}`),
+  learn: (transactionId: string, categoryId: string) =>
+    api.post('/categorization-rules/learn', { transactionId, categoryId }),
+  split: (transactionId: string, splits: { categoryId: string; amount: number; note?: string }[]) =>
+    api.post('/categorization-rules/split', { transactionId, splits }),
+};
+
+export const reportsApi = {
+  getMonthly: (year: number, month: number) => api.get<MonthlyReport>('/reports/monthly', { params: { year, month } }),
+  getYearly: (year: number) => api.get<YearlyReport>('/reports/yearly', { params: { year } }),
+  exportCsv: (year: number, month?: number) =>
+    api.get('/reports/export/csv', { params: { year, month }, responseType: 'blob' }),
+};
+
+export const assetsApi = {
+  getAll: () => api.get<Asset[]>('/assets'),
+  create: (data: CreateAssetData) => api.post<Asset>('/assets', data),
+  update: (id: string, data: Partial<CreateAssetData>) => api.patch<Asset>(`/assets/${id}`, data),
+  remove: (id: string) => api.delete(`/assets/${id}`),
+  getNetWorth: () => api.get<NetWorthSummary>('/assets/net-worth'),
+  getNetWorthHistory: (months?: number) => api.get<{ date: string; netWorth: number }[]>('/assets/net-worth/history', { params: { months } }),
+  createSnapshot: () => api.post('/assets/snapshot'),
+};
+
+export const sharedExpensesApi = {
+  getHouseholds: () => api.get<Household[]>('/shared-expenses/households'),
+  createHousehold: (data: { name: string; memberNames?: string[] }) => api.post<Household>('/shared-expenses/households', data),
+  addMember: (householdId: string, data: { name: string }) => api.post(`/shared-expenses/households/${householdId}/members`, data),
+  createExpense: (data: { householdId: string; description: string; amount: number; splitType?: string }) =>
+    api.post('/shared-expenses', data),
+  getBalances: (householdId: string) => api.get<{ members: { name: string; paid: number; owes: number; net: number }[] }>(`/shared-expenses/balances/${householdId}`),
+  settle: (shareId: string) => api.post(`/shared-expenses/settle/${shareId}`),
+  removeExpense: (id: string) => api.delete(`/shared-expenses/${id}`),
+};
+
+export const cashflowApi = {
+  getForecast: (months?: number) => api.get<CashflowForecast>('/cashflow/forecast', { params: { months } }),
+};
+
+export const importApi = {
+  importCsv: (bankAccountId: string, csvContent: string, delimiter?: string) =>
+    api.post('/import/csv', { bankAccountId, csvContent, delimiter }),
+  importMt940: (bankAccountId: string, content: string) =>
+    api.post('/import/mt940', { bankAccountId, content }),
+};
+
+export const portfolioApi = {
+  getAll: () => api.get<PortfolioSummary>('/portfolio/summary'),
+  create: (data: CreateHoldingData) => api.post('/portfolio', data),
+  update: (id: string, data: Partial<CreateHoldingData>) => api.patch(`/portfolio/${id}`, data),
+  remove: (id: string) => api.delete(`/portfolio/${id}`),
 };

@@ -243,4 +243,180 @@ export interface TransactionFilters {
   startDate?: string;
   endDate?: string;
   type?: Transaction['type'];
+  tag?: string;
+}
+
+// ---------- Notifications ----------
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+}
+
+// ---------- Categorization Rules ----------
+export interface CategorizationRule {
+  id: string;
+  categoryId: string;
+  category?: Pick<Category, 'name' | 'icon' | 'color'>;
+  field: string;
+  operator: string;
+  value: string;
+  priority: number;
+  isActive: boolean;
+  appliedCount: number;
+}
+
+export interface CreateRuleData {
+  categoryId: string;
+  field: string;
+  operator: string;
+  value: string;
+  priority?: number;
+}
+
+// ---------- Reports ----------
+export interface MonthlyReport {
+  period: { year: number; month: number; label: string };
+  income: { total: number; byCategory: { category: string; amount: number }[] };
+  expenses: { total: number; byCategory: { category: string; amount: number; percentage: number }[] };
+  balance: number;
+  savingsRate: number;
+  topExpenses: { counterpartName: string; total: number; count: number }[];
+  comparison: { prevMonth: { income: number; expenses: number }; change: { incomePercent: number; expensesPercent: number } };
+  budgetStatus: { budget: { id: string; category: { name: string; icon?: string; color?: string }; amount: number }; spent: number; remaining: number; percentage: number }[];
+  dailySpending: { date: string; amount: number }[];
+}
+
+export interface YearlyReport {
+  period: { year: number; label: string };
+  income: { total: number; byMonth: { month: number; amount: number }[]; byCategory: { category: string; amount: number }[] };
+  expenses: { total: number; byMonth: { month: number; amount: number }[]; byCategory: { category: string; amount: number; percentage: number }[] };
+  balance: number;
+  savingsRate: number;
+  monthlyAvg: { income: number; expenses: number };
+  netWorthChange: number;
+}
+
+// ---------- Assets / Net Worth ----------
+export interface Asset {
+  id: string;
+  name: string;
+  assetType: string;
+  value: number;
+  currency: string;
+  isLiability: boolean;
+  interestRate?: number;
+  institution?: string;
+  notes?: string;
+}
+
+export interface CreateAssetData {
+  name: string;
+  assetType: string;
+  value: number;
+  currency?: string;
+  isLiability?: boolean;
+  interestRate?: number;
+  institution?: string;
+  notes?: string;
+}
+
+export interface NetWorthSummary {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  byType: { type: string; items: { name: string; value: number }[]; total: number }[];
+  bankAccounts: { total: number; accounts: { name: string; balance: number }[] };
+  history: { date: string; netWorth: number }[];
+}
+
+// ---------- Shared Expenses ----------
+export interface Household {
+  id: string;
+  name: string;
+  members: HouseholdMember[];
+  expenses?: SharedExpense[];
+}
+
+export interface HouseholdMember {
+  id: string;
+  name: string;
+  userId?: string;
+  role: string;
+}
+
+export interface SharedExpense {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  splitType: string;
+  paidById: string;
+  shares: SharedExpenseShare[];
+}
+
+export interface SharedExpenseShare {
+  id: string;
+  memberId: string;
+  amount: number;
+  isSettled: boolean;
+  member?: HouseholdMember;
+}
+
+// ---------- Cashflow ----------
+export interface CashflowForecast {
+  currentBalance: number;
+  endOfMonthEstimate: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  monthlyNet: number;
+  recurring: { income: number; expenses: number };
+  variable: { income: number; expenses: number };
+  forecast: { month: string; label: string; projectedBalance: number; income: number; expenses: number; net: number }[];
+  warnings: string[];
+}
+
+// ---------- Portfolio ----------
+export interface PortfolioHolding {
+  id: string;
+  symbol: string;
+  name: string;
+  holdingType: string;
+  quantity: number;
+  avgBuyPrice: number;
+  currentPrice: number;
+  currency: string;
+  exchange?: string;
+  isin?: string;
+  totalInvested: number;
+  currentValue: number;
+  profitLoss: number;
+  profitLossPercent: number;
+}
+
+export interface CreateHoldingData {
+  symbol: string;
+  name: string;
+  holdingType: string;
+  quantity: number;
+  avgBuyPrice: number;
+  currentPrice: number;
+  currency?: string;
+  exchange?: string;
+  isin?: string;
+}
+
+export interface PortfolioSummary {
+  totalInvested: number;
+  totalCurrentValue: number;
+  totalProfitLoss: number;
+  totalProfitLossPercent: number;
+  holdingsCount: number;
+  byType: { type: string; value: number; invested: number; items: number }[];
+  holdings: PortfolioHolding[];
 }

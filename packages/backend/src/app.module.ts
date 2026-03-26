@@ -14,6 +14,14 @@ import { BankingModule } from './banking/banking.module';
 import { RecurringPaymentsModule } from './recurring-payments/recurring-payments.module';
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { ContractsModule } from './contracts/contracts.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { CategorizationRulesModule } from './categorization-rules/categorization-rules.module';
+import { ReportsModule } from './reports/reports.module';
+import { AssetsModule } from './assets/assets.module';
+import { SharedExpensesModule } from './shared-expenses/shared-expenses.module';
+import { CashflowModule } from './cashflow/cashflow.module';
+import { ImportModule } from './import/import.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -53,6 +61,14 @@ import { ContractsModule } from './contracts/contracts.module';
     RecurringPaymentsModule,
     SavingsGoalsModule,
     ContractsModule,
+    NotificationsModule,
+    CategorizationRulesModule,
+    ReportsModule,
+    AssetsModule,
+    SharedExpensesModule,
+    CashflowModule,
+    ImportModule,
+    PortfolioModule,
   ],
 })
 export class AppModule {}

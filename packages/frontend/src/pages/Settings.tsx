@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { User, Shield, Bell, Loader2, Check, Eye, EyeOff, Copy } from 'lucide-react';
+import { User, Shield, Bell, Loader2, Check, Eye, EyeOff, Copy, Palette, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-type Tab = 'profile' | 'security' | 'notifications';
+type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
@@ -15,6 +16,7 @@ export function SettingsPage() {
     { id: 'profile' as Tab, label: 'Profil', icon: User },
     { id: 'security' as Tab, label: 'Sicherheit', icon: Shield },
     { id: 'notifications' as Tab, label: 'Benachrichtigungen', icon: Bell },
+    { id: 'appearance' as Tab, label: 'Darstellung', icon: Palette },
   ];
 
   return (
@@ -48,6 +50,7 @@ export function SettingsPage() {
         {activeTab === 'profile' && <ProfileTab />}
         {activeTab === 'security' && <SecurityTab />}
         {activeTab === 'notifications' && <NotificationsTab />}
+        {activeTab === 'appearance' && <AppearanceTab />}
       </div>
     </div>
   );
@@ -505,6 +508,42 @@ function NotificationsTab() {
               />
             </button>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Appearance Tab ─── */
+function AppearanceTab() {
+  const { theme, setTheme } = useThemeStore();
+
+  const themes = [
+    { id: 'dark' as const, label: 'Dunkel', icon: Moon, description: 'Dunkles Farbschema für weniger Augenbelastung' },
+    { id: 'light' as const, label: 'Hell', icon: Sun, description: 'Helles Farbschema für bessere Lesbarkeit bei Tageslicht' },
+  ];
+
+  return (
+    <div className="card">
+      <h3 className="text-lg font-semibold text-white mb-6">Erscheinungsbild</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+        {themes.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTheme(t.id)}
+            className={cn(
+              'flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all',
+              theme === t.id
+                ? 'border-brand-500 bg-brand-500/5'
+                : 'border-surface-700 hover:border-surface-600 bg-surface-800/30'
+            )}
+          >
+            <t.icon className={cn('h-8 w-8', theme === t.id ? 'text-brand-400' : 'text-surface-400')} />
+            <div className="text-center">
+              <p className={cn('text-sm font-medium', theme === t.id ? 'text-white' : 'text-surface-300')}>{t.label}</p>
+              <p className="text-xs text-surface-500 mt-1">{t.description}</p>
+            </div>
+          </button>
         ))}
       </div>
     </div>

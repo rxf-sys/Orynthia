@@ -18,23 +18,28 @@ model User {
   passwordHash   String    @map("password_hash")
   firstName      String?   @map("first_name")
   lastName       String?   @map("last_name")
-  
+
   // 2FA
   twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?  @map("two_factor_secret")
-  
+
   // Refresh Token
   refreshToken   String?   @map("refresh_token")
-  
+
+  // Einstellungen
+  preferredCurrency String  @default("EUR") @map("preferred_currency")
+  theme            String   @default("dark") // dark | light
+  locale           String   @default("de")
+
   // Status
   isActive       Boolean   @default(true) @map("is_active")
   isEmailVerified Boolean  @default(false) @map("is_email_verified")
-  
+
   // Timestamps
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   lastLoginAt    DateTime? @map("last_login_at")
-  
+
   // Relations
   bankAccounts   BankAccount[]
   categories     Category[]
@@ -44,6 +49,12 @@ model User {
   notifications  Notification[]
   bankConnections BankConnection[]
   contracts      Contract[]
+  categorizationRules CategorizationRule[]
+  assets         Asset[]
+  households     HouseholdMember[]
+  sharedExpenses SharedExpense[]
+  sharedExpenseShares SharedExpenseShare[]
+  portfolioHoldings PortfolioHolding[]
 
   @@map("users")
 }
@@ -52,31 +63,31 @@ model User {
 model BankAccount {
   id              String    @id @default(uuid())
   userId          String    @map("user_id")
-  
+
   bankName        String    @map("bank_name")
   accountName     String    @map("account_name")
   iban            String?
   bic             String?
   accountType     AccountType @default(CHECKING) @map("account_type")
-  
+
   // Kontostand
   balance         Decimal   @default(0) @db.Decimal(12, 2)
   currency        String    @default("EUR")
-  
+
   // Banking API Verbindung (verschlüsselt)
   externalId      String?   @map("external_id")
-  accessToken     String?   @map("access_token") // AES-256 verschlüsselt
-  refreshToken    String?   @map("refresh_token") // AES-256 verschlüsselt
+  accessToken     String?   @map("access_token")
+  refreshToken    String?   @map("refresh_token")
   consentExpiry   DateTime? @map("consent_expiry")
-  
+
   // Status
   isActive        Boolean   @default(true) @map("is_active")
   lastSynced      DateTime? @map("last_synced")
-  
+
   // Timestamps
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-  
+
   // Relations
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions    Transaction[]
@@ -85,12 +96,12 @@ model BankAccount {
 }
 
 enum AccountType {
-  CHECKING    // Girokonto
-  SAVINGS     // Sparkonto
-  CREDIT_CARD // Kreditkarte
-  DEPOT       // Wertpapierdepot
-  LOAN        // Kredit
-  OTHER       // Sonstige
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  DEPOT
+  LOAN
+  OTHER
 }
 
 // ---------- Transaktionen ----------
@@ -98,34 +109,40 @@ model Transaction {
   id              String    @id @default(uuid())
   bankAccountId   String    @map("bank_account_id")
   categoryId      String?   @map("category_id")
-  
+
   // Transaktionsdaten
   amount          Decimal   @db.Decimal(12, 2)
   currency        String    @default("EUR")
+  originalAmount  Decimal?  @map("original_amount") @db.Decimal(12, 2)
+  originalCurrency String?  @map("original_currency")
+  exchangeRate    Decimal?  @map("exchange_rate") @db.Decimal(12, 6)
   date            DateTime
   valueDate       DateTime? @map("value_date")
-  
+
   // Details
-  purpose         String?   // Verwendungszweck
+  purpose         String?
   counterpartName String?   @map("counterpart_name")
   counterpartIban String?   @map("counterpart_iban")
-  
+
   // Typ & Status
   type            TransactionType @default(OTHER)
   isRecurring     Boolean   @default(false) @map("is_recurring")
   recurringPaymentId String? @map("recurring_payment_id")
-  
+
   // Externe Referenz
   externalId      String?   @map("external_id") @unique
-  
-  // Notizen
+
+  // Notizen & Tags
   notes           String?
   tags            String[]  @default([])
-  
+
+  // Splittbuchungen
+  splitTransactions TransactionSplit[]
+
   // Timestamps
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-  
+
   // Relations
   bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   category        Category?   @relation(fields: [categoryId], references: [id])
@@ -134,36 +151,51 @@ model Transaction {
   @@index([bankAccountId, date])
   @@index([categoryId])
   @@index([date])
+  @@index([tags])
   @@map("transactions")
 }
 
+// ---------- Splittbuchungen ----------
+model TransactionSplit {
+  id            String   @id @default(uuid())
+  transactionId String   @map("transaction_id")
+  categoryId    String?  @map("category_id")
+  amount        Decimal  @db.Decimal(12, 2)
+  note          String?
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category      Category?   @relation(fields: [categoryId], references: [id])
+
+  @@map("transaction_splits")
+}
+
 enum TransactionType {
-  INCOME          // Einnahme
-  EXPENSE         // Ausgabe
-  TRANSFER        // Umbuchung
-  STANDING_ORDER  // Dauerauftrag
-  DIRECT_DEBIT    // Lastschrift
-  OTHER           // Sonstige
+  INCOME
+  EXPENSE
+  TRANSFER
+  STANDING_ORDER
+  DIRECT_DEBIT
+  OTHER
 }
 
 // ---------- Kategorien ----------
 model Category {
   id          String    @id @default(uuid())
-  userId      String?   @map("user_id") // null = System-Kategorie
-  
+  userId      String?   @map("user_id")
+
   name        String
   icon        String?
-  color       String?   // Hex-Farbcode
+  color       String?
   parentId    String?   @map("parent_id")
   isSystem    Boolean   @default(false) @map("is_system")
-  
+
   // Keywords für Auto-Kategorisierung
   keywords    String[]  @default([])
-  
+
   // Timestamps
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-  
+
   // Relations
   user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent       Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
@@ -171,9 +203,59 @@ model Category {
   transactions Transaction[]
   budgets      Budget[]
   recurringPayments RecurringPayment[]
+  transactionSplits TransactionSplit[]
+  categorizationRules CategorizationRule[]
 
   @@unique([userId, name])
   @@map("categories")
+}
+
+// ---------- Kategorisierungsregeln ----------
+model CategorizationRule {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  categoryId  String    @map("category_id")
+
+  // Regel-Bedingungen
+  field       RuleField // Welches Feld wird geprüft
+  operator    RuleOperator // Vergleichsoperator
+  value       String    // Wert zum Vergleichen
+
+  // Priorität (höher = wird zuerst angewendet)
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true) @map("is_active")
+
+  // Lernend: wie oft wurde diese Regel angewendet
+  appliedCount Int      @default(0) @map("applied_count")
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id])
+
+  @@index([userId, isActive])
+  @@map("categorization_rules")
+}
+
+enum RuleField {
+  COUNTERPART_NAME
+  COUNTERPART_IBAN
+  PURPOSE
+  AMOUNT_MIN
+  AMOUNT_MAX
+}
+
+enum RuleOperator {
+  EQUALS
+  CONTAINS
+  STARTS_WITH
+  ENDS_WITH
+  REGEX
+  GREATER_THAN
+  LESS_THAN
 }
 
 // ---------- Budgets ----------
@@ -181,22 +263,25 @@ model Budget {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
   categoryId  String    @map("category_id")
-  
+
   amount      Decimal   @db.Decimal(12, 2)
   currency    String    @default("EUR")
   period      BudgetPeriod @default(MONTHLY)
-  
+
+  // Warnungen
+  warningThreshold Int  @default(80) @map("warning_threshold") // Prozent
+
   // Zeitraum
   startDate   DateTime  @map("start_date")
   endDate     DateTime? @map("end_date")
-  
+
   // Status
   isActive    Boolean   @default(true) @map("is_active")
-  
+
   // Timestamps
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-  
+
   // Relations
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category    Category  @relation(fields: [categoryId], references: [id])
@@ -212,7 +297,7 @@ enum BudgetPeriod {
   YEARLY
 }
 
-// ---------- Wiederkehrende Zahlungen (Abos) ----------
+// ---------- Wiederkehrende Zahlungen ----------
 model RecurringPayment {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
@@ -223,19 +308,15 @@ model RecurringPayment {
   currency    String    @default("EUR")
   frequency   PaymentFrequency @default(MONTHLY)
 
-  // Details
   counterpartName String? @map("counterpart_name")
   nextDueDate DateTime?  @map("next_due_date")
   lastChargeDate DateTime? @map("last_charge_date")
 
-  // Status
   isActive    Boolean   @default(true) @map("is_active")
 
-  // Timestamps
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  // Relations
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category     Category? @relation(fields: [categoryId], references: [id])
   transactions Transaction[]
@@ -257,26 +338,22 @@ enum PaymentFrequency {
 model SavingsGoal {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
-  
+
   name        String
   targetAmount Decimal  @map("target_amount") @db.Decimal(12, 2)
   currentAmount Decimal @default(0) @map("current_amount") @db.Decimal(12, 2)
   currency    String    @default("EUR")
-  
-  // Deadline
+
   deadline    DateTime?
   icon        String?
   color       String?
-  
-  // Status
+
   isCompleted Boolean   @default(false) @map("is_completed")
   completedAt DateTime? @map("completed_at")
-  
-  // Timestamps
+
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-  
-  // Relations
+
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("savings_goals")
@@ -287,45 +364,36 @@ model Contract {
   id              String    @id @default(uuid())
   userId          String    @map("user_id")
 
-  // Vertragsdaten
-  name            String    // z.B. "Haftpflichtversicherung", "Strom Vattenfall"
-  provider        String    // z.B. "Allianz", "Vattenfall", "Telekom"
+  name            String
+  provider        String
   contractType    ContractType @map("contract_type")
 
-  // Kosten
   monthlyCost     Decimal?  @map("monthly_cost") @db.Decimal(12, 2)
   yearlyCost      Decimal?  @map("yearly_cost") @db.Decimal(12, 2)
   billingCycle    BillingCycle @default(MONTHLY) @map("billing_cycle")
 
-  // Vertragsdetails
   contractNumber  String?   @map("contract_number")
   startDate       DateTime? @map("start_date")
   endDate         DateTime? @map("end_date")
-  cancellationDate DateTime? @map("cancellation_date") // Kündigungsfrist
-  noticePeriod    String?   @map("notice_period") // z.B. "3 Monate"
+  cancellationDate DateTime? @map("cancellation_date")
+  noticePeriod    String?   @map("notice_period")
   autoRenewal     Boolean   @default(true) @map("auto_renewal")
 
-  // Provider-spezifisch (Versicherung, Strom etc.)
-  details         Json?     // Flexible Zusatzinfos (kWh-Preis, Deckungssumme, Tarif etc.)
+  details         Json?
 
-  // Erkennungsmuster
-  counterpartName String?   @map("counterpart_name") // Für Auto-Erkennung
+  counterpartName String?   @map("counterpart_name")
   counterpartIban String?   @map("counterpart_iban")
 
-  // Durchschnitt aus Transaktionen
   avgMonthlyAmount Decimal? @map("avg_monthly_amount") @db.Decimal(12, 2)
   transactionCount Int      @default(0) @map("transaction_count")
   lastChargeDate  DateTime? @map("last_charge_date")
 
-  // Status
   isActive        Boolean   @default(true) @map("is_active")
   isAutoDetected  Boolean   @default(false) @map("is_auto_detected")
 
-  // Timestamps
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  // Relations
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -333,27 +401,27 @@ model Contract {
 }
 
 enum ContractType {
-  INSURANCE_LIABILITY     // Haftpflicht
-  INSURANCE_HOUSEHOLD     // Hausrat
-  INSURANCE_HEALTH        // Krankenversicherung
-  INSURANCE_DENTAL        // Zahnzusatzversicherung
-  INSURANCE_LIFE          // Lebensversicherung
-  INSURANCE_CAR           // KFZ-Versicherung
-  INSURANCE_LEGAL         // Rechtsschutz
-  INSURANCE_DISABILITY    // Berufsunfähigkeit
-  INSURANCE_OTHER         // Sonstige Versicherung
-  ENERGY_ELECTRICITY      // Strom
-  ENERGY_GAS              // Gas
-  TELECOM_MOBILE          // Mobilfunk
-  TELECOM_INTERNET        // Internet/DSL
-  TELECOM_LANDLINE        // Festnetz
-  STREAMING               // Netflix, Spotify etc.
-  GYM                     // Fitnessstudio
-  SUBSCRIPTION            // Sonstige Abos
-  RENT                    // Miete
-  LEASE                   // Leasing
-  LOAN                    // Kredit/Darlehen
-  OTHER                   // Sonstige
+  INSURANCE_LIABILITY
+  INSURANCE_HOUSEHOLD
+  INSURANCE_HEALTH
+  INSURANCE_DENTAL
+  INSURANCE_LIFE
+  INSURANCE_CAR
+  INSURANCE_LEGAL
+  INSURANCE_DISABILITY
+  INSURANCE_OTHER
+  ENERGY_ELECTRICITY
+  ENERGY_GAS
+  TELECOM_MOBILE
+  TELECOM_INTERNET
+  TELECOM_LANDLINE
+  STREAMING
+  GYM
+  SUBSCRIPTION
+  RENT
+  LEASE
+  LOAN
+  OTHER
 }
 
 enum BillingCycle {
@@ -367,19 +435,17 @@ enum BillingCycle {
 model Notification {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
-  
+
   type        NotificationType
   title       String
   message     String
-  data        Json?     // Zusätzliche Daten
-  
+  data        Json?
+
   isRead      Boolean   @default(false) @map("is_read")
   readAt      DateTime? @map("read_at")
-  
-  // Timestamps
+
   createdAt   DateTime  @default(now()) @map("created_at")
-  
-  // Relations
+
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
@@ -387,35 +453,206 @@ model Notification {
 }
 
 enum NotificationType {
-  BUDGET_WARNING     // Budget fast aufgebraucht
-  BUDGET_EXCEEDED    // Budget überschritten
-  LARGE_TRANSACTION  // Große Transaktion erkannt
-  RECURRING_DETECTED // Neues Abo erkannt
-  SAVINGS_MILESTONE  // Sparziel Meilenstein
-  SYNC_ERROR         // Bank-Sync Fehler
-  SYSTEM             // System-Nachricht
+  BUDGET_WARNING
+  BUDGET_EXCEEDED
+  LARGE_TRANSACTION
+  LOW_BALANCE
+  CONTRACT_REMINDER
+  RECURRING_DETECTED
+  SAVINGS_MILESTONE
+  UNUSUAL_SPENDING
+  SYNC_ERROR
+  SYSTEM
 }
 
-// ---------- Bank-Verbindungen (Open Banking) ----------
+// ---------- Vermögenswerte ----------
+model Asset {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+
+  name        String
+  assetType   AssetType @map("asset_type")
+  value       Decimal   @db.Decimal(14, 2)
+  currency    String    @default("EUR")
+
+  // Für Schulden/Kredite
+  isLiability Boolean   @default(false) @map("is_liability")
+  interestRate Decimal? @map("interest_rate") @db.Decimal(5, 2)
+
+  // Details
+  institution String?
+  notes       String?
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots   AssetSnapshot[]
+
+  @@index([userId])
+  @@map("assets")
+}
+
+enum AssetType {
+  REAL_ESTATE
+  VEHICLE
+  INVESTMENT
+  CRYPTO
+  CASH
+  OTHER_ASSET
+  MORTGAGE
+  CONSUMER_LOAN
+  STUDENT_LOAN
+  OTHER_LIABILITY
+}
+
+// ---------- Vermögens-Snapshots (für Zeitverlauf) ----------
+model AssetSnapshot {
+  id        String   @id @default(uuid())
+  assetId   String   @map("asset_id")
+  value     Decimal  @db.Decimal(14, 2)
+  date      DateTime @default(now())
+
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, date])
+  @@map("asset_snapshots")
+}
+
+// ---------- Haushalte (Shared Expenses) ----------
+model Household {
+  id          String    @id @default(uuid())
+  name        String
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  members     HouseholdMember[]
+  expenses    SharedExpense[]
+
+  @@map("households")
+}
+
+model HouseholdMember {
+  id          String    @id @default(uuid())
+  householdId String    @map("household_id")
+  userId      String?   @map("user_id")
+  name        String    // Für nicht-registrierte Mitglieder
+  role        HouseholdRole @default(MEMBER)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id])
+  shares      SharedExpenseShare[]
+
+  @@unique([householdId, userId])
+  @@map("household_members")
+}
+
+enum HouseholdRole {
+  ADMIN
+  MEMBER
+}
+
+model SharedExpense {
+  id          String    @id @default(uuid())
+  householdId String    @map("household_id")
+  paidById    String    @map("paid_by_id") // User who paid
+
+  description String
+  amount      Decimal   @db.Decimal(12, 2)
+  currency    String    @default("EUR")
+  date        DateTime  @default(now())
+
+  splitType   SplitType @default(EQUAL) @map("split_type")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  paidBy      User      @relation(fields: [paidById], references: [id])
+  shares      SharedExpenseShare[]
+
+  @@index([householdId])
+  @@map("shared_expenses")
+}
+
+model SharedExpenseShare {
+  id          String    @id @default(uuid())
+  expenseId   String    @map("expense_id")
+  memberId    String    @map("member_id")
+  userId      String?   @map("user_id")
+  amount      Decimal   @db.Decimal(12, 2)
+  isSettled   Boolean   @default(false) @map("is_settled")
+
+  expense     SharedExpense    @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  member      HouseholdMember  @relation(fields: [memberId], references: [id])
+  user        User?            @relation(fields: [userId], references: [id])
+
+  @@map("shared_expense_shares")
+}
+
+enum SplitType {
+  EQUAL
+  PERCENTAGE
+  CUSTOM
+}
+
+// ---------- Portfolio/Depot ----------
+model PortfolioHolding {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+
+  symbol      String    // z.B. "BTC", "ETH", "AAPL"
+  name        String    // z.B. "Bitcoin", "Apple Inc."
+  holdingType HoldingType @map("holding_type")
+
+  quantity    Decimal   @db.Decimal(18, 8)
+  avgBuyPrice Decimal   @map("avg_buy_price") @db.Decimal(14, 2)
+  currentPrice Decimal  @map("current_price") @db.Decimal(14, 2)
+  currency    String    @default("EUR")
+
+  // Externes Tracking
+  exchange    String?   // z.B. "XETRA", "BINANCE"
+  isin        String?   // Für Aktien/ETFs
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("portfolio_holdings")
+}
+
+enum HoldingType {
+  STOCK
+  ETF
+  BOND
+  CRYPTO
+  FUND
+  OTHER
+}
+
+// ---------- Bank-Verbindungen ----------
 model BankConnection {
   id                    String    @id @default(uuid())
   userId                String    @map("user_id")
 
-  provider              String    // "enablebanking" | "finapi"
+  provider              String
   externalConnectionId  String    @map("external_connection_id")
   institutionId         String    @map("institution_id")
   institutionName       String?   @map("institution_name")
   institutionLogo       String?   @map("institution_logo")
-  sessionId             String?   @map("session_id") // Enable Banking Session ID
+  sessionId             String?   @map("session_id")
 
-  status                String    @default("CREATED") // CREATED, LINKED, EXPIRED, etc.
+  status                String    @default("CREATED")
 
-  // Timestamps
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
   expiresAt             DateTime? @map("expires_at")
 
-  // Relations
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

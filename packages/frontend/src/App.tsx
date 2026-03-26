@@ -11,6 +11,12 @@ import { AccountsPage } from '@/pages/Accounts';
 import { RecurringPaymentsPage } from '@/pages/RecurringPayments';
 import { SavingsGoalsPage } from '@/pages/SavingsGoals';
 import { ContractsPage } from '@/pages/Contracts';
+import { ReportsPage } from '@/pages/Reports';
+import { NetWorthPage } from '@/pages/NetWorth';
+import { CashflowPage } from '@/pages/Cashflow';
+import { PortfolioPage } from '@/pages/Portfolio';
+import { SharedExpensesPage } from '@/pages/SharedExpenses';
+import { ImportPage } from '@/pages/Import';
 import { SettingsPage } from '@/pages/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -60,6 +66,12 @@ export default function App() {
         <Route path="recurring" element={<RecurringPaymentsPage />} />
         <Route path="savings" element={<SavingsGoalsPage />} />
         <Route path="contracts" element={<ContractsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="net-worth" element={<NetWorthPage />} />
+        <Route path="cashflow" element={<CashflowPage />} />
+        <Route path="portfolio" element={<PortfolioPage />} />
+        <Route path="shared" element={<SharedExpensesPage />} />
+        <Route path="import" element={<ImportPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

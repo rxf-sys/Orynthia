@@ -1,5 +1,9 @@
-import { Menu, Bell, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Menu, Bell, Search, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
+import { notificationsApi } from '@/lib/api';
 import { getInitials } from '@/lib/utils';
 
 interface HeaderProps {
@@ -8,6 +12,14 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const user = useAuthStore((s) => s.user);
+  const { theme, toggle: toggleTheme } = useThemeStore();
+  const navigate = useNavigate();
+
+  const { data: unreadCount } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => notificationsApi.getUnreadCount().then((r) => r.data.count),
+    refetchInterval: 30000,
+  });
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-surface-800 bg-surface-900/80 backdrop-blur-xl px-4 md:px-6">
@@ -35,9 +47,25 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right */}
       <div className="flex items-center gap-3">
-        <button aria-label="Benachrichtigungen" className="relative rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors">
+        <button
+          onClick={toggleTheme}
+          aria-label="Theme umschalten"
+          className="rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors"
+        >
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+
+        <button
+          onClick={() => navigate('/settings')}
+          aria-label="Benachrichtigungen"
+          className="relative rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors"
+        >
           <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand-500" />
+          {(unreadCount ?? 0) > 0 && (
+            <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
+              {unreadCount! > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
 
         <div className="flex items-center gap-3 pl-3 border-l border-surface-700">

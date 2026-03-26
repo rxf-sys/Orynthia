@@ -10,6 +10,12 @@ import {
   Repeat,
   Target,
   FileText,
+  BarChart3,
+  Landmark,
+  LineChart,
+  Briefcase,
+  Users,
+  Upload,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,7 +28,13 @@ const navItems = [
   { to: '/recurring', icon: Repeat, label: 'Abos' },
   { to: '/contracts', icon: FileText, label: 'Verträge' },
   { to: '/savings', icon: Target, label: 'Sparziele' },
+  { to: '/reports', icon: BarChart3, label: 'Berichte' },
+  { to: '/cashflow', icon: LineChart, label: 'Cashflow' },
+  { to: '/net-worth', icon: Landmark, label: 'Vermögen' },
+  { to: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+  { to: '/shared', icon: Users, label: 'Haushalt' },
   { to: '/accounts', icon: Wallet, label: 'Konten' },
+  { to: '/import', icon: Upload, label: 'Import' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];
 
@@ -57,7 +69,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-0.5 px-3 py-4 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -66,7 +78,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClick={onClose}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200',
                 isActive
                   ? 'bg-brand-600/10 text-brand-400'
                   : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200',
