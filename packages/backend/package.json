@@ -1,8 +1,8 @@
 {
-  "name": "@finanzguru/backend",
+  "name": "@orynthia/backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Finanzguru Backend API - NestJS",
+  "description": "Orynthia Backend API - NestJS",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",

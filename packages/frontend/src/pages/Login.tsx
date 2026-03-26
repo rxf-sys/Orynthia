@@ -41,7 +41,7 @@ export function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-white">Finanzguru</span>
+          <span className="text-xl font-bold text-white">Orynthia</span>
         </div>
 
         <div className="space-y-6">
@@ -55,7 +55,7 @@ export function LoginPage() {
         </div>
 
         <p className="text-sm text-surface-600">
-          © 2025 Finanzguru. Sicher & DSGVO-konform.
+          © 2025 Orynthia. Sicher & DSGVO-konform.
         </p>
       </div>
 
@@ -67,7 +67,7 @@ export function LoginPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600">
               <TrendingUp className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-white">Finanzguru</span>
+            <span className="text-xl font-bold text-white">Orynthia</span>
           </div>
 
           <div>
@@ -143,7 +143,7 @@ export function LoginPage() {
           {/* Demo Login Hint */}
           <div className="rounded-xl border border-surface-800 bg-surface-900/50 p-4">
             <p className="text-xs text-surface-500 text-center">
-              Demo-Zugang: <span className="text-surface-300">demo@finanzguru.local</span> / <span className="text-surface-300">demo1234</span>
+              Demo-Zugang: <span className="text-surface-300">demo@orynthia.local</span> / <span className="text-surface-300">demo1234</span>
             </p>
           </div>
         </div>

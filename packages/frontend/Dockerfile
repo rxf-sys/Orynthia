@@ -1,5 +1,5 @@
 # ====================================
-# Finanzguru Frontend - Multi-Stage Build
+# Orynthia Frontend - Multi-Stage Build
 # ====================================
 
 # --- Base ---

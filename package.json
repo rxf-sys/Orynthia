@@ -1,8 +1,8 @@
 {
-  "name": "finanzguru",
+  "name": "orynthia",
   "version": "1.0.0",
   "private": true,
-  "description": "Finanzguru-ähnliche persönliche Finanzmanagement Web-App",
+  "description": "Orynthia - Persönliche Finanzmanagement Web-App",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",

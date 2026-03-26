@@ -49,7 +49,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600">
             <TrendingUp className="h-5 w-5 text-white" />
           </div>
-          <span className="text-lg font-bold text-white">Finanzguru</span>
+          <span className="text-lg font-bold text-white">Orynthia</span>
         </div>
         <button onClick={onClose} aria-label="Menü schließen" className="lg:hidden text-surface-400 hover:text-white">
           <X className="h-5 w-5" />
