@@ -9,7 +9,7 @@ services:
       target: production
     volumes: !reset []
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
     restart: always
 
   frontend:

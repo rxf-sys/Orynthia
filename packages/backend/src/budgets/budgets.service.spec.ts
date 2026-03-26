@@ -16,7 +16,7 @@ describe('BudgetsService', () => {
       delete: jest.fn(),
     },
     transaction: {
-      groupBy: jest.fn(),
+      aggregate: jest.fn(),
     },
   };
 
@@ -52,9 +52,9 @@ describe('BudgetsService', () => {
       ];
 
       mockPrisma.budget.findMany.mockResolvedValue(mockBudgets);
-      mockPrisma.transaction.groupBy.mockResolvedValue([
-        { categoryId: 'cat1', _sum: { amount: -300 } },
-      ]);
+      mockPrisma.transaction.aggregate.mockResolvedValue({
+        _sum: { amount: -300 },
+      });
 
       const result = await service.findAll('user1');
 

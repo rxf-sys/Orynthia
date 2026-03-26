@@ -116,6 +116,124 @@ export interface CreateTransactionData {
   tags?: string[];
 }
 
+export interface RecurringPayment {
+  id: string;
+  name: string;
+  amount: number | string;
+  currency: string;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'BIANNUALLY' | 'YEARLY';
+  counterpartName?: string;
+  categoryId?: string;
+  category?: Pick<Category, 'name' | 'icon' | 'color'>;
+  nextDueDate?: string;
+  lastChargeDate?: string;
+  isActive: boolean;
+}
+
+export interface CreateRecurringPaymentData {
+  name: string;
+  amount: number;
+  frequency?: RecurringPayment['frequency'];
+  counterpartName?: string;
+  categoryId?: string;
+  nextDueDate?: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  deadline?: string;
+  icon?: string;
+  color?: string;
+  isCompleted: boolean;
+  completedAt?: string;
+  percentage: number;
+  remaining: number;
+}
+
+export interface CreateSavingsGoalData {
+  name: string;
+  targetAmount: number;
+  currentAmount?: number;
+  deadline?: string;
+  icon?: string;
+  color?: string;
+}
+
+export interface Contract {
+  id: string;
+  name: string;
+  provider: string;
+  contractType: string;
+  monthlyCost: number;
+  yearlyCost: number;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'BIANNUALLY' | 'YEARLY';
+  contractNumber?: string;
+  startDate?: string;
+  endDate?: string;
+  cancellationDate?: string;
+  noticePeriod?: string;
+  autoRenewal: boolean;
+  details?: Record<string, unknown>;
+  counterpartName?: string;
+  counterpartIban?: string;
+  avgMonthlyAmount: number;
+  transactionCount: number;
+  lastChargeDate?: string;
+  isActive: boolean;
+  isAutoDetected: boolean;
+}
+
+export interface CreateContractData {
+  name: string;
+  provider: string;
+  contractType: string;
+  monthlyCost?: number;
+  yearlyCost?: number;
+  billingCycle?: string;
+  contractNumber?: string;
+  startDate?: string;
+  endDate?: string;
+  cancellationDate?: string;
+  noticePeriod?: string;
+  autoRenewal?: boolean;
+  details?: Record<string, unknown>;
+  counterpartName?: string;
+  counterpartIban?: string;
+}
+
+export interface DetectedContract {
+  counterpartName: string;
+  counterpartIban?: string;
+  occurrences: number;
+  totalAmount: number;
+  avgAmount: number;
+  frequency: string;
+  lastDate: string;
+  firstDate: string;
+  suggestedType: string;
+}
+
+export interface ProviderComparison {
+  contractId: string;
+  contractName: string;
+  provider: string;
+  contractType: string;
+  currentMonthly: number;
+  currentYearly: number;
+  marketAvgMonthly: number;
+  marketAvgYearly: number;
+  savingsPotentialMonthly: number;
+  savingsPotentialYearly: number;
+  percentAboveAvg: number;
+  rating: 'GOOD' | 'OK' | 'EXPENSIVE';
+  tips: string[];
+  compareUrls: string[];
+}
+
 export interface TransactionFilters {
   page?: number;
   limit?: number;

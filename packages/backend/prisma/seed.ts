@@ -24,24 +24,22 @@ const defaultCategories = [
 async function main() {
   console.log('🌱 Seeding Datenbank...');
 
-  // System-Kategorien erstellen
+  // System-Kategorien erstellen (upsert-Logik für nullable userId)
   for (const cat of defaultCategories) {
-    await prisma.category.upsert({
-      where: {
-        userId_name: {
-          userId: '00000000-0000-0000-0000-000000000000', // Placeholder for system
-          name: cat.name,
-        },
-      },
-      update: {},
-      create: {
-        name: cat.name,
-        icon: cat.icon,
-        color: cat.color,
-        keywords: cat.keywords,
-        isSystem: true,
-      },
+    const existing = await prisma.category.findFirst({
+      where: { userId: null, name: cat.name, isSystem: true },
     });
+    if (!existing) {
+      await prisma.category.create({
+        data: {
+          name: cat.name,
+          icon: cat.icon,
+          color: cat.color,
+          keywords: cat.keywords,
+          isSystem: true,
+        },
+      });
+    }
   }
 
   console.log(`✅ ${defaultCategories.length} Kategorien erstellt`);

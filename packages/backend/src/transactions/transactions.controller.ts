@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, Res, UseGuards, Header } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
@@ -22,6 +22,17 @@ export class TransactionsController {
   @ApiOperation({ summary: 'Transaktionen auflisten (mit Filtern)' })
   async findAll(@Req() req: Request, @Query() filters: TransactionFilterDto) {
     return this.transactionsService.findAll((req.user as any).id, filters);
+  }
+
+  @Get('export/csv')
+  @ApiOperation({ summary: 'Transaktionen als CSV exportieren' })
+  async exportCsv(@Req() req: Request, @Res() res: Response, @Query() filters: TransactionFilterDto) {
+    const csv = await this.transactionsService.exportCsv((req.user as any).id, filters);
+    const filename = `transaktionen_${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    // BOM für korrekte Umlaute in Excel
+    res.send('\uFEFF' + csv);
   }
 
   @Get('expenses-by-category')

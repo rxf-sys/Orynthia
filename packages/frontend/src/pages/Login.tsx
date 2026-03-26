@@ -8,6 +8,8 @@ export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [show2FA, setShow2FA] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -15,12 +17,17 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, twoFactorCode || undefined);
       toast.success('Willkommen zurück!');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen';
       const axiosMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(axiosMessage || message);
+      if (axiosMessage === '2FA-Code erforderlich') {
+        setShow2FA(true);
+        toast('Bitte 2FA-Code eingeben', { icon: '🔐' });
+      } else {
+        const message = err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen';
+        toast.error(axiosMessage || message);
+      }
     } finally {
       setLoading(false);
     }
@@ -105,6 +112,21 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {show2FA && (
+              <div className="animate-slide-up">
+                <label className="label">2FA-Code</label>
+                <input
+                  type="text"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="input font-mono text-center tracking-widest"
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                />
+              </div>
+            )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Anmelden'}

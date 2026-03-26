@@ -3,12 +3,20 @@ import type {
   BankAccount,
   Budget,
   Category,
+  Contract,
   CreateAccountData,
   CreateBudgetData,
+  CreateContractData,
+  CreateRecurringPaymentData,
+  CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
+  DetectedContract,
   MonthlyOverview,
   PaginatedResult,
+  ProviderComparison,
+  RecurringPayment,
+  SavingsGoal,
   Transaction,
   TransactionFilters,
 } from './types';
@@ -49,7 +57,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        await api.post('/auth/refresh');
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
@@ -100,6 +108,8 @@ export const transactionsApi = {
     api.get('/transactions/expenses-by-category', { params }),
   getMonthlyOverview: (months?: number) =>
     api.get<MonthlyOverview[]>('/transactions/monthly-overview', { params: { months } }),
+  exportCsv: (params?: TransactionFilters) =>
+    api.get('/transactions/export/csv', { params, responseType: 'blob' }),
 };
 
 export const categoriesApi = {
@@ -111,9 +121,49 @@ export const categoriesApi = {
   remove: (id: string) => api.delete(`/categories/${id}`),
 };
 
+export const bankingApi = {
+  getInstitutions: (country: string = 'DE') => api.get<{ id: string; name: string; bic?: string; logo?: string }[]>(`/banking/institutions?country=${country}`),
+  connectBank: (institutionId: string) => api.post<{ connectionId: string; authUrl: string }>('/banking/connect', { institutionId }),
+  handleCallback: (connectionId: string, code?: string) => api.post(`/banking/callback/${connectionId}`, { code }),
+  syncAccount: (accountId: string, dateFrom?: string) => api.post(`/banking/sync/${accountId}`, { dateFrom }),
+  syncAll: () => api.post('/banking/sync-all'),
+  getConnections: () => api.get('/banking/connections'),
+  removeConnection: (connectionId: string) => api.delete(`/banking/connections/${connectionId}`),
+};
+
 export const budgetsApi = {
   getAll: () => api.get<Budget[]>('/budgets'),
   create: (data: CreateBudgetData) => api.post<Budget>('/budgets', data),
   update: (id: string, data: Partial<CreateBudgetData>) => api.patch<Budget>(`/budgets/${id}`, data),
   remove: (id: string) => api.delete(`/budgets/${id}`),
+};
+
+export const recurringPaymentsApi = {
+  getAll: () => api.get<{ payments: RecurringPayment[]; monthlyTotal: number; yearlyTotal: number }>('/recurring-payments'),
+  create: (data: CreateRecurringPaymentData) => api.post<RecurringPayment>('/recurring-payments', data),
+  update: (id: string, data: Partial<CreateRecurringPaymentData & { isActive?: boolean }>) =>
+    api.patch<RecurringPayment>(`/recurring-payments/${id}`, data),
+  remove: (id: string) => api.delete(`/recurring-payments/${id}`),
+};
+
+export const savingsGoalsApi = {
+  getAll: () => api.get<SavingsGoal[]>('/savings-goals'),
+  create: (data: CreateSavingsGoalData) => api.post<SavingsGoal>('/savings-goals', data),
+  update: (id: string, data: Partial<CreateSavingsGoalData>) => api.patch<SavingsGoal>(`/savings-goals/${id}`, data),
+  addAmount: (id: string, amount: number) => api.post<SavingsGoal>(`/savings-goals/${id}/add`, { amount }),
+  remove: (id: string) => api.delete(`/savings-goals/${id}`),
+};
+
+export const contractsApi = {
+  getAll: () => api.get<{ contracts: Contract[]; totalMonthly: number; totalYearly: number }>('/contracts'),
+  create: (data: CreateContractData) => api.post<Contract>('/contracts', data),
+  update: (id: string, data: Partial<CreateContractData & { isActive?: boolean }>) =>
+    api.patch<Contract>(`/contracts/${id}`, data),
+  remove: (id: string) => api.delete(`/contracts/${id}`),
+  detect: () => api.get<DetectedContract[]>('/contracts/detect'),
+  createFromDetection: (data: {
+    counterpartName: string; counterpartIban?: string; avgAmount: number;
+    frequency: string; contractType: string; name?: string; provider?: string;
+  }) => api.post<Contract>('/contracts/from-detection', data),
+  compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
 };

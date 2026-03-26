@@ -170,7 +170,7 @@ function SecurityTab() {
 
   const passwordMutation = useMutation({
     mutationFn: (data: { currentPassword: string; newPassword: string }) =>
-      api.patch('/users/profile', { password: data.newPassword }),
+      api.post('/users/change-password', data),
     onSuccess: () => {
       toast.success('Passwort geändert');
       setShowPasswordForm(false);
