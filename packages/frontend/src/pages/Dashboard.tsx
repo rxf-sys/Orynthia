@@ -1,13 +1,61 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
-  BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
 } from 'recharts';
-import { Wallet, PiggyBank, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  RefreshCw,
+  Plus,
+  ArrowUpRight,
+  Search as SearchIcon,
+  TrendingUp,
+  Loader2,
+} from 'lucide-react';
 import { dashboardApi, transactionsApi } from '@/lib/api';
-import { formatCurrency, formatDateRelative, cn } from '@/lib/utils';
-import type { MonthlyOverview } from '@/lib/types';
+import { formatCurrency, formatDateRelative } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
+import type { MonthlyOverview, BankAccount, Transaction } from '@/lib/types';
+import { Card, Btn, PageHead, Tag, CategoryIcon, CategoryDot, pickCategoryColor } from '@/components/ui';
+
+const CHART_COLORS = {
+  income: 'var(--pos)',
+  expense: 'var(--indigo)',
+  grid: 'var(--line)',
+  axis: 'var(--text-3)',
+  tooltipBg: 'var(--bg-elev)',
+  tooltipBorder: 'var(--line)',
+};
+
+const CATEGORY_PALETTE = ['#424769', '#ffb17a', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
+
+const MONTH_NAMES: Record<string, string> = {
+  '01': 'Jan',
+  '02': 'Feb',
+  '03': 'Mär',
+  '04': 'Apr',
+  '05': 'Mai',
+  '06': 'Jun',
+  '07': 'Jul',
+  '08': 'Aug',
+  '09': 'Sep',
+  '10': 'Okt',
+  '11': 'Nov',
+  '12': 'Dez',
+};
 
 export function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.getData().then((r) => r.data),
@@ -20,93 +68,175 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo" />
       </div>
     );
   }
 
   const overview = dashboard?.overview;
-  const monthNames: Record<string, string> = {
-    '01': 'Jan', '02': 'Feb', '03': 'Mär', '04': 'Apr', '05': 'Mai', '06': 'Jun',
-    '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Okt', '11': 'Nov', '12': 'Dez',
-  };
+  const totalBalance = overview?.totalBalance ?? 0;
+  const monthlyIncome = overview?.monthlyIncome ?? 0;
+  const monthlyExpenses = overview?.monthlyExpenses ?? 0;
+  const savingsRate = overview?.savingsRate ?? 0;
+  const available = monthlyIncome - monthlyExpenses;
 
-  const chartData = monthlyData?.map((m: MonthlyOverview) => ({
-    name: monthNames[m.month.split('-')[1]] || m.month,
-    Einnahmen: m.income,
-    Ausgaben: m.expenses,
-  })) || [];
+  const chartData =
+    monthlyData?.map((m: MonthlyOverview) => ({
+      name: MONTH_NAMES[m.month.split('-')[1]] || m.month,
+      Einnahmen: m.income,
+      Ausgaben: m.expenses,
+    })) || [];
 
-  const COLORS = ['#338dff', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const greeting = user?.firstName ? `Hallo ${user.firstName} 👋` : 'Willkommen 👋';
+  const today = new Date();
+  const dateLabel = today.toLocaleDateString('de-DE', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const monthLabel = today.toLocaleDateString('de-DE', { month: 'long' });
 
   return (
-    <div className="space-y-6">
-      {/* Page Title */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-surface-400 mt-1">Dein finanzieller Überblick</p>
+    <div className="space-y-5">
+      <PageHead
+        title={greeting}
+        sub={`Heute ist ${dateLabel} · ${monthLabel}-Übersicht`}
+        actions={
+          <>
+            <Btn variant="ghost" icon={RefreshCw}>
+              Synchronisieren
+            </Btn>
+            <Link to="/transactions">
+              <Btn variant="grad" icon={Plus}>
+                Transaktion
+              </Btn>
+            </Link>
+          </>
+        }
+      />
+
+      {/* Hero band */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <Card variant="hero">
+          <div className="relative z-[2]">
+            <div className="flex items-center gap-2.5 text-[0.78rem] uppercase tracking-[0.08em] opacity-90">
+              <TrendingUp className="h-3.5 w-3.5" /> Nettovermögen
+              {totalBalance !== 0 && (
+                <span
+                  className="ml-1 inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[0.7rem] font-semibold"
+                  style={{ background: 'rgba(255,255,255,.18)' }}
+                >
+                  <ArrowUpRight className="h-3 w-3" /> Live
+                </span>
+              )}
+            </div>
+            <div className="h-display mt-1 text-[3.4rem] leading-[1.05] tnum">
+              {formatCurrency(totalBalance)}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-7">
+              <div>
+                <div className="text-[0.78rem] opacity-80">Einnahmen {monthLabel}</div>
+                <div className="text-[1.15rem] font-bold tnum">{formatCurrency(monthlyIncome)}</div>
+              </div>
+              <div>
+                <div className="text-[0.78rem] opacity-80">Ausgaben {monthLabel}</div>
+                <div className="text-[1.15rem] font-bold tnum">{formatCurrency(monthlyExpenses)}</div>
+              </div>
+              <div>
+                <div className="text-[0.78rem] opacity-80">Sparquote</div>
+                <div className="text-[1.15rem] font-bold tnum">{savingsRate}%</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <div className="flex flex-col gap-3.5">
+          <Card className="flex gap-3.5">
+            <div
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-md"
+              style={{ background: 'var(--pos-bg)', color: 'var(--pos)' }}
+            >
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                Verfügbar diesen Monat
+              </div>
+              <div className="tnum mt-1 text-[1.8rem] font-bold">{formatCurrency(available)}</div>
+              <div className="mt-0.5 text-[0.82rem] text-ink-3">
+                Einnahmen minus Ausgaben in {monthLabel}
+              </div>
+            </div>
+          </Card>
+          <Card className="flex gap-3.5">
+            <div
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-md"
+              style={{ background: 'rgba(255,177,122,.2)', color: 'var(--peach-press)' }}
+            >
+              <SearchIcon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                Sparpotential bei Verträgen
+              </div>
+              <div className="tnum mt-1 text-[1.8rem] font-bold">—</div>
+              <Link
+                to="/contracts"
+                className="mt-1 inline-block text-[0.82rem] font-semibold text-indigo hover:underline"
+              >
+                Verträge prüfen →
+              </Link>
+            </div>
+          </Card>
+        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Gesamtsaldo"
-          value={formatCurrency(overview?.totalBalance || 0)}
-          icon={<Wallet className="h-5 w-5" />}
-          color="brand"
-        />
-        <KpiCard
-          title="Einnahmen (Monat)"
-          value={formatCurrency(overview?.monthlyIncome || 0)}
-          icon={<ArrowUpRight className="h-5 w-5" />}
-          color="green"
-        />
-        <KpiCard
-          title="Ausgaben (Monat)"
-          value={formatCurrency(overview?.monthlyExpenses || 0)}
-          icon={<ArrowDownRight className="h-5 w-5" />}
-          color="red"
-        />
-        <KpiCard
-          title="Sparquote"
-          value={`${overview?.savingsRate || 0}%`}
-          icon={<PiggyBank className="h-5 w-5" />}
-          color="emerald"
-        />
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bar Chart - Monatlicher Verlauf */}
-        <div className="card lg:col-span-2">
-          <h3 className="text-lg font-semibold text-white mb-4">Einnahmen vs. Ausgaben</h3>
-          <ResponsiveContainer width="100%" height={300}>
+      {/* Cashflow + Categories */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[1.05rem] font-bold text-ink">Cashflow</div>
+              <div className="text-[0.85rem] text-ink-3">Letzte 6 Monate · Einnahmen vs. Ausgaben</div>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+              <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 4" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: CHART_COLORS.axis, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: CHART_COLORS.axis, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #334155',
-                  borderRadius: '12px',
-                  color: '#e2e8f0',
+                  background: CHART_COLORS.tooltipBg,
+                  border: `1px solid ${CHART_COLORS.tooltipBorder}`,
+                  borderRadius: 12,
+                  color: 'var(--text)',
                 }}
                 formatter={(value: number) => formatCurrency(value)}
               />
-              <Bar dataKey="Einnahmen" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Ausgaben" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-3)' }} />
+              <Bar dataKey="Einnahmen" fill={CHART_COLORS.income} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Ausgaben" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
-        {/* Pie Chart - Ausgaben nach Kategorie */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-white mb-4">Ausgaben nach Kategorie</h3>
+        <Card>
+          <div className="text-[1.05rem] font-bold text-ink">Ausgaben nach Kategorie</div>
+          <div className="mb-3.5 text-[0.85rem] text-ink-3">{monthLabel} {today.getFullYear()}</div>
           {(dashboard?.expensesByCategory?.length ?? 0) > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie
                     data={dashboard!.expensesByCategory}
@@ -114,122 +244,204 @@ export function DashboardPage() {
                     nameKey="category.name"
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
+                    innerRadius={48}
+                    outerRadius={76}
                     paddingAngle={2}
+                    stroke="var(--bg-elev)"
+                    strokeWidth={2}
                   >
-                    {dashboard!.expensesByCategory.map((entry: { categoryId?: string }, i: number) => (
-                      <Cell key={entry.categoryId || i} fill={COLORS[i % COLORS.length]} />
+                    {dashboard!.expensesByCategory.map((entry, i: number) => (
+                      <Cell
+                        key={entry.categoryId || i}
+                        fill={entry.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#e2e8f0' }}
+                    contentStyle={{
+                      background: CHART_COLORS.tooltipBg,
+                      border: `1px solid ${CHART_COLORS.tooltipBorder}`,
+                      borderRadius: 12,
+                      color: 'var(--text)',
+                    }}
                     formatter={(value: number) => formatCurrency(value)}
                   />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="mt-3 space-y-2">
-                {dashboard!.expensesByCategory.slice(0, 5).map((item: { categoryId?: string; category?: { name?: string; icon?: string }; amount: number }, i: number) => (
-                  <div key={item.categoryId || i} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                      <span className="text-surface-300">{item.category?.icon} {item.category?.name}</span>
+              <div className="mt-2 space-y-1.5">
+                {dashboard!.expensesByCategory.slice(0, 5).map((item, i) => {
+                  const color = item.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length];
+                  return (
+                    <div
+                      key={item.categoryId || i}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <CategoryDot cat={{ color, name: item.category?.name }} />
+                      <span className="flex-1 truncate text-ink-2">
+                        {item.category?.icon} {item.category?.name}
+                      </span>
+                      <span className="tnum font-semibold text-ink">{formatCurrency(item.amount)}</span>
                     </div>
-                    <span className="text-surface-200 font-medium">{formatCurrency(item.amount)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (
-            <p className="text-surface-500 text-sm text-center py-8">Keine Daten vorhanden</p>
+            <p className="py-8 text-center text-sm text-ink-3">Keine Daten vorhanden</p>
           )}
-        </div>
+        </Card>
       </div>
 
-      {/* Recent Transactions & Accounts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Transactions */}
-        <div className="card lg:col-span-2">
-          <h3 className="text-lg font-semibold text-white mb-4">Letzte Transaktionen</h3>
-          <div className="space-y-1">
-            {(dashboard?.recentTransactions?.length ?? 0) > 0 ? (
-              dashboard!.recentTransactions.map((tx: { id: string; category?: { name?: string; icon?: string }; counterpartName?: string; purpose?: string; amount: number | string; date: string }) => (
-                <div key={tx.id} className="flex items-center justify-between py-3 border-b border-surface-800 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-800 text-lg">
-                      {tx.category?.icon || '💳'}
+      {/* Accounts strip */}
+      <Card>
+        <div className="mb-3.5 flex items-center justify-between">
+          <div className="text-[1.05rem] font-bold text-ink">Deine Konten</div>
+          <Link to="/accounts" className="text-[0.85rem] font-semibold text-indigo hover:underline">
+            Alle ansehen →
+          </Link>
+        </div>
+        {(dashboard?.accounts?.length ?? 0) > 0 ? (
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+          >
+            {dashboard!.accounts.map((acc: BankAccount) => {
+              const color = pickCategoryColor(acc.bankName);
+              return (
+                <div
+                  key={acc.id}
+                  className="relative overflow-hidden rounded-lg border border-line p-4"
+                >
+                  <div
+                    className="pointer-events-none absolute -right-3 -top-3 h-16 w-16 rounded-full opacity-20"
+                    style={{ background: color }}
+                  />
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[0.75rem] font-bold text-white"
+                      style={{ background: color }}
+                    >
+                      {acc.bankName[0]?.toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-surface-200">
-                        {tx.counterpartName || tx.purpose || 'Transaktion'}
-                      </p>
-                      <p className="text-xs text-surface-500">
-                        {tx.category?.name || 'Unkategorisiert'} · {formatDateRelative(tx.date)}
-                      </p>
+                    <div className="min-w-0">
+                      <div className="truncate text-[0.85rem] font-semibold">{acc.bankName}</div>
+                      <div className="text-[0.72rem] text-ink-3">{acc.accountName}</div>
                     </div>
                   </div>
-                  <span className={cn(
-                    'text-sm font-semibold',
-                    Number(tx.amount) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  )}>
-                    {Number(tx.amount) >= 0 ? '+' : ''}{formatCurrency(Number(tx.amount))}
-                  </span>
+                  <div
+                    className="tnum text-[1.4rem] font-bold"
+                    style={{ color: Number(acc.balance) < 0 ? 'var(--neg)' : 'var(--text)' }}
+                  >
+                    {formatCurrency(Number(acc.balance))}
+                  </div>
+                  {acc.lastSynced && (
+                    <div className="mt-0.5 text-[0.72rem] text-ink-3">
+                      Sync: {formatDateRelative(acc.lastSynced)}
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className="text-surface-500 text-sm text-center py-8">Noch keine Transaktionen</p>
-            )}
+              );
+            })}
           </div>
-        </div>
+        ) : (
+          <p className="py-6 text-center text-sm text-ink-3">Keine Konten verknüpft</p>
+        )}
+      </Card>
 
-        {/* Accounts */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-white mb-4">Meine Konten</h3>
-          <div className="space-y-3">
-            {dashboard?.accounts?.map((acc: { id: string; accountName: string; bankName: string; balance: number | string }) => (
-              <div key={acc.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-800/50">
-                <div>
-                  <p className="text-sm font-medium text-surface-200">{acc.accountName}</p>
-                  <p className="text-xs text-surface-500">{acc.bankName}</p>
-                </div>
-                <span className="text-sm font-semibold text-surface-100">
-                  {formatCurrency(Number(acc.balance))}
-                </span>
-              </div>
-            ))}
-            {(!dashboard?.accounts || dashboard.accounts.length === 0) && (
-              <p className="text-surface-500 text-sm text-center py-4">Keine Konten verknüpft</p>
-            )}
+      {/* Lower row */}
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}
+      >
+        {/* Recent Transactions */}
+        <Card>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[1.05rem] font-bold text-ink">Letzte Transaktionen</div>
+            <Link
+              to="/transactions"
+              className="text-[0.85rem] font-semibold text-indigo hover:underline"
+            >
+              Alle →
+            </Link>
           </div>
-        </div>
+          {(dashboard?.recentTransactions?.length ?? 0) > 0 ? (
+            <div>
+              {dashboard!.recentTransactions.slice(0, 6).map((tx: Transaction) => {
+                const amount = Number(tx.amount);
+                return (
+                  <div
+                    key={tx.id}
+                    className="flex items-center gap-3.5 border-b py-3 last:border-0"
+                    style={{ borderColor: 'var(--line-2)' }}
+                  >
+                    <CategoryIcon cat={tx.category} size={38} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[0.9rem] font-semibold">
+                        {tx.counterpartName || tx.purpose || 'Transaktion'}
+                      </div>
+                      <div className="text-[0.75rem] text-ink-3">
+                        {tx.category?.name || 'Unkategorisiert'} · {formatDateRelative(tx.date)}
+                      </div>
+                    </div>
+                    <div
+                      className="tnum text-sm font-bold"
+                      style={{ color: amount > 0 ? 'var(--pos)' : 'var(--text)' }}
+                    >
+                      {amount > 0 ? '+' : ''}
+                      {formatCurrency(amount)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-ink-3">Noch keine Transaktionen</p>
+          )}
+        </Card>
+
+        {/* Quick stats */}
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="text-[1.05rem] font-bold text-ink">Diesen Monat</div>
+              <div className="text-[0.78rem] text-ink-3">Übersicht {monthLabel}</div>
+            </div>
+            <Tag variant={savingsRate >= 20 ? 'pos' : savingsRate >= 10 ? 'info' : 'warn'}>
+              {savingsRate}% Sparquote
+            </Tag>
+          </div>
+          <div className="space-y-3">
+            <StatRow label="Einnahmen" value={monthlyIncome} positive />
+            <StatRow label="Ausgaben" value={monthlyExpenses} />
+            <StatRow label="Differenz" value={available} positive={available >= 0} bold />
+          </div>
+        </Card>
       </div>
     </div>
   );
 }
 
-// --- KPI Card Component ---
-function KpiCard({ title, value, icon, color }: {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  color: string;
+function StatRow({
+  label,
+  value,
+  positive,
+  bold,
+}: {
+  label: string;
+  value: number;
+  positive?: boolean;
+  bold?: boolean;
 }) {
-  const colorMap: Record<string, string> = {
-    brand: 'bg-brand-500/10 text-brand-400',
-    green: 'bg-emerald-500/10 text-emerald-400',
-    red: 'bg-red-500/10 text-red-400',
-    emerald: 'bg-emerald-500/10 text-emerald-400',
-  };
-
   return (
-    <div className="card-hover">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-surface-400">{title}</p>
-        <div className={cn('rounded-lg p-2', colorMap[color])}>
-          {icon}
-        </div>
-      </div>
-      <p className="mt-3 text-2xl font-bold text-white">{value}</p>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm text-ink-2">{label}</span>
+      <span
+        className={`tnum text-sm ${bold ? 'font-bold' : 'font-semibold'}`}
+        style={positive ? { color: 'var(--pos)' } : undefined}
+      >
+        {positive && value > 0 ? '+' : ''}
+        {formatCurrency(value)}
+      </span>
     </div>
   );
 }

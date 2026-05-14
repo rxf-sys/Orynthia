@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, X, Loader2, Pause, Play, Calendar } from 'lucide-react';
+import { Plus, Trash2, X, Loader2, Calendar, Repeat } from 'lucide-react';
 import { recurringPaymentsApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/lib/types';
 import toast from 'react-hot-toast';
+import { Card, Btn, Field, PageHead, CategoryIcon, Tag } from '@/components/ui';
 
 const frequencyLabels: Record<string, string> = {
   WEEKLY: 'Wöchentlich',
@@ -18,7 +19,14 @@ const frequencyLabels: Record<string, string> = {
 export function RecurringPaymentsPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', amount: '', frequency: 'MONTHLY', counterpartName: '', categoryId: '', nextDueDate: '' });
+  const [form, setForm] = useState({
+    name: '',
+    amount: '',
+    frequency: 'MONTHLY',
+    counterpartName: '',
+    categoryId: '',
+    nextDueDate: '',
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['recurring-payments'],
@@ -60,33 +68,61 @@ export function RecurringPaymentsPage() {
   const payments = data?.payments || [];
   const activePayments = payments.filter((p) => p.isActive);
   const inactivePayments = payments.filter((p) => !p.isActive);
+  const sorted = [...activePayments].sort((a, b) =>
+    (a.nextDueDate || '').localeCompare(b.nextDueDate || ''),
+  );
+  const biggest = activePayments.reduce<RecurringPayment | null>((max, p) => {
+    if (!max) return p;
+    return Math.abs(Number(p.amount)) > Math.abs(Number(max.amount)) ? p : max;
+  }, null);
+
+  const today = new Date();
+  const weekFromNow = new Date(today);
+  weekFromNow.setDate(today.getDate() + 7);
+  const dueThisWeek = activePayments.filter((p) => {
+    if (!p.nextDueDate) return false;
+    const d = new Date(p.nextDueDate);
+    return d >= today && d <= weekFromNow;
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Wiederkehrende Zahlungen</h1>
-          <p className="text-surface-400 mt-1">
-            Monatlich: <span className="text-white font-semibold">{formatCurrency(data?.monthlyTotal || 0)}</span>
-            {' / '}
-            Jährlich: <span className="text-white font-semibold">{formatCurrency(data?.yearlyTotal || 0)}</span>
-          </p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? 'Abbrechen' : 'Neue Zahlung'}
-        </button>
+    <div className="space-y-5">
+      <PageHead
+        title="Wiederkehrend"
+        sub={`${activePayments.length} aktiv · ${inactivePayments.length} pausiert`}
+        actions={
+          <Btn variant="grad" icon={showForm ? X : Plus} onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Abbrechen' : 'Neue Zahlung'}
+          </Btn>
+        }
+      />
+
+      {/* KPI */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiTile label="Pro Monat" value={formatCurrency(data?.monthlyTotal || 0)} />
+        <KpiTile label="Pro Jahr" value={formatCurrency(data?.yearlyTotal || 0)} />
+        <KpiTile label="Diese Woche fällig" value={`${dueThisWeek.length}`} />
+        <KpiTile label="Größte Position" value={biggest ? formatCurrency(Number(biggest.amount)) : '—'} />
       </div>
 
-      {/* Create Form */}
       {showForm && (
-        <div className="card animate-slide-up">
-          <h3 className="text-lg font-semibold text-white mb-4">Neue wiederkehrende Zahlung</h3>
+        <Card
+          className="animate-fade-in"
+          style={{
+            borderStyle: 'dashed',
+            borderColor: 'var(--peach)',
+            background: 'rgba(255,177,122,.05)',
+          }}
+        >
+          <h3 className="mb-4 text-lg font-bold text-ink">Neue wiederkehrende Zahlung</h3>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               const amount = Number(form.amount);
-              if (!amount) { toast.error('Bitte Betrag eingeben'); return; }
+              if (!amount) {
+                toast.error('Bitte Betrag eingeben');
+                return;
+              }
               createMutation.mutate({
                 name: form.name,
                 amount,
@@ -96,143 +132,231 @@ export function RecurringPaymentsPage() {
                 nextDueDate: form.nextDueDate || undefined,
               });
             }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <div>
-              <label className="label">Name *</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="z.B. Netflix, Miete..." required />
-            </div>
-            <div>
-              <label className="label">Betrag (negativ = Ausgabe) *</label>
-              <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="input" placeholder="-12.99" step="0.01" required />
-            </div>
-            <div>
-              <label className="label">Häufigkeit</label>
-              <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="input">
+            <Field label="Name" required>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="input"
+                placeholder="z. B. Netflix, Miete…"
+                required
+              />
+            </Field>
+            <Field label="Betrag (negativ = Ausgabe)" required>
+              <input
+                type="number"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="input tnum"
+                placeholder="-12,99"
+                step="0.01"
+                required
+              />
+            </Field>
+            <Field label="Häufigkeit">
+              <select
+                value={form.frequency}
+                onChange={(e) => setForm({ ...form, frequency: e.target.value })}
+                className="select"
+              >
                 {Object.entries(frequencyLabels).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label">Empfänger</label>
-              <input value={form.counterpartName} onChange={(e) => setForm({ ...form, counterpartName: e.target.value })} className="input" placeholder="z.B. Netflix Inc." />
-            </div>
-            <div>
-              <label className="label">Kategorie</label>
-              <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="input">
+            </Field>
+            <Field label="Empfänger">
+              <input
+                value={form.counterpartName}
+                onChange={(e) => setForm({ ...form, counterpartName: e.target.value })}
+                className="input"
+                placeholder="z. B. Netflix Inc."
+              />
+            </Field>
+            <Field label="Kategorie">
+              <select
+                value={form.categoryId}
+                onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                className="select"
+              >
                 <option value="">Keine</option>
                 {categories?.map((cat: Category) => (
-                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name}
+                  </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label">Nächste Fälligkeit</label>
-              <input type="date" value={form.nextDueDate} onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })} className="input" />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
-              <button type="submit" disabled={createMutation.isPending} className="btn-primary">
+            </Field>
+            <Field label="Nächste Fälligkeit">
+              <input
+                type="date"
+                value={form.nextDueDate}
+                onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })}
+                className="input"
+              />
+            </Field>
+            <div className="flex items-end sm:col-span-2 lg:col-span-3">
+              <Btn type="submit" variant="grad" disabled={createMutation.isPending}>
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Erstellen'}
-              </button>
+              </Btn>
             </div>
           </form>
-        </div>
+        </Card>
       )}
 
-      {/* Payments List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+          <Loader2 className="h-8 w-8 animate-spin text-indigo" />
         </div>
       ) : payments.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-surface-500">Noch keine wiederkehrenden Zahlungen.</p>
-          <p className="text-surface-600 text-sm mt-1">Erfasse deine Abos, Miete und regelmäßige Zahlungen.</p>
-        </div>
+        <Card className="text-center" style={{ padding: '48px 24px' }}>
+          <Repeat className="mx-auto mb-3 h-10 w-10 text-ink-4" />
+          <p className="font-semibold text-ink">Noch keine wiederkehrenden Zahlungen</p>
+          <p className="mt-1 text-sm text-ink-3">Erfasse Abos, Miete und regelmäßige Zahlungen.</p>
+        </Card>
       ) : (
-        <div className="space-y-6">
-          {activePayments.length > 0 && (
-            <div className="space-y-2">
-              {activePayments.map((payment) => (
-                <PaymentRow
-                  key={payment.id}
-                  payment={payment}
-                  onDelete={() => { if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id); }}
-                  onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: false })}
-                />
-              ))}
+        <Card className="!p-0">
+          <div className="border-b px-5 py-3" style={{ borderColor: 'var(--line-2)' }}>
+            <div className="text-[1.05rem] font-bold text-ink">Kommende Buchungen</div>
+            <div className="text-[0.78rem] text-ink-3">
+              Nach Fälligkeitsdatum sortiert
             </div>
-          )}
-
+          </div>
+          {sorted.map((payment, i) => (
+            <PaymentRow
+              key={payment.id}
+              payment={payment}
+              isLast={i === sorted.length - 1 && inactivePayments.length === 0}
+              onDelete={() => {
+                if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id);
+              }}
+              onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: false })}
+            />
+          ))}
           {inactivePayments.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium text-surface-500 mb-2">Pausiert</h3>
-              <div className="space-y-2 opacity-60">
-                {inactivePayments.map((payment) => (
+            <>
+              <div
+                className="border-y bg-soft px-5 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-3"
+                style={{ borderColor: 'var(--line-2)' }}
+              >
+                Pausiert
+              </div>
+              {inactivePayments.map((payment, i) => (
+                <div key={payment.id} className="opacity-60">
                   <PaymentRow
-                    key={payment.id}
                     payment={payment}
-                    onDelete={() => { if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id); }}
+                    isLast={i === inactivePayments.length - 1}
+                    onDelete={() => {
+                      if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id);
+                    }}
                     onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: true })}
                   />
-                ))}
-              </div>
-            </div>
+                </div>
+              ))}
+            </>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );
 }
 
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <div className="text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+        {label}
+      </div>
+      <div className="tnum mt-2 text-[1.85rem] font-bold leading-none">{value}</div>
+    </Card>
+  );
+}
+
 function PaymentRow({
   payment,
+  isLast,
   onDelete,
   onToggle,
 }: {
   payment: RecurringPayment;
+  isLast?: boolean;
   onDelete: () => void;
   onToggle: () => void;
 }) {
   const amount = Number(payment.amount);
   const isExpense = amount < 0;
+  const dueDate = payment.nextDueDate ? new Date(payment.nextDueDate) : null;
+  const daysUntil = dueDate ? Math.round((dueDate.getTime() - Date.now()) / 86400000) : null;
 
   return (
-    <div className="card-hover group flex items-center gap-4">
-      <div className="flex-shrink-0 text-lg">
-        {payment.category?.icon || (isExpense ? '💸' : '💰')}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h4 className="font-medium text-surface-200 truncate">{payment.name}</h4>
-          <span className="text-xs text-surface-500 bg-surface-800 px-2 py-0.5 rounded-full">
-            {frequencyLabels[payment.frequency] || payment.frequency}
-          </span>
+    <div
+      className={cn('group flex items-center gap-4 px-5 py-3.5', !isLast && 'border-b')}
+      style={!isLast ? { borderColor: 'var(--line-2)' } : undefined}
+    >
+      {dueDate && (
+        <div className="hidden h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-line bg-soft text-center sm:flex">
+          <div className="text-[0.6rem] font-semibold uppercase text-ink-3">
+            {dueDate.toLocaleDateString('de-DE', { month: 'short' })}
+          </div>
+          <div className="text-base font-bold leading-none tnum">{dueDate.getDate()}</div>
         </div>
-        <div className="flex items-center gap-3 mt-0.5">
-          {payment.counterpartName && (
-            <span className="text-xs text-surface-500">{payment.counterpartName}</span>
-          )}
-          {payment.nextDueDate && (
-            <span className="text-xs text-surface-500 flex items-center gap-1">
+      )}
+      <CategoryIcon cat={payment.category} fallbackIcon={isExpense ? '💸' : '💰'} size={38} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="truncate font-semibold text-ink">{payment.name}</h4>
+          <Tag>{frequencyLabels[payment.frequency] || payment.frequency}</Tag>
+        </div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+          {payment.counterpartName && <span>{payment.counterpartName}</span>}
+          {daysUntil !== null && (
+            <span
+              className="flex items-center gap-1"
+              style={daysUntil <= 7 ? { color: 'var(--warn)' } : undefined}
+            >
               <Calendar className="h-3 w-3" />
-              {new Date(payment.nextDueDate).toLocaleDateString('de-DE')}
+              {daysUntil < 0 ? `vor ${Math.abs(daysUntil)} T.` : `in ${daysUntil} T.`}
             </span>
           )}
         </div>
       </div>
-      <div className={cn('text-lg font-semibold tabular-nums', isExpense ? 'text-red-400' : 'text-emerald-400')}>
+      <div
+        className="tnum w-28 text-right text-[1.05rem] font-bold"
+        style={isExpense ? undefined : { color: 'var(--pos)' }}
+      >
         {formatCurrency(amount)}
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onToggle} className="text-surface-500 hover:text-amber-400 p-1" title={payment.isActive ? 'Pausieren' : 'Aktivieren'}>
-          {payment.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </button>
-        <button onClick={onDelete} className="text-surface-500 hover:text-red-400 p-1">
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
+      <label className="inline-flex shrink-0 cursor-pointer items-center" title={payment.isActive ? 'Pausieren' : 'Aktivieren'}>
+        <input
+          type="checkbox"
+          checked={payment.isActive}
+          onChange={onToggle}
+          className="peer sr-only"
+          aria-label={payment.isActive ? 'Pausieren' : 'Aktivieren'}
+        />
+        <div
+          className={cn(
+            'relative h-5 w-9 rounded-pill transition-colors',
+            payment.isActive ? 'bg-indigo' : 'bg-sunken',
+          )}
+        >
+          <div
+            className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
+              payment.isActive ? 'translate-x-4' : 'translate-x-0.5',
+            )}
+          />
+        </div>
+      </label>
+      <button
+        onClick={onDelete}
+        className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+        aria-label="Zahlung löschen"
+      >
+        <Trash2 className="h-4 w-4 text-ink-3" />
+      </button>
     </div>
   );
 }

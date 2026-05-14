@@ -2,33 +2,24 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { MobileTabbar } from './MobileTabbar';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-950">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-bg lg:grid lg:grid-cols-[260px_1fr]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-col">
         <Header onMenuClick={() => setSidebarOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl animate-fade-in">
-            <Outlet />
-          </div>
+        <main className="mx-auto w-full max-w-[1480px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7">
+          <Outlet />
         </main>
       </div>
 
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <MobileTabbar />
     </div>
   );
 }
