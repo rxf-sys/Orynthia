@@ -1,33 +1,45 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, X, Loader2, ShieldCheck, ExternalLink, TrendingDown, Sparkles, FileText } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  X,
+  Loader2,
+  ShieldCheck,
+  ExternalLink,
+  TrendingDown,
+  Sparkles,
+  FileText,
+  Lightbulb,
+} from 'lucide-react';
 import { contractsApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Contract, CreateContractData, DetectedContract } from '@/lib/types';
 import toast from 'react-hot-toast';
+import { Card, Btn, Field, PageHead, Tag } from '@/components/ui';
 
-const contractTypeLabels: Record<string, { label: string; icon: string; group: string }> = {
-  INSURANCE_LIABILITY: { label: 'Haftpflicht', icon: '🛡️', group: 'Versicherungen' },
-  INSURANCE_HOUSEHOLD: { label: 'Hausrat', icon: '🏠', group: 'Versicherungen' },
-  INSURANCE_HEALTH: { label: 'Krankenversicherung', icon: '🏥', group: 'Versicherungen' },
-  INSURANCE_DENTAL: { label: 'Zahnzusatz', icon: '🦷', group: 'Versicherungen' },
-  INSURANCE_LIFE: { label: 'Lebensversicherung', icon: '❤️', group: 'Versicherungen' },
-  INSURANCE_CAR: { label: 'KFZ-Versicherung', icon: '🚗', group: 'Versicherungen' },
-  INSURANCE_LEGAL: { label: 'Rechtsschutz', icon: '⚖️', group: 'Versicherungen' },
-  INSURANCE_DISABILITY: { label: 'Berufsunfähigkeit', icon: '🏗️', group: 'Versicherungen' },
-  INSURANCE_OTHER: { label: 'Sonstige Versicherung', icon: '📋', group: 'Versicherungen' },
-  ENERGY_ELECTRICITY: { label: 'Strom', icon: '⚡', group: 'Energie' },
-  ENERGY_GAS: { label: 'Gas', icon: '🔥', group: 'Energie' },
-  TELECOM_MOBILE: { label: 'Mobilfunk', icon: '📱', group: 'Telekommunikation' },
-  TELECOM_INTERNET: { label: 'Internet', icon: '🌐', group: 'Telekommunikation' },
-  TELECOM_LANDLINE: { label: 'Festnetz', icon: '📞', group: 'Telekommunikation' },
-  STREAMING: { label: 'Streaming', icon: '🎬', group: 'Abos' },
-  GYM: { label: 'Fitness', icon: '💪', group: 'Abos' },
-  SUBSCRIPTION: { label: 'Sonstiges Abo', icon: '📦', group: 'Abos' },
-  RENT: { label: 'Miete', icon: '🏘️', group: 'Wohnen' },
-  LEASE: { label: 'Leasing', icon: '🚙', group: 'Sonstige' },
-  LOAN: { label: 'Kredit', icon: '🏦', group: 'Sonstige' },
-  OTHER: { label: 'Sonstige', icon: '📄', group: 'Sonstige' },
+const contractTypeLabels: Record<string, { label: string; icon: string; group: string; color?: string }> = {
+  INSURANCE_LIABILITY: { label: 'Haftpflicht', icon: '🛡️', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_HOUSEHOLD: { label: 'Hausrat', icon: '🏠', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_HEALTH: { label: 'Krankenversicherung', icon: '🏥', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_DENTAL: { label: 'Zahnzusatz', icon: '🦷', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_LIFE: { label: 'Lebensversicherung', icon: '❤️', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_CAR: { label: 'KFZ-Versicherung', icon: '🚗', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_LEGAL: { label: 'Rechtsschutz', icon: '⚖️', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_DISABILITY: { label: 'Berufsunfähigkeit', icon: '🏗️', group: 'Versicherungen', color: '#5b8def' },
+  INSURANCE_OTHER: { label: 'Sonstige Versicherung', icon: '📋', group: 'Versicherungen', color: '#5b8def' },
+  ENERGY_ELECTRICITY: { label: 'Strom', icon: '⚡', group: 'Energie', color: '#d99a2b' },
+  ENERGY_GAS: { label: 'Gas', icon: '🔥', group: 'Energie', color: '#d99a2b' },
+  TELECOM_MOBILE: { label: 'Mobilfunk', icon: '📱', group: 'Telekommunikation', color: '#b97aff' },
+  TELECOM_INTERNET: { label: 'Internet', icon: '🌐', group: 'Telekommunikation', color: '#b97aff' },
+  TELECOM_LANDLINE: { label: 'Festnetz', icon: '📞', group: 'Telekommunikation', color: '#b97aff' },
+  STREAMING: { label: 'Streaming', icon: '🎬', group: 'Abos', color: '#e76b8d' },
+  GYM: { label: 'Fitness', icon: '💪', group: 'Abos', color: '#1f8a5b' },
+  SUBSCRIPTION: { label: 'Sonstiges Abo', icon: '📦', group: 'Abos', color: '#e76b8d' },
+  RENT: { label: 'Miete', icon: '🏘️', group: 'Wohnen', color: '#424769' },
+  LEASE: { label: 'Leasing', icon: '🚙', group: 'Sonstige', color: '#3aa3a5' },
+  LOAN: { label: 'Kredit', icon: '🏦', group: 'Sonstige', color: '#3aa3a5' },
+  OTHER: { label: 'Sonstige', icon: '📄', group: 'Sonstige', color: '#878f9d' },
 };
 
 const billingLabels: Record<string, string> = {
@@ -44,7 +56,10 @@ export function ContractsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('contracts');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<CreateContractData>>({
-    name: '', provider: '', contractType: 'SUBSCRIPTION', billingCycle: 'MONTHLY',
+    name: '',
+    provider: '',
+    contractType: 'SUBSCRIPTION',
+    billingCycle: 'MONTHLY',
   });
 
   const { data, isLoading } = useQuery({
@@ -85,13 +100,14 @@ export function ContractsPage() {
   });
 
   const adoptMutation = useMutation({
-    mutationFn: (det: DetectedContract) => contractsApi.createFromDetection({
-      counterpartName: det.counterpartName,
-      counterpartIban: det.counterpartIban,
-      avgAmount: det.avgAmount,
-      frequency: det.frequency,
-      contractType: det.suggestedType,
-    }),
+    mutationFn: (det: DetectedContract) =>
+      contractsApi.createFromDetection({
+        counterpartName: det.counterpartName,
+        counterpartIban: det.counterpartIban,
+        avgAmount: det.avgAmount,
+        frequency: det.frequency,
+        contractType: det.suggestedType,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
       queryClient.invalidateQueries({ queryKey: ['contracts-detect'] });
@@ -102,7 +118,6 @@ export function ContractsPage() {
 
   const contracts = data?.contracts || [];
 
-  // Gruppierung nach Typ-Gruppe
   const grouped = new Map<string, Contract[]>();
   for (const c of contracts) {
     const group = contractTypeLabels[c.contractType]?.group || 'Sonstige';
@@ -111,33 +126,59 @@ export function ContractsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Verträge</h1>
-          <p className="text-surface-400 mt-1">
-            Monatlich: <span className="text-white font-semibold">{formatCurrency(data?.totalMonthly || 0)}</span>
-            {' / '}
-            Jährlich: <span className="text-white font-semibold">{formatCurrency(data?.totalYearly || 0)}</span>
-          </p>
+    <div className="space-y-5">
+      <PageHead
+        title="Verträge"
+        sub={`${contracts.length} laufende Verträge`}
+        actions={
+          <Btn variant="grad" icon={showForm ? X : Plus} onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Abbrechen' : 'Neuer Vertrag'}
+          </Btn>
+        }
+      />
+
+      {/* Hero: savings potential */}
+      <Card variant="hero">
+        <div className="relative z-[2] grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+          <div>
+            <div className="text-[0.78rem] uppercase tracking-[0.08em] opacity-90">
+              Sparpotential
+            </div>
+            <div className="h-display mt-1 text-[2.4rem] leading-[1.1]">
+              Du könntest{' '}
+              <span style={{ color: 'var(--peach-2)' }} className="tnum">
+                {formatCurrency(comparison?.totalSavingsYearly || 0)}
+              </span>
+              /Jahr sparen
+            </div>
+            <div className="mt-1 text-[0.9rem] opacity-85">
+              Wir vergleichen deine Verträge mit Marktdurchschnitten.
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-white">
+            <HeroTile label="Monatlich" value={formatCurrency(data?.totalMonthly || 0)} />
+            <HeroTile label="Jährlich" value={formatCurrency(data?.totalYearly || 0)} />
+            <HeroTile label="Verträge" value={`${contracts.length}`} />
+          </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? 'Abbrechen' : 'Neuer Vertrag'}
-        </button>
-      </div>
+      </Card>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-800 rounded-xl p-1 w-fit">
-        {[
-          { key: 'contracts' as Tab, label: 'Meine Verträge', icon: FileText },
-          { key: 'detect' as Tab, label: 'Auto-Erkennung', icon: Sparkles },
-          { key: 'compare' as Tab, label: 'Anbietervergleich', icon: TrendingDown },
-        ].map(({ key, label, icon: Icon }) => (
+      <div className="flex flex-wrap gap-1 rounded-pill border border-line bg-soft p-1 sm:w-fit">
+        {(
+          [
+            { key: 'contracts', label: 'Meine Verträge', icon: FileText },
+            { key: 'detect', label: 'Auto-Erkennung', icon: Sparkles },
+            { key: 'compare', label: 'Anbietervergleich', icon: TrendingDown },
+          ] as const
+        ).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', activeTab === key ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-surface-200')}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-pill px-4 py-2 text-sm font-semibold transition sm:flex-none',
+              activeTab === key ? 'bg-elev text-ink shadow-sm' : 'text-ink-3 hover:text-ink',
+            )}
           >
             <Icon className="h-4 w-4" />
             {label}
@@ -145,252 +186,375 @@ export function ContractsPage() {
         ))}
       </div>
 
-      {/* Create Form */}
       {showForm && (
-        <div className="card animate-slide-up">
-          <h3 className="text-lg font-semibold text-white mb-4">Neuen Vertrag erfassen</h3>
+        <Card
+          className="animate-fade-in"
+          style={{
+            borderStyle: 'dashed',
+            borderColor: 'var(--peach)',
+            background: 'rgba(255,177,122,.05)',
+          }}
+        >
+          <h3 className="mb-4 text-lg font-bold text-ink">Neuen Vertrag erfassen</h3>
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!form.name || !form.provider || !form.contractType) { toast.error('Bitte Name, Anbieter und Typ ausfüllen'); return; }
+              if (!form.name || !form.provider || !form.contractType) {
+                toast.error('Bitte Name, Anbieter und Typ ausfüllen');
+                return;
+              }
               createMutation.mutate(form as CreateContractData);
             }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <div>
-              <label className="label">Vertragsname *</label>
-              <input value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="z.B. Haftpflicht, Strom..." required />
-            </div>
-            <div>
-              <label className="label">Anbieter *</label>
-              <input value={form.provider || ''} onChange={(e) => setForm({ ...form, provider: e.target.value })} className="input" placeholder="z.B. Allianz, Vattenfall..." required />
-            </div>
-            <div>
-              <label className="label">Vertragstyp *</label>
-              <select value={form.contractType || ''} onChange={(e) => setForm({ ...form, contractType: e.target.value })} className="input" required>
+            <Field label="Vertragsname" required>
+              <input
+                value={form.name || ''}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="input"
+                placeholder="z. B. Haftpflicht, Strom…"
+                required
+              />
+            </Field>
+            <Field label="Anbieter" required>
+              <input
+                value={form.provider || ''}
+                onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                className="input"
+                placeholder="z. B. Allianz, Vattenfall…"
+                required
+              />
+            </Field>
+            <Field label="Vertragstyp" required>
+              <select
+                value={form.contractType || ''}
+                onChange={(e) => setForm({ ...form, contractType: e.target.value })}
+                className="select"
+                required
+              >
                 {Object.entries(contractTypeLabels).map(([k, v]) => (
-                  <option key={k} value={k}>{v.icon} {v.label}</option>
+                  <option key={k} value={k}>
+                    {v.icon} {v.label}
+                  </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label">Monatliche Kosten</label>
-              <input type="number" value={form.monthlyCost || ''} onChange={(e) => setForm({ ...form, monthlyCost: Number(e.target.value) || undefined })} className="input" placeholder="0.00" step="0.01" />
-            </div>
-            <div>
-              <label className="label">Jährliche Kosten</label>
-              <input type="number" value={form.yearlyCost || ''} onChange={(e) => setForm({ ...form, yearlyCost: Number(e.target.value) || undefined })} className="input" placeholder="0.00" step="0.01" />
-            </div>
-            <div>
-              <label className="label">Abrechnungszyklus</label>
-              <select value={form.billingCycle || 'MONTHLY'} onChange={(e) => setForm({ ...form, billingCycle: e.target.value })} className="input">
+            </Field>
+            <Field label="Monatliche Kosten">
+              <input
+                type="number"
+                value={form.monthlyCost ?? ''}
+                onChange={(e) => setForm({ ...form, monthlyCost: Number(e.target.value) || undefined })}
+                className="input tnum"
+                placeholder="0,00"
+                step="0.01"
+              />
+            </Field>
+            <Field label="Jährliche Kosten">
+              <input
+                type="number"
+                value={form.yearlyCost ?? ''}
+                onChange={(e) => setForm({ ...form, yearlyCost: Number(e.target.value) || undefined })}
+                className="input tnum"
+                placeholder="0,00"
+                step="0.01"
+              />
+            </Field>
+            <Field label="Abrechnungszyklus">
+              <select
+                value={form.billingCycle || 'MONTHLY'}
+                onChange={(e) => setForm({ ...form, billingCycle: e.target.value })}
+                className="select"
+              >
                 {Object.entries(billingLabels).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label">Vertragsnummer</label>
-              <input value={form.contractNumber || ''} onChange={(e) => setForm({ ...form, contractNumber: e.target.value })} className="input" placeholder="Optional" />
-            </div>
-            <div>
-              <label className="label">Kündigungsfrist</label>
-              <input value={form.noticePeriod || ''} onChange={(e) => setForm({ ...form, noticePeriod: e.target.value })} className="input" placeholder="z.B. 3 Monate" />
-            </div>
-            <div>
-              <label className="label">Vertragsbeginn</label>
-              <input type="date" value={form.startDate || ''} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input" />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
-              <button type="submit" disabled={createMutation.isPending} className="btn-primary">
+            </Field>
+            <Field label="Vertragsnummer">
+              <input
+                value={form.contractNumber || ''}
+                onChange={(e) => setForm({ ...form, contractNumber: e.target.value })}
+                className="input"
+                placeholder="Optional"
+              />
+            </Field>
+            <Field label="Kündigungsfrist">
+              <input
+                value={form.noticePeriod || ''}
+                onChange={(e) => setForm({ ...form, noticePeriod: e.target.value })}
+                className="input"
+                placeholder="z. B. 3 Monate"
+              />
+            </Field>
+            <Field label="Vertragsbeginn">
+              <input
+                type="date"
+                value={form.startDate || ''}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="input"
+              />
+            </Field>
+            <div className="flex items-end sm:col-span-2 lg:col-span-3">
+              <Btn type="submit" variant="grad" disabled={createMutation.isPending}>
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Vertrag speichern'}
-              </button>
+              </Btn>
             </div>
           </form>
-        </div>
+        </Card>
       )}
 
-      {/* Tab: Meine Verträge */}
-      {activeTab === 'contracts' && (
-        isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-          </div>
+      {/* Tab content */}
+      {activeTab === 'contracts' &&
+        (isLoading ? (
+          <Loader />
         ) : contracts.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-surface-500">Noch keine Verträge erfasst.</p>
-            <p className="text-surface-600 text-sm mt-1">Nutze die Auto-Erkennung oder erfasse Verträge manuell.</p>
-          </div>
+          <EmptyState
+            icon={<FileText className="h-10 w-10 text-ink-4" />}
+            title="Noch keine Verträge erfasst"
+            sub="Nutze die Auto-Erkennung oder erfasse Verträge manuell."
+          />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {Array.from(grouped.entries()).map(([group, items]) => (
               <div key={group}>
-                <h3 className="text-sm font-medium text-surface-500 mb-3">{group}</h3>
-                <div className="space-y-2">
-                  {items.map((contract) => {
-                    const typeInfo = contractTypeLabels[contract.contractType] || { label: contract.contractType, icon: '📄' };
+                <h3 className="mb-2.5 text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                  {group}
+                </h3>
+                <Card className="!p-0">
+                  {items.map((contract, idx) => {
+                    const info =
+                      contractTypeLabels[contract.contractType] || {
+                        label: contract.contractType,
+                        icon: '📄',
+                        color: '#878f9d',
+                      };
                     return (
-                      <div key={contract.id} className="card-hover group flex items-center gap-4">
-                        <span className="text-xl flex-shrink-0">{typeInfo.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-surface-200 truncate">{contract.name}</h4>
-                            <span className="text-xs text-surface-500">{contract.provider}</span>
+                      <div
+                        key={contract.id}
+                        className={cn(
+                          'group flex items-center gap-4 px-5 py-3.5',
+                          idx > 0 && 'border-t',
+                        )}
+                        style={idx > 0 ? { borderColor: 'var(--line-2)' } : undefined}
+                      >
+                        <div
+                          className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-lg"
+                          style={{
+                            background: `${info.color}1f`,
+                            color: info.color,
+                          }}
+                        >
+                          {info.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="truncate font-semibold text-ink">{contract.name}</h4>
+                            <Tag>{info.label}</Tag>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-surface-500 mt-0.5">
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+                            <span>{contract.provider}</span>
+                            <span>·</span>
                             <span>{billingLabels[contract.billingCycle] || contract.billingCycle}</span>
-                            {contract.noticePeriod && <span>Kündigungsfrist: {contract.noticePeriod}</span>}
-                            {contract.contractNumber && <span>Nr. {contract.contractNumber}</span>}
+                            {contract.noticePeriod && (
+                              <>
+                                <span>·</span>
+                                <span>Frist: {contract.noticePeriod}</span>
+                              </>
+                            )}
+                            {contract.contractNumber && (
+                              <>
+                                <span>·</span>
+                                <span>Nr. {contract.contractNumber}</span>
+                              </>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-lg font-semibold text-white tabular-nums">{formatCurrency(contract.monthlyCost)}/M</p>
-                          <p className="text-xs text-surface-500">{formatCurrency(contract.yearlyCost)}/J</p>
+                        <div className="shrink-0 text-right">
+                          <div className="tnum text-[1.05rem] font-bold">
+                            {formatCurrency(contract.monthlyCost)}
+                          </div>
+                          <div className="text-[0.72rem] text-ink-3 tnum">
+                            {formatCurrency(contract.yearlyCost)}/J
+                          </div>
                         </div>
                         <button
-                          onClick={() => { if (confirm('Vertrag wirklich löschen?')) deleteMutation.mutate(contract.id); }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-surface-500 hover:text-red-400 p-1"
+                          onClick={() => {
+                            if (confirm('Vertrag wirklich löschen?')) deleteMutation.mutate(contract.id);
+                          }}
+                          className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+                          aria-label="Vertrag löschen"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-ink-3" />
                         </button>
                       </div>
                     );
                   })}
-                </div>
+                </Card>
               </div>
             ))}
           </div>
-        )
-      )}
+        ))}
 
-      {/* Tab: Auto-Erkennung */}
       {activeTab === 'detect' && (
         <div>
-          <p className="text-sm text-surface-400 mb-4">
+          <p className="mb-4 text-sm text-ink-3">
             Analyse der letzten 12 Monate. Wiederkehrende Zahlungen mit mindestens 3 Buchungen werden erkannt.
           </p>
           {loadingDetect ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-surface-500" />
-            </div>
+            <Loader />
           ) : !detected || detected.length === 0 ? (
-            <div className="card text-center py-12">
-              <p className="text-surface-500">Keine neuen Verträge erkannt.</p>
-              <p className="text-surface-600 text-sm mt-1">Alle wiederkehrenden Zahlungen sind bereits erfasst.</p>
-            </div>
+            <EmptyState
+              icon={<Sparkles className="h-10 w-10 text-ink-4" />}
+              title="Keine neuen Verträge erkannt"
+              sub="Alle wiederkehrenden Zahlungen sind bereits erfasst."
+            />
           ) : (
-            <div className="space-y-2">
+            <Card className="!p-0">
               {detected.map((det, i) => {
-                const typeInfo = contractTypeLabels[det.suggestedType] || { label: det.suggestedType, icon: '📄' };
+                const info =
+                  contractTypeLabels[det.suggestedType] || {
+                    label: det.suggestedType,
+                    icon: '📄',
+                    color: '#878f9d',
+                  };
                 return (
-                  <div key={i} className="card-hover flex items-center gap-4">
-                    <span className="text-xl flex-shrink-0">{typeInfo.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-surface-200 truncate">{det.counterpartName}</h4>
-                      <div className="flex items-center gap-3 text-xs text-surface-500 mt-0.5">
-                        <span>{det.occurrences}x in 12 Monaten</span>
-                        <span>Erkannt als: {typeInfo.label}</span>
-                        <span>Letzte: {new Date(det.lastDate).toLocaleDateString('de-DE')}</span>
+                  <div
+                    key={i}
+                    className={cn('flex items-center gap-4 px-5 py-3.5', i > 0 && 'border-t')}
+                    style={i > 0 ? { borderColor: 'var(--line-2)' } : undefined}
+                  >
+                    <div
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-lg"
+                      style={{ background: `${info.color}1f`, color: info.color }}
+                    >
+                      {info.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="truncate font-semibold text-ink">{det.counterpartName}</h4>
+                        <Tag variant="info">{det.occurrences}× in 12 Mon.</Tag>
+                        <Tag variant="accent">{info.label}</Tag>
+                      </div>
+                      <div className="mt-0.5 text-xs text-ink-3">
+                        Letzte: {new Date(det.lastDate).toLocaleDateString('de-DE')}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-lg font-semibold text-white tabular-nums">{formatCurrency(det.avgAmount)}</p>
-                      <p className="text-xs text-surface-500">Durchschnitt</p>
+                    <div className="shrink-0 text-right">
+                      <div className="tnum text-[1.05rem] font-bold">{formatCurrency(det.avgAmount)}</div>
+                      <div className="text-[0.72rem] text-ink-3">Durchschnitt</div>
                     </div>
-                    <button
+                    <Btn
+                      size="sm"
+                      variant="grad"
+                      icon={Plus}
                       onClick={() => adoptMutation.mutate(det)}
                       disabled={adoptMutation.isPending}
-                      className="btn-primary text-sm px-3 py-1.5 flex-shrink-0"
                     >
-                      {adoptMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                       Übernehmen
-                    </button>
+                    </Btn>
                   </div>
                 );
               })}
-            </div>
+            </Card>
           )}
         </div>
       )}
 
-      {/* Tab: Anbietervergleich */}
       {activeTab === 'compare' && (
-        <div>
-          <p className="text-sm text-surface-400 mb-4">
-            Vergleich deiner Verträge mit deutschen Marktdurchschnitten. Preise basierend auf Check24/Verivox Referenzwerten.
+        <div className="space-y-4">
+          <p className="text-sm text-ink-3">
+            Vergleich deiner Verträge mit deutschen Marktdurchschnitten. Preise basierend auf Check24/Verivox-Referenzwerten.
           </p>
           {loadingCompare ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-surface-500" />
-            </div>
+            <Loader />
           ) : !comparison || comparison.comparisons.length === 0 ? (
-            <div className="card text-center py-12">
-              <p className="text-surface-500">Noch keine vergleichbaren Verträge vorhanden.</p>
-              <p className="text-surface-600 text-sm mt-1">Erfasse Versicherungen und Energieverträge um Sparpotential zu sehen.</p>
-            </div>
+            <EmptyState
+              icon={<TrendingDown className="h-10 w-10 text-ink-4" />}
+              title="Keine vergleichbaren Verträge"
+              sub="Erfasse Versicherungen und Energieverträge, um Sparpotential zu sehen."
+            />
           ) : (
-            <div className="space-y-4">
+            <>
               {comparison.totalSavingsYearly > 0 && (
-                <div className="card bg-emerald-500/5 border border-emerald-500/20">
-                  <div className="flex items-center gap-3">
-                    <TrendingDown className="h-6 w-6 text-emerald-400" />
-                    <div>
-                      <p className="text-lg font-bold text-emerald-400">
-                        Bis zu {formatCurrency(comparison.totalSavingsYearly)}/Jahr Sparpotential
-                      </p>
-                      <p className="text-sm text-surface-400">
-                        Das sind {formatCurrency(comparison.totalSavingsMonthly)} pro Monat
-                      </p>
-                    </div>
+                <Card
+                  className="flex items-center gap-3"
+                  style={{ background: 'var(--pos-bg)', borderColor: 'transparent' }}
+                >
+                  <TrendingDown className="h-6 w-6 text-pos" />
+                  <div>
+                    <p className="tnum text-lg font-bold text-pos">
+                      Bis zu {formatCurrency(comparison.totalSavingsYearly)}/Jahr Sparpotential
+                    </p>
+                    <p className="text-sm text-ink-2">
+                      Das sind {formatCurrency(comparison.totalSavingsMonthly)} pro Monat
+                    </p>
                   </div>
-                </div>
+                </Card>
               )}
 
               {comparison.comparisons.map((comp) => {
-                const typeInfo = contractTypeLabels[comp.contractType] || { label: comp.contractType, icon: '📄' };
-                const ratingColor = comp.rating === 'GOOD' ? 'text-emerald-400 bg-emerald-500/10' : comp.rating === 'OK' ? 'text-amber-400 bg-amber-500/10' : 'text-red-400 bg-red-500/10';
-                const ratingLabel = comp.rating === 'GOOD' ? 'Gut' : comp.rating === 'OK' ? 'OK' : 'Teuer';
+                const info =
+                  contractTypeLabels[comp.contractType] || {
+                    label: comp.contractType,
+                    icon: '📄',
+                    color: '#878f9d',
+                  };
+                const ratingVariant: 'pos' | 'warn' | 'neg' =
+                  comp.rating === 'GOOD' ? 'pos' : comp.rating === 'OK' ? 'warn' : 'neg';
+                const ratingLabel =
+                  comp.rating === 'GOOD' ? 'Gut' : comp.rating === 'OK' ? 'OK' : 'Teuer';
 
                 return (
-                  <div key={comp.contractId} className="card">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{typeInfo.icon}</span>
+                  <Card key={comp.contractId}>
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="grid h-10 w-10 place-items-center rounded-md text-lg"
+                          style={{ background: `${info.color}1f`, color: info.color }}
+                        >
+                          {info.icon}
+                        </div>
                         <div>
-                          <h4 className="font-medium text-surface-200">{comp.contractName}</h4>
-                          <p className="text-xs text-surface-500">{comp.provider}</p>
+                          <h4 className="font-semibold text-ink">{comp.contractName}</h4>
+                          <p className="text-xs text-ink-3">{comp.provider}</p>
                         </div>
                       </div>
-                      <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', ratingColor)}>
+                      <Tag variant={ratingVariant}>
                         {ratingLabel}
                         {comp.percentAboveAvg > 0 && ` (+${comp.percentAboveAvg}%)`}
-                      </span>
+                      </Tag>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-3">
-                      <div>
-                        <p className="text-xs text-surface-500">Dein Preis</p>
-                        <p className="text-lg font-semibold text-white">{formatCurrency(comp.currentMonthly)}/M</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-surface-500">Marktdurchschnitt</p>
-                        <p className="text-lg font-semibold text-surface-300">{formatCurrency(comp.marketAvgMonthly)}/M</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-surface-500">Sparpotential</p>
-                        <p className={cn('text-lg font-semibold', comp.savingsPotentialYearly > 0 ? 'text-emerald-400' : 'text-surface-500')}>
-                          {comp.savingsPotentialYearly > 0 ? `${formatCurrency(comp.savingsPotentialYearly)}/J` : '--'}
-                        </p>
-                      </div>
+                    <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                      <CompareKpi label="Dein Tarif" value={formatCurrency(comp.currentMonthly)} />
+                      <CompareKpi
+                        label="Marktdurchschnitt"
+                        value={formatCurrency(comp.marketAvgMonthly)}
+                        muted
+                      />
+                      <CompareKpi
+                        label="Ersparnis"
+                        value={
+                          comp.savingsPotentialYearly > 0
+                            ? `${formatCurrency(comp.savingsPotentialYearly)}/J`
+                            : '—'
+                        }
+                        positive={comp.savingsPotentialYearly > 0}
+                      />
                     </div>
 
                     {comp.tips.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-xs font-medium text-surface-400 mb-1">Tipps:</p>
-                        <ul className="text-xs text-surface-500 space-y-0.5">
+                      <div
+                        className="mb-3 flex items-start gap-2 rounded-md p-3"
+                        style={{ background: 'var(--bg-soft)' }}
+                      >
+                        <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-peach" />
+                        <ul className="space-y-0.5 text-xs text-ink-2">
                           {comp.tips.map((tip, i) => (
                             <li key={i} className="flex items-start gap-1.5">
-                              <ShieldCheck className="h-3 w-3 text-brand-400 mt-0.5 flex-shrink-0" />
+                              <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-indigo" />
                               {tip}
                             </li>
                           ))}
@@ -399,25 +563,103 @@ export function ContractsPage() {
                     )}
 
                     {comp.compareUrls.length > 0 && (
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-2">
                         {comp.compareUrls.map((url, i) => {
-                          const domain = new URL(url).hostname.replace('www.', '');
+                          let host = url;
+                          try {
+                            host = new URL(url).hostname.replace('www.', '');
+                          } catch {
+                            /* keep as is */
+                          }
                           return (
-                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors">
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-pill border border-line bg-elev px-3 py-1 text-xs font-semibold text-ink-2 hover:text-indigo"
+                            >
                               <ExternalLink className="h-3 w-3" />
-                              {domain}
+                              {host}
                             </a>
                           );
                         })}
+                        <Btn size="sm" variant="grad" className="ml-auto">
+                          Wechseln
+                        </Btn>
                       </div>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
-            </div>
+            </>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function HeroTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="rounded-lg p-3 backdrop-blur"
+      style={{ background: 'rgba(255,255,255,.12)' }}
+    >
+      <div className="text-[0.72rem] opacity-85">{label}</div>
+      <div className="tnum mt-0.5 text-[1.1rem] font-bold">{value}</div>
+    </div>
+  );
+}
+
+function CompareKpi({
+  label,
+  value,
+  muted,
+  positive,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  positive?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+        {label}
+      </div>
+      <div
+        className={cn('tnum mt-1 text-lg font-bold', muted && 'text-ink-3')}
+        style={positive ? { color: 'var(--pos)' } : undefined}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  sub,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  sub?: string;
+}) {
+  return (
+    <Card className="text-center" style={{ padding: '48px 24px' }}>
+      <div className="mb-3 inline-flex">{icon}</div>
+      <p className="font-semibold text-ink">{title}</p>
+      {sub && <p className="mt-1 text-sm text-ink-3">{sub}</p>}
+    </Card>
+  );
+}
+
+function Loader() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-8 w-8 animate-spin text-indigo" />
     </div>
   );
 }

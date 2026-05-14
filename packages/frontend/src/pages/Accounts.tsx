@@ -1,17 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, X, Loader2, Building2, CreditCard, PiggyBank, TrendingUp, RefreshCw, Link2, Search } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  X,
+  Loader2,
+  Building2,
+  CreditCard,
+  PiggyBank,
+  TrendingUp,
+  RefreshCw,
+  Link2,
+  Search,
+} from 'lucide-react';
 import { accountsApi, bankingApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { BankAccount, CreateAccountData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
+import { Card, Btn, Field, PageHead, pickCategoryColor } from '@/components/ui';
 
-const accountTypeConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  CHECKING: { label: 'Girokonto', icon: <Building2 className="h-5 w-5" />, color: 'text-blue-400 bg-blue-500/10' },
-  SAVINGS: { label: 'Sparkonto', icon: <PiggyBank className="h-5 w-5" />, color: 'text-emerald-400 bg-emerald-500/10' },
-  CREDIT_CARD: { label: 'Kreditkarte', icon: <CreditCard className="h-5 w-5" />, color: 'text-amber-400 bg-amber-500/10' },
-  DEPOT: { label: 'Depot', icon: <TrendingUp className="h-5 w-5" />, color: 'text-purple-400 bg-purple-500/10' },
+const accountTypeConfig: Record<string, { label: string; icon: React.ReactNode }> = {
+  CHECKING: { label: 'Girokonto', icon: <Building2 className="h-5 w-5" /> },
+  SAVINGS: { label: 'Sparkonto', icon: <PiggyBank className="h-5 w-5" /> },
+  CREDIT_CARD: { label: 'Kreditkarte', icon: <CreditCard className="h-5 w-5" /> },
+  DEPOT: { label: 'Depot', icon: <TrendingUp className="h-5 w-5" /> },
 };
 
 type Tab = 'manual' | 'bank';
@@ -21,7 +34,13 @@ export function AccountsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('bank');
-  const [form, setForm] = useState({ bankName: '', accountName: '', iban: '', accountType: 'CHECKING', balance: '' });
+  const [form, setForm] = useState({
+    bankName: '',
+    accountName: '',
+    iban: '',
+    accountType: 'CHECKING',
+    balance: '',
+  });
   const [bankSearch, setBankSearch] = useState('');
   const [selectedBank, setSelectedBank] = useState<{ id: string; name: string; logo?: string } | null>(null);
 
@@ -42,21 +61,22 @@ export function AccountsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Callback nach Bank-Authentifizierung (Enable Banking sendet ?code=... zurück)
   useEffect(() => {
     const code = searchParams.get('code');
     const bankConnected = searchParams.get('bankConnected');
     if (code || bankConnected === 'true') {
-      // Letzte Verbindung laden und Callback mit dem Authorization-Code auslösen
       bankingApi.getConnections().then((r) => {
         const latest = r.data?.[0];
         if (latest?.externalConnectionId) {
-          bankingApi.handleCallback(latest.externalConnectionId, code || undefined).then((res) => {
-            toast.success(res.data?.message || 'Konten importiert');
-            queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
-            queryClient.invalidateQueries({ queryKey: ['bank-connections'] });
-          }).catch(() => toast.error('Fehler beim Importieren der Konten'));
+          bankingApi
+            .handleCallback(latest.externalConnectionId, code || undefined)
+            .then((res) => {
+              toast.success(res.data?.message || 'Konten importiert');
+              queryClient.invalidateQueries({ queryKey: ['accounts'] });
+              queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
+              queryClient.invalidateQueries({ queryKey: ['bank-connections'] });
+            })
+            .catch(() => toast.error('Fehler beim Importieren der Konten'));
         }
       });
       setSearchParams({}, { replace: true });
@@ -87,7 +107,6 @@ export function AccountsPage() {
   const connectMutation = useMutation({
     mutationFn: (institutionId: string) => bankingApi.connectBank(institutionId),
     onSuccess: (res) => {
-      // Weiterleitung zur Bank-Authentifizierung
       window.location.href = res.data.authUrl;
     },
     onError: () => toast.error('Fehler beim Verbinden mit der Bank'),
@@ -117,123 +136,150 @@ export function AccountsPage() {
     onError: () => toast.error('Sync fehlgeschlagen'),
   });
 
-  const filteredInstitutions = institutions?.filter((inst) =>
-    inst.name.toLowerCase().includes(bankSearch.toLowerCase())
-  ) || [];
+  const filteredInstitutions =
+    institutions?.filter((inst) => inst.name.toLowerCase().includes(bankSearch.toLowerCase())) || [];
 
   const hasConnectedAccounts = accounts?.some((acc: BankAccount) => acc.lastSynced);
+  const totalBalance = balanceData?.totalBalance ?? 0;
+  const assets = (accounts || [])
+    .filter((a: BankAccount) => Number(a.balance) >= 0)
+    .reduce((s: number, a: BankAccount) => s + Number(a.balance), 0);
+  const liabilities = (accounts || [])
+    .filter((a: BankAccount) => Number(a.balance) < 0)
+    .reduce((s: number, a: BankAccount) => s + Number(a.balance), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Konten</h1>
-          <p className="text-surface-400 mt-1">
-            Gesamtsaldo: <span className="text-white font-semibold">{formatCurrency(balanceData?.totalBalance || 0)}</span>
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasConnectedAccounts && (
-            <button
-              onClick={() => syncAllMutation.mutate()}
-              disabled={syncAllMutation.isPending}
-              className="btn-ghost"
-              title="Alle Konten synchronisieren"
-            >
-              <RefreshCw className={cn('h-4 w-4', syncAllMutation.isPending && 'animate-spin')} />
-              Sync
-            </button>
-          )}
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {showForm ? 'Abbrechen' : 'Konto hinzufügen'}
-          </button>
-        </div>
+    <div className="space-y-5">
+      <PageHead
+        title="Konten"
+        sub={`${accounts?.length ?? 0} Konten verwaltet`}
+        actions={
+          <>
+            {hasConnectedAccounts && (
+              <Btn
+                variant="ghost"
+                icon={RefreshCw}
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isPending}
+              >
+                {syncAllMutation.isPending ? 'Syncing…' : 'Sync'}
+              </Btn>
+            )}
+            <Btn variant="grad" icon={showForm ? X : Plus} onClick={() => setShowForm(!showForm)}>
+              {showForm ? 'Abbrechen' : 'Konto hinzufügen'}
+            </Btn>
+          </>
+        }
+      />
+
+      {/* KPI Strip */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiTile label="Nettovermögen" value={totalBalance} accent />
+        <KpiTile label="Vermögen" value={assets} positive />
+        <KpiTile label="Verbindlichkeiten" value={liabilities} negative />
+        <KpiTile label="Aktive Konten" value={accounts?.length || 0} isNumber />
       </div>
 
-      {/* Add Account Form */}
+      {/* Form */}
       {showForm && (
-        <div className="card animate-slide-up">
-          {/* Tab Toggle */}
-          <div className="flex gap-1 bg-surface-800 rounded-xl p-1 mb-6 w-fit">
+        <Card
+          className="animate-fade-in"
+          style={{
+            borderStyle: 'dashed',
+            borderColor: 'var(--peach)',
+            background: 'rgba(255,177,122,.05)',
+          }}
+        >
+          <div className="mb-5 flex gap-1 rounded-pill border border-line bg-soft p-1">
             <button
               onClick={() => setActiveTab('bank')}
-              className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', activeTab === 'bank' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-surface-200')}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-pill px-4 py-2 text-sm font-semibold transition',
+                activeTab === 'bank' ? 'bg-elev text-ink shadow-sm' : 'text-ink-3',
+              )}
             >
               <Link2 className="h-4 w-4" />
               Bank verbinden
             </button>
             <button
               onClick={() => setActiveTab('manual')}
-              className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', activeTab === 'manual' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-surface-200')}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-pill px-4 py-2 text-sm font-semibold transition',
+                activeTab === 'manual' ? 'bg-elev text-ink shadow-sm' : 'text-ink-3',
+              )}
             >
               <Plus className="h-4 w-4" />
               Manuell
             </button>
           </div>
 
-          {/* Bank Connect Tab */}
           {activeTab === 'bank' && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-2">Bank verbinden</h3>
-              <p className="text-sm text-surface-400 mb-4">
+              <h3 className="mb-1 text-lg font-bold text-ink">Bank verbinden</h3>
+              <p className="mb-4 text-sm text-ink-3">
                 Verbinde dein Bankkonto per Open Banking (PSD2). Transaktionen und Kontostände werden automatisch synchronisiert.
               </p>
 
               {selectedBank ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3 bg-surface-800 rounded-xl p-4">
-                    {selectedBank.logo && <img src={selectedBank.logo} alt="" className="h-8 w-8 rounded" />}
+                  <div className="flex items-center gap-3 rounded-md border border-line bg-soft p-4">
+                    {selectedBank.logo && (
+                      <img src={selectedBank.logo} alt="" className="h-8 w-8 rounded" />
+                    )}
                     <div>
-                      <p className="text-white font-medium">{selectedBank.name}</p>
-                      <p className="text-xs text-surface-500">Weiterleitung zur Bank-Authentifizierung</p>
+                      <p className="font-semibold text-ink">{selectedBank.name}</p>
+                      <p className="text-xs text-ink-3">Weiterleitung zur Bank-Authentifizierung</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <button
+                    <Btn
+                      variant="grad"
+                      icon={connectMutation.isPending ? undefined : Link2}
                       onClick={() => connectMutation.mutate(selectedBank.id)}
                       disabled={connectMutation.isPending}
-                      className="btn-primary"
                     >
-                      {connectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                      Jetzt verbinden
-                    </button>
-                    <button onClick={() => setSelectedBank(null)} className="btn-ghost">
+                      {connectMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Jetzt verbinden'
+                      )}
+                    </Btn>
+                    <Btn variant="ghost" onClick={() => setSelectedBank(null)}>
                       Andere Bank
-                    </button>
+                    </Btn>
                   </div>
                 </div>
               ) : (
                 <div>
                   <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
                     <input
                       type="text"
                       value={bankSearch}
                       onChange={(e) => setBankSearch(e.target.value)}
-                      placeholder="Bank suchen (z.B. Sparkasse, DKB, ING...)"
+                      placeholder="Bank suchen (z. B. Sparkasse, DKB, ING…)"
                       className="input pl-10"
                       autoFocus
                     />
                   </div>
                   {loadingBanks ? (
                     <div className="flex justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-surface-500" />
+                      <Loader2 className="h-6 w-6 animate-spin text-ink-3" />
                     </div>
                   ) : (
-                    <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
+                    <div className="max-h-64 space-y-1 overflow-y-auto">
                       {filteredInstitutions.slice(0, 50).map((inst) => (
                         <button
                           key={inst.id}
                           onClick={() => setSelectedBank(inst)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-800 transition-colors text-left"
+                          className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-soft"
                         >
                           {inst.logo && <img src={inst.logo} alt="" className="h-6 w-6 rounded" />}
-                          <span className="text-sm text-surface-200">{inst.name}</span>
+                          <span className="text-sm text-ink">{inst.name}</span>
                         </button>
                       ))}
                       {filteredInstitutions.length === 0 && bankSearch && (
-                        <p className="text-sm text-surface-500 text-center py-4">Keine Bank gefunden</p>
+                        <p className="py-4 text-center text-sm text-ink-3">Keine Bank gefunden</p>
                       )}
                     </div>
                   )}
@@ -242,112 +288,221 @@ export function AccountsPage() {
             </div>
           )}
 
-          {/* Manual Tab */}
           {activeTab === 'manual' && (
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Konto manuell hinzufügen</h3>
+              <h3 className="mb-4 text-lg font-bold text-ink">Konto manuell hinzufügen</h3>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  createMutation.mutate({ ...form, balance: Number(form.balance) || 0, accountType: form.accountType as CreateAccountData['accountType'] });
+                  createMutation.mutate({
+                    ...form,
+                    balance: Number(form.balance) || 0,
+                    accountType: form.accountType as CreateAccountData['accountType'],
+                  });
                 }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                className="grid gap-4 sm:grid-cols-2"
               >
-                <div>
-                  <label className="label">Bankname *</label>
-                  <input value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} className="input" placeholder="z.B. Sparkasse" required />
-                </div>
-                <div>
-                  <label className="label">Kontoname *</label>
-                  <input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} className="input" placeholder="z.B. Girokonto" required />
-                </div>
-                <div>
-                  <label className="label">IBAN</label>
-                  <input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} className="input" placeholder="DE89 3704 0044 ..." />
-                </div>
-                <div>
-                  <label className="label">Kontotyp</label>
-                  <select value={form.accountType} onChange={(e) => setForm({ ...form, accountType: e.target.value })} className="input">
+                <Field label="Bankname" required>
+                  <input
+                    value={form.bankName}
+                    onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                    className="input"
+                    placeholder="z. B. Sparkasse"
+                    required
+                  />
+                </Field>
+                <Field label="Kontoname" required>
+                  <input
+                    value={form.accountName}
+                    onChange={(e) => setForm({ ...form, accountName: e.target.value })}
+                    className="input"
+                    placeholder="z. B. Girokonto"
+                    required
+                  />
+                </Field>
+                <Field label="IBAN">
+                  <input
+                    value={form.iban}
+                    onChange={(e) => setForm({ ...form, iban: e.target.value })}
+                    className="input font-mono"
+                    placeholder="DE89 3704 0044 …"
+                  />
+                </Field>
+                <Field label="Kontotyp">
+                  <select
+                    value={form.accountType}
+                    onChange={(e) => setForm({ ...form, accountType: e.target.value })}
+                    className="select"
+                  >
                     <option value="CHECKING">Girokonto</option>
                     <option value="SAVINGS">Sparkonto</option>
                     <option value="CREDIT_CARD">Kreditkarte</option>
                     <option value="DEPOT">Depot</option>
                   </select>
-                </div>
-                <div>
-                  <label className="label">Aktueller Kontostand</label>
-                  <input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} className="input" placeholder="0.00" step="0.01" />
-                </div>
+                </Field>
+                <Field label="Aktueller Kontostand">
+                  <input
+                    type="number"
+                    value={form.balance}
+                    onChange={(e) => setForm({ ...form, balance: e.target.value })}
+                    className="input tnum"
+                    placeholder="0,00"
+                    step="0.01"
+                  />
+                </Field>
                 <div className="flex items-end">
-                  <button type="submit" disabled={createMutation.isPending} className="btn-primary w-full">
-                    {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Konto erstellen'}
-                  </button>
+                  <Btn type="submit" variant="grad" disabled={createMutation.isPending} className="w-full">
+                    {createMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Konto erstellen'
+                    )}
+                  </Btn>
                 </div>
               </form>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* Account List */}
+      {/* Accounts grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+          <Loader2 className="h-8 w-8 animate-spin text-indigo" />
         </div>
       ) : accounts?.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-surface-500">Noch keine Konten hinzugefügt.</p>
-          <p className="text-surface-600 text-sm mt-1">Verbinde deine Bank oder erstelle ein Konto manuell.</p>
-        </div>
+        <Card className="text-center" style={{ padding: '48px 24px' }}>
+          <Building2 className="mx-auto mb-3 h-10 w-10 text-ink-4" />
+          <p className="font-semibold text-ink">Noch keine Konten hinzugefügt</p>
+          <p className="mt-1 text-sm text-ink-3">Verbinde deine Bank oder erstelle ein Konto manuell.</p>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts?.map((acc: BankAccount) => {
-            const config = accountTypeConfig[acc.accountType] || accountTypeConfig.CHECKING;
+            const cfg = accountTypeConfig[acc.accountType] || accountTypeConfig.CHECKING;
+            const color = pickCategoryColor(acc.bankName);
             const isLinked = !!acc.lastSynced;
             return (
-              <div key={acc.id} className="card-hover group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={cn('rounded-xl p-2.5', config.color)}>
-                    {config.icon}
+              <div
+                key={acc.id}
+                className="group overflow-hidden rounded-lg border border-line bg-elev shadow-sm"
+              >
+                {/* Bank Header */}
+                <div
+                  className="relative px-5 py-4 text-white"
+                  style={{
+                    background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+                  }}
+                >
+                  <div
+                    className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full"
+                    style={{ background: 'rgba(255,255,255,.15)' }}
+                  />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="grid h-10 w-10 place-items-center rounded-md font-bold backdrop-blur"
+                        style={{ background: 'rgba(255,255,255,.22)' }}
+                      >
+                        {acc.bankName[0]?.toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[0.85rem] font-semibold opacity-90">
+                          {acc.bankName}
+                        </div>
+                        <div className="truncate text-[0.78rem] opacity-75">{acc.accountName}</div>
+                      </div>
+                    </div>
+                    <span className="rounded-pill bg-white/20 px-2 py-0.5 text-[0.7rem] font-semibold">
+                      {cfg.label}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="tnum mt-4 text-[1.7rem] font-bold leading-none">
+                    {formatCurrency(Number(acc.balance))}
+                  </div>
+                  {acc.iban && (
+                    <div className="mt-1 font-mono text-[0.72rem] opacity-75">{acc.iban}</div>
+                  )}
+                </div>
+                {/* Body */}
+                <div className="flex items-center justify-between p-4">
+                  <div className="text-[0.72rem] text-ink-3">
+                    {isLinked
+                      ? `Sync: ${new Date(acc.lastSynced!).toLocaleDateString('de-DE')}`
+                      : 'Manuell verwaltet'}
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     {isLinked && (
                       <button
                         onClick={() => syncMutation.mutate(acc.id)}
                         disabled={syncMutation.isPending}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-surface-500 hover:text-brand-400 p-1"
+                        className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-indigo"
                         title="Konto synchronisieren"
+                        aria-label="Konto synchronisieren"
                       >
                         <RefreshCw className={cn('h-4 w-4', syncMutation.isPending && 'animate-spin')} />
                       </button>
                     )}
                     <button
-                      onClick={() => { if (confirm('Konto wirklich entfernen?')) deleteMutation.mutate(acc.id); }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-surface-500 hover:text-red-400 p-1"
+                      onClick={() => {
+                        if (confirm('Konto wirklich entfernen?')) deleteMutation.mutate(acc.id);
+                      }}
+                      className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-neg"
+                      aria-label="Konto entfernen"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-                <h4 className="text-lg font-semibold text-white">{acc.accountName}</h4>
-                <p className="text-sm text-surface-500">{acc.bankName}</p>
-                {acc.iban && <p className="text-xs text-surface-600 mt-1 font-mono">{acc.iban}</p>}
-                <div className="mt-4 pt-4 border-t border-surface-800">
-                  <p className="text-2xl font-bold text-white">{formatCurrency(Number(acc.balance))}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-surface-500">{config.label}</p>
-                    {isLinked && (
-                      <p className="text-xs text-surface-600">
-                        Sync: {new Date(acc.lastSynced!).toLocaleDateString('de-DE')}
-                      </p>
-                    )}
-                  </div>
-                </div>
               </div>
             );
           })}
+
+          {/* Add card */}
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-ink-3 transition-colors hover:border-peach hover:bg-soft hover:text-ink"
+            style={{ borderColor: 'var(--line)' }}
+          >
+            <Plus className="h-6 w-6" />
+            <span className="text-sm font-semibold">Bank verbinden</span>
+          </button>
         </div>
       )}
     </div>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  positive,
+  negative,
+  accent,
+  isNumber,
+}: {
+  label: string;
+  value: number;
+  positive?: boolean;
+  negative?: boolean;
+  accent?: boolean;
+  isNumber?: boolean;
+}) {
+  let valueColor: string | undefined;
+  if (negative) valueColor = 'var(--neg)';
+  else if (positive) valueColor = 'var(--pos)';
+
+  return (
+    <Card
+      className={accent ? 'relative overflow-hidden' : ''}
+      style={accent ? { background: 'var(--grad-soft)' } : undefined}
+    >
+      <div className="text-[0.78rem] font-semibold uppercase tracking-[0.06em] text-ink-3">
+        {label}
+      </div>
+      <div className="tnum mt-2 text-[1.85rem] font-bold leading-none" style={{ color: valueColor }}>
+        {isNumber ? value : formatCurrency(value)}
+      </div>
+    </Card>
   );
 }

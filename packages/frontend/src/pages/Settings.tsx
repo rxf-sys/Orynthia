@@ -1,59 +1,73 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { User, Shield, Bell, Loader2, Check, Eye, EyeOff, Copy } from 'lucide-react';
+import {
+  User,
+  Shield,
+  Bell,
+  Loader2,
+  Check,
+  Eye,
+  EyeOff,
+  Copy,
+  Palette,
+  Sun,
+  Moon,
+  Trash2,
+} from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { Card, Btn, Field, PageHead, Tag, Avatar } from '@/components/ui';
 
-type Tab = 'profile' | 'security' | 'notifications';
+type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
+
+const tabs: { id: Tab; label: string; icon: typeof User }[] = [
+  { id: 'profile', label: 'Profil', icon: User },
+  { id: 'security', label: 'Sicherheit', icon: Shield },
+  { id: 'notifications', label: 'Benachrichtigungen', icon: Bell },
+  { id: 'appearance', label: 'Darstellung', icon: Palette },
+];
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
 
-  const tabs = [
-    { id: 'profile' as Tab, label: 'Profil', icon: User },
-    { id: 'security' as Tab, label: 'Sicherheit', icon: Shield },
-    { id: 'notifications' as Tab, label: 'Benachrichtigungen', icon: Bell },
-  ];
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Einstellungen</h1>
-        <p className="text-surface-400 mt-1">Verwalte dein Profil und deine Einstellungen</p>
-      </div>
+    <div className="space-y-5">
+      <PageHead title="Einstellungen" sub="Verwalte dein Profil und deine Einstellungen" />
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 bg-surface-900 rounded-xl p-1 w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-              activeTab === tab.id
-                ? 'bg-surface-800 text-white shadow-sm'
-                : 'text-surface-400 hover:text-surface-200'
-            )}
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
+        <aside className="flex flex-row gap-1 overflow-x-auto lg:flex-col">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-2.5 whitespace-nowrap rounded-md border border-transparent px-3 py-2.5 text-sm font-medium transition-all',
+                activeTab === tab.id
+                  ? 'bg-soft text-indigo'
+                  : 'text-ink-2 hover:bg-soft hover:text-ink',
+              )}
+              style={activeTab === tab.id ? { borderColor: 'var(--line)' } : undefined}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          ))}
+        </aside>
 
-      {/* Tab Content */}
-      <div className="animate-fade-in">
-        {activeTab === 'profile' && <ProfileTab />}
-        {activeTab === 'security' && <SecurityTab />}
-        {activeTab === 'notifications' && <NotificationsTab />}
+        <div className="min-w-0 animate-fade-in">
+          {activeTab === 'profile' && <ProfileTab />}
+          {activeTab === 'security' && <SecurityTab />}
+          {activeTab === 'notifications' && <NotificationsTab />}
+          {activeTab === 'appearance' && <AppearanceTab />}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ─── Profile Tab ─── */
 function ProfileTab() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -80,39 +94,42 @@ function ProfileTab() {
     },
   });
 
+  const fullName = `${form.firstName} ${form.lastName}`.trim() || form.email;
+
   return (
-    <div className="space-y-6">
-      <div className="card">
-        <h3 className="text-lg font-semibold text-white mb-6">Persönliche Daten</h3>
+    <div className="space-y-5">
+      <Card>
+        <div className="mb-5 flex items-center gap-4">
+          <Avatar name={fullName} size={64} />
+          <div>
+            <h3 className="text-lg font-bold text-ink">{fullName || 'Profil'}</h3>
+            <p className="text-sm text-ink-3">{form.email}</p>
+          </div>
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             updateMutation.mutate(form);
           }}
-          className="space-y-4 max-w-lg"
+          className="grid max-w-2xl gap-4 sm:grid-cols-2"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Vorname</label>
-              <input
-                value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                className="input"
-                placeholder="Max"
-              />
-            </div>
-            <div>
-              <label className="label">Nachname</label>
-              <input
-                value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                className="input"
-                placeholder="Mustermann"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="label">E-Mail</label>
+          <Field label="Vorname">
+            <input
+              value={form.firstName}
+              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+              className="input"
+              placeholder="Max"
+            />
+          </Field>
+          <Field label="Nachname">
+            <input
+              value={form.lastName}
+              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+              className="input"
+              placeholder="Mustermann"
+            />
+          </Field>
+          <Field label="E-Mail" required className="sm:col-span-2">
             <input
               type="email"
               value={form.email}
@@ -120,40 +137,41 @@ function ProfileTab() {
               className="input"
               required
             />
+          </Field>
+          <div className="sm:col-span-2">
+            <Btn type="submit" variant="grad" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Speichern
+            </Btn>
           </div>
-          <button type="submit" disabled={updateMutation.isPending} className="btn-primary">
-            {updateMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
-            Speichern
-          </button>
         </form>
-      </div>
+      </Card>
 
-      {/* Danger Zone */}
-      <div className="card border border-red-500/20">
-        <h3 className="text-lg font-semibold text-red-400 mb-2">Gefahrenzone</h3>
-        <p className="text-sm text-surface-400 mb-4">
+      <Card style={{ borderColor: 'var(--neg)' }}>
+        <h3 className="mb-1 text-lg font-bold text-neg">Gefahrenzone</h3>
+        <p className="mb-4 text-sm text-ink-3">
           Dein Konto und alle zugehörigen Daten werden unwiderruflich gelöscht.
         </p>
-        <button
+        <Btn
+          variant="danger"
+          icon={Trash2}
           onClick={() => {
             if (confirm('Bist du sicher? Alle Daten werden unwiderruflich gelöscht!')) {
               deleteAccountMutation.mutate();
             }
           }}
-          className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors"
         >
           Konto löschen
-        </button>
-      </div>
+        </Btn>
+      </Card>
     </div>
   );
 }
 
-/* ─── Security Tab ─── */
 function SecurityTab() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
@@ -209,18 +227,17 @@ function SecurityTab() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Password Change */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
+    <div className="space-y-5">
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-white">Passwort ändern</h3>
-            <p className="text-sm text-surface-400">Ändere dein Anmeldepasswort</p>
+            <h3 className="text-lg font-bold text-ink">Passwort ändern</h3>
+            <p className="text-sm text-ink-3">Aktualisiere dein Anmeldepasswort regelmäßig.</p>
           </div>
           {!showPasswordForm && (
-            <button onClick={() => setShowPasswordForm(true)} className="btn-ghost text-sm">
+            <Btn variant="ghost" onClick={() => setShowPasswordForm(true)}>
               Ändern
-            </button>
+            </Btn>
           )}
         </div>
 
@@ -241,27 +258,30 @@ function SecurityTab() {
                 newPassword: passwordForm.newPassword,
               });
             }}
-            className="space-y-4 max-w-lg animate-slide-up"
+            className="max-w-md space-y-4 animate-fade-in"
           >
-            <div className="relative">
-              <label className="label">Aktuelles Passwort</label>
-              <input
-                type={showPasswords ? 'text' : 'password'}
-                value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                className="input pr-10"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(!showPasswords)}
-                className="absolute right-3 top-[38px] text-surface-500 hover:text-surface-300"
-              >
-                {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <div>
-              <label className="label">Neues Passwort</label>
+            <Field label="Aktuelles Passwort">
+              <div className="relative">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  value={passwordForm.currentPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                  }
+                  className="input pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(!showPasswords)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink"
+                  aria-label="Passwort anzeigen"
+                >
+                  {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Neues Passwort">
               <input
                 type={showPasswords ? 'text' : 'password'}
                 value={passwordForm.newPassword}
@@ -270,9 +290,8 @@ function SecurityTab() {
                 required
                 minLength={8}
               />
-            </div>
-            <div>
-              <label className="label">Neues Passwort bestätigen</label>
+            </Field>
+            <Field label="Neues Passwort bestätigen">
               <input
                 type={showPasswords ? 'text' : 'password'}
                 value={passwordForm.confirmPassword}
@@ -280,70 +299,62 @@ function SecurityTab() {
                 className="input"
                 required
               />
-            </div>
+            </Field>
             <div className="flex gap-3">
-              <button type="submit" disabled={passwordMutation.isPending} className="btn-primary">
-                {passwordMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowPasswordForm(false)}
-                className="btn-ghost"
-              >
+              <Btn type="submit" variant="grad" disabled={passwordMutation.isPending}>
+                {passwordMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Speichern'
+                )}
+              </Btn>
+              <Btn type="button" variant="ghost" onClick={() => setShowPasswordForm(false)}>
                 Abbrechen
-              </button>
+              </Btn>
             </div>
           </form>
         )}
-      </div>
+      </Card>
 
-      {/* 2FA */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-white">Zwei-Faktor-Authentifizierung</h3>
-            <p className="text-sm text-surface-400">
-              Schütze dein Konto mit einem zusätzlichen Sicherheitscode
+            <h3 className="text-lg font-bold text-ink">Zwei-Faktor-Authentifizierung</h3>
+            <p className="text-sm text-ink-3">
+              Schütze dein Konto mit einem zusätzlichen Sicherheitscode.
             </p>
           </div>
-          <span
-            className={cn(
-              'text-xs font-medium px-2.5 py-1 rounded-full',
-              user?.twoFactorEnabled
-                ? 'bg-emerald-500/10 text-emerald-400'
-                : 'bg-surface-800 text-surface-400'
-            )}
-          >
+          <Tag variant={user?.twoFactorEnabled ? 'pos' : 'default'}>
             {user?.twoFactorEnabled ? 'Aktiv' : 'Inaktiv'}
-          </span>
+          </Tag>
         </div>
 
         {!user?.twoFactorEnabled && !qrCode && (
-          <button
+          <Btn
+            variant="grad"
+            icon={Shield}
             onClick={() => generate2faMutation.mutate()}
             disabled={generate2faMutation.isPending}
-            className="btn-primary"
           >
             {generate2faMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Shield className="h-4 w-4" />
+              '2FA aktivieren'
             )}
-            2FA aktivieren
-          </button>
+          </Btn>
         )}
 
         {qrCode && (
-          <div className="space-y-4 animate-slide-up">
-            <p className="text-sm text-surface-300">
-              Scanne diesen QR-Code mit deiner Authenticator-App (z.B. Google Authenticator, Authy):
+          <div className="space-y-4 animate-fade-in">
+            <p className="text-sm text-ink-2">
+              Scanne diesen QR-Code mit deiner Authenticator-App (z. B. Google Authenticator, Authy).
             </p>
-            <div className="bg-white p-4 rounded-xl w-fit">
-              <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
+            <div className="w-fit rounded-lg bg-white p-4">
+              <img src={qrCode} alt="2FA QR Code" className="h-48 w-48" />
             </div>
             {totpSecret && (
               <div className="flex items-center gap-2">
-                <code className="text-xs bg-surface-800 px-3 py-2 rounded-lg text-surface-300 font-mono">
+                <code className="rounded-md bg-soft px-3 py-2 font-mono text-xs text-ink-2">
                   {totpSecret}
                 </code>
                 <button
@@ -352,80 +363,87 @@ function SecurityTab() {
                     navigator.clipboard.writeText(totpSecret);
                     toast.success('Secret kopiert');
                   }}
-                  className="text-surface-500 hover:text-surface-300"
+                  className="text-ink-3 hover:text-ink"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-3 max-w-xs">
+            <div className="flex max-w-xs items-center gap-3">
               <input
                 type="text"
                 value={verifyCode}
                 onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="6-stelliger Code"
-                className="input font-mono text-center tracking-widest"
+                className="input text-center font-mono tracking-widest"
                 maxLength={6}
               />
-              <button
+              <Btn
+                variant="grad"
                 onClick={() => enable2faMutation.mutate(verifyCode)}
                 disabled={verifyCode.length !== 6 || enable2faMutation.isPending}
-                className="btn-primary shrink-0"
               >
-                {enable2faMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Bestätigen'}
-              </button>
+                {enable2faMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Bestätigen'
+                )}
+              </Btn>
             </div>
           </div>
         )}
 
         {user?.twoFactorEnabled && (
           <div className="space-y-3">
-            <p className="text-sm text-surface-400">
+            <p className="text-sm text-ink-3">
               2FA ist aktiv. Gib deinen aktuellen Code ein, um 2FA zu deaktivieren.
             </p>
-            <div className="flex items-center gap-3 max-w-xs">
+            <div className="flex max-w-xs items-center gap-3">
               <input
                 type="text"
                 value={verifyCode}
                 onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="6-stelliger Code"
-                className="input font-mono text-center tracking-widest"
+                className="input text-center font-mono tracking-widest"
                 maxLength={6}
               />
-              <button
+              <Btn
+                variant="danger"
                 onClick={() => disable2faMutation.mutate(verifyCode)}
                 disabled={verifyCode.length !== 6 || disable2faMutation.isPending}
-                className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors shrink-0"
               >
-                {disable2faMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Deaktivieren'}
-              </button>
+                {disable2faMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Deaktivieren'
+                )}
+              </Btn>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Active Sessions Info */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-white mb-2">Aktive Sitzungen</h3>
-        <p className="text-sm text-surface-400 mb-4">
-          Verwalte deine aktiven Anmeldesitzungen
-        </p>
-        <div className="bg-surface-800/50 rounded-lg p-4 flex items-center justify-between">
+      <Card>
+        <h3 className="mb-1 text-lg font-bold text-ink">Aktive Sitzungen</h3>
+        <p className="mb-4 text-sm text-ink-3">Verwalte deine aktiven Anmeldesitzungen.</p>
+        <div
+          className="flex items-center justify-between rounded-md p-4"
+          style={{ background: 'var(--bg-soft)' }}
+        >
           <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-emerald-400" />
+            <div className="h-2 w-2 rounded-full bg-pos" />
             <div>
-              <p className="text-sm text-surface-200">Aktuelle Sitzung</p>
-              <p className="text-xs text-surface-500">Dieses Gerät</p>
+              <p className="text-sm font-semibold text-ink">Aktuelle Sitzung</p>
+              <p className="text-xs text-ink-3">Dieses Gerät</p>
             </div>
           </div>
-          <span className="text-xs text-emerald-400">Aktiv</span>
+          <Tag variant="pos">Aktiv</Tag>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
 
-/* ─── Notifications Tab ─── */
 function NotificationsTab() {
   const [settings, setSettings] = useState({
     budgetWarnings: true,
@@ -445,7 +463,7 @@ function NotificationsTab() {
     {
       key: 'budgetWarnings' as const,
       label: 'Budget-Warnungen',
-      description: 'Benachrichtigung wenn 80% oder 100% eines Budgets erreicht sind',
+      description: 'Benachrichtigung wenn 80 % oder 100 % eines Budgets erreicht sind',
     },
     {
       key: 'newTransactions' as const,
@@ -475,38 +493,125 @@ function NotificationsTab() {
   ];
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold text-white mb-6">Benachrichtigungseinstellungen</h3>
-      <div className="space-y-1">
-        {notificationOptions.map((opt) => (
+    <Card className="!p-0">
+      <div className="border-b px-5 py-4" style={{ borderColor: 'var(--line-2)' }}>
+        <h3 className="text-lg font-bold text-ink">Benachrichtigungen</h3>
+        <p className="mt-0.5 text-sm text-ink-3">Wähle, worüber wir dich informieren sollen.</p>
+      </div>
+      <div>
+        {notificationOptions.map((opt, i) => (
           <div
             key={opt.key}
-            className="flex items-center justify-between py-4 px-2 rounded-lg hover:bg-surface-800/30 transition-colors"
+            className={cn(
+              'flex items-center justify-between gap-4 px-5 py-4',
+              i < notificationOptions.length - 1 && 'border-b',
+            )}
+            style={
+              i < notificationOptions.length - 1 ? { borderColor: 'var(--line-2)' } : undefined
+            }
           >
             <div>
-              <p className="text-sm font-medium text-surface-200">{opt.label}</p>
-              <p className="text-xs text-surface-500 mt-0.5">{opt.description}</p>
+              <p className="text-sm font-semibold text-ink">{opt.label}</p>
+              <p className="mt-0.5 text-xs text-ink-3">{opt.description}</p>
             </div>
-            <button
-              role="switch"
-              aria-checked={settings[opt.key]}
-              aria-label={opt.label}
-              onClick={() => toggleSetting(opt.key)}
-              className={cn(
-                'relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4',
-                settings[opt.key] ? 'bg-brand-500' : 'bg-surface-700'
-              )}
+            <label
+              className="inline-flex shrink-0 cursor-pointer items-center"
+              title={settings[opt.key] ? 'Aus' : 'An'}
             >
+              <input
+                type="checkbox"
+                checked={settings[opt.key]}
+                onChange={() => toggleSetting(opt.key)}
+                className="peer sr-only"
+                aria-label={opt.label}
+              />
               <div
                 className={cn(
-                  'absolute top-1 h-4 w-4 rounded-full bg-white transition-transform',
-                  settings[opt.key] ? 'translate-x-6' : 'translate-x-1'
+                  'relative h-6 w-11 rounded-pill transition-colors',
+                  settings[opt.key] ? 'bg-indigo' : 'bg-sunken',
                 )}
-              />
-            </button>
+              >
+                <div
+                  className={cn(
+                    'absolute top-1 h-4 w-4 rounded-full bg-white transition-transform',
+                    settings[opt.key] ? 'translate-x-6' : 'translate-x-1',
+                  )}
+                />
+              </div>
+            </label>
           </div>
         ))}
       </div>
-    </div>
+    </Card>
+  );
+}
+
+function AppearanceTab() {
+  const theme = useThemeStore((s) => s.theme);
+  const setTheme = useThemeStore((s) => s.set);
+
+  return (
+    <Card>
+      <h3 className="mb-1 text-lg font-bold text-ink">Theme</h3>
+      <p className="mb-4 text-sm text-ink-3">
+        Wähle das Erscheinungsbild der App. Wird auf diesem Gerät gespeichert.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ThemeOption
+          active={theme === 'light'}
+          onClick={() => setTheme('light')}
+          icon={Sun}
+          label="Hell"
+          description="Helle Oberfläche, ideal bei viel Tageslicht."
+        />
+        <ThemeOption
+          active={theme === 'dark'}
+          onClick={() => setTheme('dark')}
+          icon={Moon}
+          label="Dunkel"
+          description="Dunkle Oberfläche, schont die Augen am Abend."
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ThemeOption({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  description,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Sun;
+  label: string;
+  description: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-start gap-3 rounded-md border-2 p-4 text-left transition-all',
+        active ? 'border-peach bg-soft' : 'border-line bg-elev hover:bg-soft',
+      )}
+    >
+      <div
+        className={cn(
+          'grid h-10 w-10 shrink-0 place-items-center rounded-md',
+          active ? 'bg-peach text-navy' : 'bg-soft text-ink-2',
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-ink">{label}</span>
+          {active && <Tag variant="accent">Aktiv</Tag>}
+        </div>
+        <p className="mt-0.5 text-xs text-ink-3">{description}</p>
+      </div>
+    </button>
   );
 }

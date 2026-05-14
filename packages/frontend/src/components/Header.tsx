@@ -1,56 +1,92 @@
-import { Menu, Bell, Search } from 'lucide-react';
-import { useAuthStore } from '@/stores/authStore';
-import { getInitials } from '@/lib/utils';
+import { Menu, Search, Bell, HelpCircle, Plus, Sun, Moon } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useThemeStore } from '@/stores/themeStore';
+import { cn } from '@/lib/utils';
+import { Btn, IconBtn } from './ui/Btn';
+
+const TITLE_MAP: Record<string, string> = {
+  '/': 'Dashboard',
+  '/transactions': 'Transaktionen',
+  '/accounts': 'Konten',
+  '/budgets': 'Budgets',
+  '/savings': 'Sparzielen',
+  '/contracts': 'Verträgen',
+  '/recurring': 'wiederkehrenden Zahlungen',
+  '/settings': 'Einstellungen',
+};
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const theme = useThemeStore((s) => s.theme);
+  const setTheme = useThemeStore((s) => s.set);
+
+  const placeholder = `In ${TITLE_MAP[pathname] || 'Orynthia'} suchen…`;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-surface-800 bg-surface-900/80 backdrop-blur-xl px-4 md:px-6">
-      {/* Left */}
-      <div className="flex items-center gap-4">
+    <header
+      className="sticky top-0 z-20 flex items-center gap-3 border-b border-line px-4 py-3 backdrop-blur md:gap-4 md:px-8 md:py-[18px]"
+      style={{ background: 'color-mix(in oklab, var(--bg-elev) 80%, transparent)' }}
+    >
+      <button
+        onClick={onMenuClick}
+        aria-label="Menü öffnen"
+        className="grid h-9 w-9 place-items-center rounded-md border border-line bg-elev text-ink-2 lg:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Search */}
+      <div className="hidden flex-1 items-center gap-2.5 rounded-pill border border-line bg-soft px-3.5 py-2 text-ink-3 md:flex md:max-w-[420px]">
+        <Search className="h-4 w-4" />
+        <input className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-4" placeholder={placeholder} />
+        <span className="rounded border border-line px-1.5 py-0.5 text-[0.7rem] text-ink-3">⌘K</span>
+      </div>
+
+      <div className="flex-1 md:flex-none" />
+
+      {/* Theme toggle */}
+      <div className="theme-toggle">
         <button
-          onClick={onMenuClick}
-          aria-label="Menü öffnen"
-          className="rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white lg:hidden"
+          aria-label="Helles Theme"
+          title="Hell"
+          onClick={() => setTheme('light')}
+          className={cn(theme === 'light' && 'active')}
         >
-          <Menu className="h-5 w-5" />
+          <Sun className="h-3.5 w-3.5" />
         </button>
-
-        {/* Search */}
-        <div className="hidden md:flex items-center gap-2 rounded-xl bg-surface-800/50 border border-surface-700/50 px-3 py-2 w-72">
-          <Search className="h-4 w-4 text-surface-500" />
-          <input
-            type="text"
-            placeholder="Transaktionen suchen..."
-            aria-label="Transaktionen suchen"
-            className="bg-transparent text-sm text-surface-200 placeholder-surface-500 outline-none w-full"
-          />
-        </div>
+        <button
+          aria-label="Dunkles Theme"
+          title="Dunkel"
+          onClick={() => setTheme('dark')}
+          className={cn(theme === 'dark' && 'active')}
+        >
+          <Moon className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      {/* Right */}
-      <div className="flex items-center gap-3">
-        <button aria-label="Benachrichtigungen" className="relative rounded-lg p-2 text-surface-400 hover:bg-surface-800 hover:text-white transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand-500" />
-        </button>
-
-        <div className="flex items-center gap-3 pl-3 border-l border-surface-700">
-          <div className="h-8 w-8 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white">
-            {getInitials(user?.firstName, user?.lastName)}
-          </div>
-          <div className="hidden md:block">
-            <p className="text-sm font-medium text-surface-200">
-              {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}
-            </p>
-          </div>
-        </div>
+      <IconBtn icon={HelpCircle} aria-label="Hilfe" variant="ghost" className="hidden sm:grid" />
+      <div className="relative">
+        <IconBtn icon={Bell} aria-label="Benachrichtigungen" variant="ghost" />
+        <span
+          className="absolute right-2 top-2 h-2 w-2 rounded-full"
+          style={{ background: 'var(--peach)', boxShadow: '0 0 0 2px var(--bg-elev)' }}
+        />
       </div>
+
+      <Btn
+        variant="grad"
+        size="sm"
+        icon={Plus}
+        onClick={() => navigate('/transactions')}
+        className="hidden sm:inline-flex"
+      >
+        Neu
+      </Btn>
     </header>
   );
 }
