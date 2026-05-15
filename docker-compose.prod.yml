@@ -8,8 +8,6 @@ services:
     build:
       target: production
     volumes: !reset []
-    environment:
-      NODE_ENV: development
     restart: always
 
   frontend:
