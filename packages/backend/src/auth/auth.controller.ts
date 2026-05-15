@@ -4,11 +4,11 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, Enable2FADto } from './dto/auth.dto';
-import { JwtAuthGuard, JwtRefreshGuard } from './guards/jwt-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: process.env.COOKIE_SECURE === 'true',
   sameSite: 'lax' as const,
   path: '/',
 };
@@ -64,7 +64,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Abmelden' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    await this.authService.logout((req.user as any).id);
+    await this.authService.logout(req.user!.id);
     this.clearTokenCookies(res);
     return { message: 'Erfolgreich abgemeldet' };
   }
@@ -74,7 +74,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '2FA Secret generieren' })
   async generate2FA(@Req() req: Request) {
-    return this.authService.generate2FASecret((req.user as any).id);
+    return this.authService.generate2FASecret(req.user!.id);
   }
 
   @Post('2fa/enable')
@@ -83,7 +83,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '2FA aktivieren' })
   async enable2FA(@Req() req: Request, @Body() dto: Enable2FADto) {
-    return this.authService.enable2FA((req.user as any).id, dto.code);
+    return this.authService.enable2FA(req.user!.id, dto.code);
   }
 
   @Post('2fa/disable')
@@ -92,7 +92,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '2FA deaktivieren' })
   async disable2FA(@Req() req: Request) {
-    await this.authService.disable2FA((req.user as any).id);
+    await this.authService.disable2FA(req.user!.id);
     return { message: '2FA deaktiviert' };
   }
 

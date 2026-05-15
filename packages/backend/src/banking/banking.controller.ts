@@ -22,7 +22,7 @@ export class BankingController {
   @Post('connect')
   @ApiOperation({ summary: 'Bank-Verbindung starten' })
   async connectBank(@Req() req: Request, @Body() dto: ConnectBankDto) {
-    return this.bankingService.connectBank((req.user as any).id, dto.institutionId);
+    return this.bankingService.connectBank(req.user!.id, dto.institutionId);
   }
 
   @Post('callback/:connectionId')
@@ -32,30 +32,30 @@ export class BankingController {
     @Param('connectionId') connectionId: string,
     @Body() dto: BankCallbackDto,
   ) {
-    return this.bankingService.handleCallback((req.user as any).id, connectionId, dto.code);
+    return this.bankingService.handleCallback(req.user!.id, connectionId, dto.code);
   }
 
   @Post('sync/:accountId')
   @ApiOperation({ summary: 'Einzelnes Konto synchronisieren' })
   async syncAccount(@Req() req: Request, @Param('accountId') accountId: string, @Body() dto: SyncAccountDto) {
-    return this.bankingService.syncAccount((req.user as any).id, accountId, dto.dateFrom);
+    return this.bankingService.syncAccount(req.user!.id, accountId, dto.dateFrom);
   }
 
   @Post('sync-all')
   @ApiOperation({ summary: 'Alle verbundenen Konten synchronisieren' })
   async syncAllAccounts(@Req() req: Request) {
-    return this.bankingService.syncAllAccounts((req.user as any).id);
+    return this.bankingService.syncAllAccounts(req.user!.id);
   }
 
   @Get('connections')
   @ApiOperation({ summary: 'Aktive Bank-Verbindungen auflisten' })
   async getConnections(@Req() req: Request) {
-    return this.bankingService.getConnections((req.user as any).id);
+    return this.bankingService.getConnections(req.user!.id);
   }
 
   @Delete('connections/:connectionId')
   @ApiOperation({ summary: 'Bank-Verbindung entfernen' })
   async removeConnection(@Req() req: Request, @Param('connectionId') connectionId: string) {
-    return this.bankingService.removeConnection((req.user as any).id, connectionId);
+    return this.bankingService.removeConnection(req.user!.id, connectionId);
   }
 }

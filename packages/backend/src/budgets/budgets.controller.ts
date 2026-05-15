@@ -14,21 +14,21 @@ export class BudgetsController {
 
   @Get()
   async findAll(@Req() req: Request) {
-    return this.budgetsService.findAll((req.user as any).id);
+    return this.budgetsService.findAll(req.user!.id);
   }
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreateBudgetDto) {
-    return this.budgetsService.create((req.user as any).id, dto);
+    return this.budgetsService.create(req.user!.id, dto);
   }
 
   @Patch(':id')
   async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateBudgetDto) {
-    return this.budgetsService.update((req.user as any).id, id, dto);
+    return this.budgetsService.update(req.user!.id, id, dto);
   }
 
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') id: string) {
-    return this.budgetsService.remove((req.user as any).id, id);
+    return this.budgetsService.remove(req.user!.id, id);
   }
 }

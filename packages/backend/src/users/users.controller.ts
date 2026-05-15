@@ -14,23 +14,23 @@ export class UsersController {
 
   @Get('profile')
   async getProfile(@Req() req: Request) {
-    return this.usersService.findById((req.user as any).id);
+    return this.usersService.findById(req.user!.id);
   }
 
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
-    return this.usersService.updateProfile((req.user as any).id, dto);
+    return this.usersService.updateProfile(req.user!.id, dto);
   }
 
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Passwort ändern' })
   async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
-    return this.usersService.changePassword((req.user as any).id, dto.currentPassword, dto.newPassword);
+    return this.usersService.changePassword(req.user!.id, dto.currentPassword, dto.newPassword);
   }
 
   @Delete('account')
   async deleteAccount(@Req() req: Request) {
-    return this.usersService.deleteAccount((req.user as any).id);
+    return this.usersService.deleteAccount(req.user!.id);
   }
 }

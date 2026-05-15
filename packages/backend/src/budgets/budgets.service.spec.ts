@@ -5,7 +5,6 @@ import { NotFoundException } from '@nestjs/common';
 
 describe('BudgetsService', () => {
   let service: BudgetsService;
-  let prisma: PrismaService;
 
   const mockPrisma = {
     budget: {
@@ -29,7 +28,6 @@ describe('BudgetsService', () => {
     }).compile();
 
     service = module.get<BudgetsService>(BudgetsService);
-    prisma = module.get<PrismaService>(PrismaService);
     jest.clearAllMocks();
   });
 

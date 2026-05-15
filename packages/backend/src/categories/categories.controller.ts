@@ -14,21 +14,21 @@ export class CategoriesController {
 
   @Get()
   async findAll(@Req() req: Request) {
-    return this.categoriesService.findAll((req.user as any).id);
+    return this.categoriesService.findAll(req.user!.id);
   }
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create((req.user as any).id, dto);
+    return this.categoriesService.create(req.user!.id, dto);
   }
 
   @Patch(':id')
   async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.categoriesService.update((req.user as any).id, id, dto);
+    return this.categoriesService.update(req.user!.id, id, dto);
   }
 
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') id: string) {
-    return this.categoriesService.remove((req.user as any).id, id);
+    return this.categoriesService.remove(req.user!.id, id);
   }
 }

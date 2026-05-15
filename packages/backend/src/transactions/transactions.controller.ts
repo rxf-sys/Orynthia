@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, Res, UseGuards, Header } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -15,19 +15,19 @@ export class TransactionsController {
   @Post()
   @ApiOperation({ summary: 'Transaktion erstellen' })
   async create(@Req() req: Request, @Body() dto: CreateTransactionDto) {
-    return this.transactionsService.create((req.user as any).id, dto);
+    return this.transactionsService.create(req.user!.id, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Transaktionen auflisten (mit Filtern)' })
   async findAll(@Req() req: Request, @Query() filters: TransactionFilterDto) {
-    return this.transactionsService.findAll((req.user as any).id, filters);
+    return this.transactionsService.findAll(req.user!.id, filters);
   }
 
   @Get('export/csv')
   @ApiOperation({ summary: 'Transaktionen als CSV exportieren' })
   async exportCsv(@Req() req: Request, @Res() res: Response, @Query() filters: TransactionFilterDto) {
-    const csv = await this.transactionsService.exportCsv((req.user as any).id, filters);
+    const csv = await this.transactionsService.exportCsv(req.user!.id, filters);
     const filename = `transaktionen_${new Date().toISOString().split('T')[0]}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -44,30 +44,30 @@ export class TransactionsController {
   ) {
     const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate) : new Date();
-    return this.transactionsService.getExpensesByCategory((req.user as any).id, start, end);
+    return this.transactionsService.getExpensesByCategory(req.user!.id, start, end);
   }
 
   @Get('monthly-overview')
   @ApiOperation({ summary: 'Monatliche Einnahmen/Ausgaben Übersicht' })
   async getMonthlyOverview(@Req() req: Request, @Query('months') months?: number) {
-    return this.transactionsService.getMonthlyOverview((req.user as any).id, months || 6);
+    return this.transactionsService.getMonthlyOverview(req.user!.id, months || 6);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Einzelne Transaktion' })
   async findById(@Req() req: Request, @Param('id') id: string) {
-    return this.transactionsService.findById((req.user as any).id, id);
+    return this.transactionsService.findById(req.user!.id, id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Transaktion aktualisieren' })
   async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateTransactionDto) {
-    return this.transactionsService.update((req.user as any).id, id, dto);
+    return this.transactionsService.update(req.user!.id, id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Transaktion löschen' })
   async remove(@Req() req: Request, @Param('id') id: string) {
-    return this.transactionsService.remove((req.user as any).id, id);
+    return this.transactionsService.remove(req.user!.id, id);
   }
 }

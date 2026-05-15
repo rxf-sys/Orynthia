@@ -1,4 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ContractType, BillingCycle, Prisma } from '@prisma/client';
+import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContractDto, UpdateContractDto } from './dto/contract.dto';
 
@@ -116,17 +118,17 @@ export class ContractsService {
         userId,
         name: dto.name,
         provider: dto.provider,
-        contractType: dto.contractType as any,
+        contractType: dto.contractType as ContractType,
         monthlyCost,
         yearlyCost,
-        billingCycle: cycle as any,
+        billingCycle: cycle as BillingCycle,
         contractNumber: dto.contractNumber,
         startDate: dto.startDate ? new Date(dto.startDate) : null,
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         cancellationDate: dto.cancellationDate ? new Date(dto.cancellationDate) : null,
         noticePeriod: dto.noticePeriod,
         autoRenewal: dto.autoRenewal ?? true,
-        details: dto.details || undefined,
+        details: (dto.details as InputJsonValue) || undefined,
         counterpartName: dto.counterpartName,
         counterpartIban: dto.counterpartIban,
       },
@@ -177,15 +179,15 @@ export class ContractsService {
     });
     if (!contract) throw new NotFoundException('Vertrag nicht gefunden');
 
-    const data: any = {};
+    const data: Prisma.ContractUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.provider !== undefined) data.provider = dto.provider;
-    if (dto.contractType !== undefined) data.contractType = dto.contractType;
-    if (dto.billingCycle !== undefined) data.billingCycle = dto.billingCycle;
+    if (dto.contractType !== undefined) data.contractType = dto.contractType as ContractType;
+    if (dto.billingCycle !== undefined) data.billingCycle = dto.billingCycle as BillingCycle;
     if (dto.contractNumber !== undefined) data.contractNumber = dto.contractNumber;
     if (dto.noticePeriod !== undefined) data.noticePeriod = dto.noticePeriod;
     if (dto.autoRenewal !== undefined) data.autoRenewal = dto.autoRenewal;
-    if (dto.details !== undefined) data.details = dto.details;
+    if (dto.details !== undefined) data.details = dto.details as InputJsonValue;
     if (dto.counterpartName !== undefined) data.counterpartName = dto.counterpartName;
     if (dto.counterpartIban !== undefined) data.counterpartIban = dto.counterpartIban;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PaymentFrequency } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRecurringPaymentDto, UpdateRecurringPaymentDto } from './dto/recurring-payment.dto';
 
@@ -12,7 +13,7 @@ export class RecurringPaymentsService {
         userId,
         name: dto.name,
         amount: dto.amount,
-        frequency: dto.frequency as any || 'MONTHLY',
+        frequency: (dto.frequency as PaymentFrequency) || 'MONTHLY',
         counterpartName: dto.counterpartName,
         categoryId: dto.categoryId || null,
         nextDueDate: dto.nextDueDate ? new Date(dto.nextDueDate) : null,
@@ -60,7 +61,7 @@ export class RecurringPaymentsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.amount !== undefined && { amount: dto.amount }),
-        ...(dto.frequency !== undefined && { frequency: dto.frequency as any }),
+        ...(dto.frequency !== undefined && { frequency: dto.frequency as PaymentFrequency }),
         ...(dto.counterpartName !== undefined && { counterpartName: dto.counterpartName }),
         ...(dto.categoryId !== undefined && { categoryId: dto.categoryId || null }),
         ...(dto.nextDueDate !== undefined && { nextDueDate: dto.nextDueDate ? new Date(dto.nextDueDate) : null }),

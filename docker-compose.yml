@@ -58,11 +58,14 @@ services:
     env_file:
       - .env
     environment:
-      NODE_ENV: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
+      # Cookies über HTTP zulassen (false für Homeserver ohne HTTPS)
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Swagger UI aktivieren (nur für Entwicklung empfohlen)
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
     volumes:
       - ./packages/backend:/app
       - /app/node_modules
