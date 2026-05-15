@@ -35,8 +35,10 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger API Documentation
-  if (process.env.NODE_ENV !== 'production') {
+  const port = process.env.APP_PORT || 3000;
+
+  // Swagger API Documentation (nur wenn SWAGGER_ENABLED=true)
+  if (process.env.SWAGGER_ENABLED === 'true') {
     const config = new DocumentBuilder()
       .setTitle('Orynthia API')
       .setDescription('Persönliche Finanzmanagement API')
@@ -46,12 +48,11 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
+    console.log(`📚 API Docs: http://localhost:${port}/api/docs`);
   }
 
-  const port = process.env.APP_PORT || 3000;
   await app.listen(port);
   console.log(`🚀 Orynthia API läuft auf Port ${port}`);
-  console.log(`📚 API Docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

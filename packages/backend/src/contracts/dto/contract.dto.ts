@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsBoolean, IsObject } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateContractDto {
@@ -62,7 +62,7 @@ export class CreateContractDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsObject()
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -88,7 +88,7 @@ export class UpdateContractDto {
   @IsOptional() @IsString() cancellationDate?: string;
   @IsOptional() @IsString() noticePeriod?: string;
   @IsOptional() @IsBoolean() autoRenewal?: boolean;
-  @IsOptional() @IsObject() details?: Record<string, any>;
+  @IsOptional() @IsObject() details?: Record<string, unknown>;
   @IsOptional() @IsString() counterpartName?: string;
   @IsOptional() @IsString() counterpartIban?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;

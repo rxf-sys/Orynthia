@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Category } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EnableBankingProvider } from './providers/enable-banking.provider';
 import { Institution } from './providers/banking-provider.interface';
@@ -95,8 +96,8 @@ export class BankingService {
       try {
         const balanceData = await this.enableBanking.getBalances(ext.id);
         balance = balanceData.current;
-      } catch (e) {
-        this.logger.warn(`Kontostand für ${ext.id} nicht abrufbar: ${e}`);
+      } catch (error: unknown) {
+        this.logger.warn(`Kontostand für ${ext.id} nicht abrufbar: ${error}`);
       }
 
       // Konto anlegen
@@ -120,8 +121,8 @@ export class BankingService {
     // Direkt erste Synchronisation starten
     for (const acc of importedAccounts) {
       if (acc.externalId) {
-        await this.syncAccount(userId, acc.id).catch((e) =>
-          this.logger.warn(`Erster Sync für ${acc.id} fehlgeschlagen: ${e}`),
+        await this.syncAccount(userId, acc.id).catch((error: unknown) =>
+          this.logger.warn(`Erster Sync für ${acc.id} fehlgeschlagen: ${error}`),
         );
       }
     }
@@ -149,8 +150,8 @@ export class BankingService {
         where: { id: accountId },
         data: { balance: balance.current, lastSynced: new Date() },
       });
-    } catch (e) {
-      this.logger.warn(`Kontostand-Sync für ${accountId} fehlgeschlagen: ${e}`);
+    } catch (error: unknown) {
+      this.logger.warn(`Kontostand-Sync für ${accountId} fehlgeschlagen: ${error}`);
     }
 
     // Transaktionen abrufen (letzte 30 Tage als Standard)
@@ -189,7 +190,7 @@ export class BankingService {
           purpose: tx.purpose,
           counterpartName: tx.counterpartName,
           counterpartIban: tx.counterpartIban,
-          type: tx.type as any,
+          type: tx.type,
           externalId: tx.externalId,
           categoryId,
         },
@@ -221,9 +222,9 @@ export class BankingService {
       try {
         const result = await this.syncAccount(userId, account.id);
         results.push({ accountId: account.id, accountName: account.accountName, ...result });
-      } catch (e) {
-        this.logger.error(`Sync fehlgeschlagen für ${account.id}: ${e}`);
-        results.push({ accountId: account.id, accountName: account.accountName, error: String(e) });
+      } catch (error: unknown) {
+        this.logger.error(`Sync fehlgeschlagen für ${account.id}: ${error}`);
+        results.push({ accountId: account.id, accountName: account.accountName, error: String(error) });
       }
     }
 
@@ -263,8 +264,8 @@ export class BankingService {
       try {
         await this.syncAccount(account.userId, account.id);
         this.logger.log(`Sync erfolgreich: ${account.accountName} (${account.id})`);
-      } catch (e) {
-        this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${e}`);
+      } catch (error: unknown) {
+        this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${error}`);
       }
     }
 
@@ -283,7 +284,7 @@ export class BankingService {
     return 'CHECKING';
   }
 
-  private autoMatchCategory(purpose: string, counterpartName: string, categories: any[]): string | null {
+  private autoMatchCategory(purpose: string, counterpartName: string, categories: Category[]): string | null {
     const searchText = `${purpose} ${counterpartName}`.toLowerCase();
 
     for (const cat of categories) {

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSavingsGoalDto, UpdateSavingsGoalDto } from './dto/savings-goal.dto';
 
@@ -48,7 +49,7 @@ export class SavingsGoalsService {
     });
     if (!goal) throw new NotFoundException('Sparziel nicht gefunden');
 
-    const data: any = {};
+    const data: Prisma.SavingsGoalUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.targetAmount !== undefined) data.targetAmount = dto.targetAmount;
     if (dto.currentAmount !== undefined) {

@@ -13,6 +13,6 @@ export class DashboardController {
 
   @Get()
   async getDashboard(@Req() req: Request) {
-    return this.dashboardService.getDashboardData((req.user as any).id);
+    return this.dashboardService.getDashboardData(req.user!.id);
   }
 }

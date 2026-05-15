@@ -81,6 +81,7 @@ model BankAccount {
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions    Transaction[]
 
+  @@index([userId])
   @@map("bank_accounts")
 }
 
@@ -279,6 +280,7 @@ model SavingsGoal {
   // Relations
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("savings_goals")
 }
 

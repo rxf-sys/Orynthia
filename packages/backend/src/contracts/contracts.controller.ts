@@ -15,31 +15,31 @@ export class ContractsController {
   @Post()
   @ApiOperation({ summary: 'Vertrag erstellen' })
   async create(@Req() req: Request, @Body() dto: CreateContractDto) {
-    return this.service.create((req.user as any).id, dto);
+    return this.service.create(req.user!.id, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Alle Verträge auflisten' })
   async findAll(@Req() req: Request) {
-    return this.service.findAll((req.user as any).id);
+    return this.service.findAll(req.user!.id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Vertrag aktualisieren' })
   async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateContractDto) {
-    return this.service.update((req.user as any).id, id, dto);
+    return this.service.update(req.user!.id, id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Vertrag löschen' })
   async remove(@Req() req: Request, @Param('id') id: string) {
-    return this.service.remove((req.user as any).id, id);
+    return this.service.remove(req.user!.id, id);
   }
 
   @Get('detect')
   @ApiOperation({ summary: 'Verträge automatisch aus Transaktionen erkennen' })
   async detectContracts(@Req() req: Request) {
-    return this.service.detectContracts((req.user as any).id);
+    return this.service.detectContracts(req.user!.id);
   }
 
   @Post('from-detection')
@@ -53,12 +53,12 @@ export class ContractsController {
     name?: string;
     provider?: string;
   }) {
-    return this.service.createFromDetection((req.user as any).id, body);
+    return this.service.createFromDetection(req.user!.id, body);
   }
 
   @Get('compare')
   @ApiOperation({ summary: 'Anbietervergleich: aktuelle Kosten vs. Marktdurchschnitt' })
   async compareProviders(@Req() req: Request) {
-    return this.service.compareProviders((req.user as any).id);
+    return this.service.compareProviders(req.user!.id);
   }
 }

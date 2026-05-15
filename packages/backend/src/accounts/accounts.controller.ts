@@ -14,26 +14,26 @@ export class AccountsController {
 
   @Get()
   async findAll(@Req() req: Request) {
-    return this.accountsService.findAll((req.user as any).id);
+    return this.accountsService.findAll(req.user!.id);
   }
 
   @Get('balance')
   async getTotalBalance(@Req() req: Request) {
-    return this.accountsService.getTotalBalance((req.user as any).id);
+    return this.accountsService.getTotalBalance(req.user!.id);
   }
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreateAccountDto) {
-    return this.accountsService.create((req.user as any).id, dto);
+    return this.accountsService.create(req.user!.id, dto);
   }
 
   @Patch(':id')
   async update(@Req() req: Request, @Param('id') id: string, @Body() dto: UpdateAccountDto) {
-    return this.accountsService.update((req.user as any).id, id, dto);
+    return this.accountsService.update(req.user!.id, id, dto);
   }
 
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') id: string) {
-    return this.accountsService.remove((req.user as any).id, id);
+    return this.accountsService.remove(req.user!.id, id);
   }
 }

@@ -14,6 +14,74 @@ import {
 
 const BASE_URL = 'https://api.enablebanking.com';
 
+// Enable Banking API Response Interfaces
+interface AspspResponse {
+  name: string;
+  country: string;
+  bic?: string;
+  logo?: string;
+}
+
+interface AuthResponse {
+  authorization_id: string;
+  url: string;
+}
+
+interface SessionAccount {
+  uid: string;
+  account_id?: { iban?: string };
+  name?: string;
+  details?: string;
+  currency?: string;
+  cash_account_type?: string;
+}
+
+interface SessionResponse {
+  session_id: string;
+  accounts?: SessionAccount[];
+}
+
+interface BalanceAmount {
+  amount: string;
+  currency: string;
+}
+
+interface Balance {
+  balance_type: string;
+  balance_amount: BalanceAmount;
+}
+
+interface BalancesResponse {
+  balances?: Balance[];
+}
+
+interface TransactionParty {
+  name?: string;
+}
+
+interface TransactionAccount {
+  iban?: string;
+}
+
+interface ApiTransaction {
+  entry_reference?: string;
+  booking_date?: string;
+  transaction_date?: string;
+  value_date?: string;
+  transaction_amount?: { amount: string; currency: string };
+  credit_debit_indicator?: string;
+  remittance_information?: string[];
+  debtor?: TransactionParty;
+  creditor?: TransactionParty;
+  debtor_account?: TransactionAccount;
+  creditor_account?: TransactionAccount;
+}
+
+interface TransactionsResponse {
+  continuation_key?: string;
+  transactions?: ApiTransaction[];
+}
+
 @Injectable()
 export class EnableBankingProvider implements BankingProvider {
   readonly name = 'enablebanking';
@@ -65,26 +133,34 @@ export class EnableBankingProvider implements BankingProvider {
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const jwt = this.generateJwt();
-    const res = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${jwt}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
 
-    if (!res.ok) {
-      const error = await res.text();
-      this.logger.error(`API-Fehler ${method} ${path}: ${res.status} - ${error}`);
-      throw new Error(`Enable Banking API-Fehler: ${res.status}`);
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        this.logger.error(`API-Fehler ${method} ${path}: ${res.status} - ${error}`);
+        throw new Error(`Enable Banking API-Fehler: ${res.status}`);
+      }
+
+      return res.json() as Promise<T>;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return res.json();
   }
 
   async getInstitutions(countryCode: string): Promise<Institution[]> {
-    const data = await this.request<any[]>('GET', `/aspsps?country=${countryCode}`);
+    const data = await this.request<AspspResponse[]>('GET', `/aspsps?country=${countryCode}`);
     return data.map((aspsp) => ({
       // Enable Banking identifiziert Banken über name+country Kombination
       id: `${aspsp.name}:::${aspsp.country}`,
@@ -99,7 +175,7 @@ export class EnableBankingProvider implements BankingProvider {
     // institutionId = "Bankname:::Country" (aus getInstitutions)
     const [bankName, country] = params.institutionId.split(':::');
 
-    const authResponse = await this.request<any>('POST', '/auth', {
+    const authResponse = await this.request<AuthResponse>('POST', '/auth', {
       access: {
         valid_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       },
@@ -118,11 +194,11 @@ export class EnableBankingProvider implements BankingProvider {
     };
   }
 
-  async getConnectionStatus(connectionId: string): Promise<ConnectionStatus> {
+  async getConnectionStatus(_connectionId: string): Promise<ConnectionStatus> {
     // Bei Enable Banking gibt es keinen direkten Status-Endpunkt für Autorisierungen
     // Der Status wird über die Session bestimmt
     return {
-      id: connectionId,
+      id: _connectionId,
       status: 'CREATED',
       accountIds: [],
     };
@@ -130,9 +206,9 @@ export class EnableBankingProvider implements BankingProvider {
 
   /** Session erstellen mit dem Code aus dem Callback */
   async createSession(code: string): Promise<{ sessionId: string; accounts: ExternalAccount[] }> {
-    const data = await this.request<any>('POST', '/sessions', { code });
+    const data = await this.request<SessionResponse>('POST', '/sessions', { code });
 
-    const accounts: ExternalAccount[] = (data.accounts || []).map((acc: any) => ({
+    const accounts: ExternalAccount[] = (data.accounts || []).map((acc) => ({
       id: acc.uid,
       iban: acc.account_id?.iban,
       name: acc.name || acc.details,
@@ -147,19 +223,19 @@ export class EnableBankingProvider implements BankingProvider {
     };
   }
 
-  async getAccounts(connectionId: string): Promise<ExternalAccount[]> {
+  async getAccounts(_connectionId: string): Promise<ExternalAccount[]> {
     // Bei Enable Banking werden Konten direkt beim Session-Erstellen zurückgegeben
     // Diese Methode ist ein Fallback - normalerweise wird createSession verwendet
     throw new Error('Verwende createSession() mit dem Authorization-Code statt getAccounts()');
   }
 
   async getBalances(externalAccountId: string): Promise<AccountBalance> {
-    const data = await this.request<any>('GET', `/accounts/${externalAccountId}/balances`);
+    const data = await this.request<BalancesResponse>('GET', `/accounts/${externalAccountId}/balances`);
     const balances = data.balances || [];
 
     // Bevorzuge CLBD (Closing Booked Balance) oder ersten verfügbaren
-    const closingBooked = balances.find((b: any) => b.balance_type === 'CLBD');
-    const interimAvailable = balances.find((b: any) => b.balance_type === 'ITAV');
+    const closingBooked = balances.find((b) => b.balance_type === 'CLBD');
+    const interimAvailable = balances.find((b) => b.balance_type === 'ITAV');
     const primary = closingBooked || interimAvailable || balances[0];
 
     if (!primary) {
@@ -191,7 +267,7 @@ export class EnableBankingProvider implements BankingProvider {
       const query = params.toString();
       const path = `/accounts/${externalAccountId}/transactions${query ? '?' + query : ''}`;
 
-      const data = await this.request<any>('GET', path);
+      const data = await this.request<TransactionsResponse>('GET', path);
       continuationKey = data.continuation_key;
 
       const transactions = data.transactions || [];
@@ -205,7 +281,7 @@ export class EnableBankingProvider implements BankingProvider {
             `${tx.booking_date}-${amount}-${(tx.remittance_information || []).join('').slice(0, 20)}`,
           amount: isCredit ? Math.abs(amount) : -Math.abs(amount),
           currency: tx.transaction_amount?.currency || 'EUR',
-          date: tx.booking_date || tx.transaction_date || tx.value_date,
+          date: (tx.booking_date ?? tx.transaction_date ?? tx.value_date) as string,
           bookingDate: tx.booking_date,
           purpose: (tx.remittance_information || []).join(' ') || undefined,
           counterpartName: isCredit ? tx.debtor?.name : tx.creditor?.name,
