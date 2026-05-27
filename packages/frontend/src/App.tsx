@@ -14,6 +14,7 @@ import { RecurringPaymentsPage } from '@/pages/RecurringPayments';
 import { SavingsGoalsPage } from '@/pages/SavingsGoals';
 import { ContractsPage } from '@/pages/Contracts';
 import { SettingsPage } from '@/pages/Settings';
+import { ConfirmProvider } from '@/components/ui';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -50,25 +51,27 @@ export default function App() {
   }, [checkAuth]);
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-      <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+    <ConfirmProvider>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
-      {/* Protected Routes */}
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<DashboardPage />} />
-        <Route path="transactions" element={<TransactionsPage />} />
-        <Route path="budgets" element={<BudgetsPage />} />
-        <Route path="accounts" element={<AccountsPage />} />
-        <Route path="recurring" element={<RecurringPaymentsPage />} />
-        <Route path="savings" element={<SavingsGoalsPage />} />
-        <Route path="contracts" element={<ContractsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
+        {/* Protected Routes */}
+        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<DashboardPage />} />
+          <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="budgets" element={<BudgetsPage />} />
+          <Route path="accounts" element={<AccountsPage />} />
+          <Route path="recurring" element={<RecurringPaymentsPage />} />
+          <Route path="savings" element={<SavingsGoalsPage />} />
+          <Route path="contracts" element={<ContractsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ConfirmProvider>
   );
 }

@@ -16,7 +16,7 @@ import { contractsApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Contract, CreateContractData, DetectedContract } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Tag } from '@/components/ui';
+import { Card, Btn, Field, PageHead, Tag, useConfirm } from '@/components/ui';
 
 const contractTypeLabels: Record<string, { label: string; icon: string; group: string; color?: string }> = {
   INSURANCE_LIABILITY: { label: 'Haftpflicht', icon: '🛡️', group: 'Versicherungen', color: '#5b8def' },
@@ -53,6 +53,7 @@ type Tab = 'contracts' | 'detect' | 'compare';
 
 export function ContractsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<Tab>('contracts');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<CreateContractData>>({
@@ -380,10 +381,16 @@ export function ContractsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => {
-                            if (confirm('Vertrag wirklich löschen?')) deleteMutation.mutate(contract.id);
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Vertrag löschen?',
+                              description: `${contract.name} (${contract.provider})`,
+                              confirmLabel: 'Löschen',
+                              destructive: true,
+                            });
+                            if (ok) deleteMutation.mutate(contract.id);
                           }}
-                          className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+                          className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
                           aria-label="Vertrag löschen"
                         >
                           <Trash2 className="h-4 w-4 text-ink-3" />

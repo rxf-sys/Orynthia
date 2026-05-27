@@ -39,15 +39,20 @@ docker compose up --build
 | Backend API | http://localhost:3000 |
 | Swagger Docs | http://localhost:3000/api/docs |
 
-### 3. Datenbank initialisieren
+### 3. Datenbank
+
+Beim Container-Start läuft automatisch `prisma migrate deploy` — die Tabellen werden aus
+`packages/backend/prisma/migrations/` erstellt. System-Kategorien (15 Defaults wie
+"Lebensmittel", "Miete & Wohnen", …) werden beim ersten App-Boot idempotent über
+`CategoriesService.onModuleInit` angelegt; ein manueller Seed-Aufruf ist nicht nötig.
+
+Optional (nur für Demo-Daten):
 
 ```bash
-# In einem neuen Terminal:
-docker compose exec backend npx prisma migrate dev --name init
 docker compose exec backend npx prisma db seed
 ```
 
-### 4. Demo-Login
+### 4. Demo-Login (nur nach `db seed`)
 
 - **E-Mail:** demo@orynthia.local
 - **Passwort:** demo1234
@@ -80,8 +85,9 @@ Orynthia/
 ├── packages/
 │   ├── backend/
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma   # Datenbankschema
-│   │   │   └── seed.ts         # Demo-Daten
+│   │   │   ├── schema.prisma          # Datenbankschema
+│   │   │   ├── migrations/            # Versionierte SQL-Migrationen (migrate deploy)
+│   │   │   └── seed.ts                # Optionale Demo-Daten
 │   │   └── src/
 │   │       ├── auth/           # JWT, 2FA, Login/Register
 │   │       ├── users/          # Profilverwaltung
@@ -98,7 +104,8 @@ Orynthia/
 │       └── src/
 │           ├── pages/          # Dashboard, Transaktionen, Budgets, etc.
 │           ├── components/     # Layout, Sidebar, Header
-│           ├── stores/         # Zustand Auth Store
+│           │   └── ui/         # Btn, Card, Modal, ConfirmDialog, EmptyState, …
+│           ├── stores/         # Zustand: Auth, Theme
 │           └── lib/            # API Client, Types, Utilities
 ```
 
@@ -106,9 +113,15 @@ Orynthia/
 
 ### Finanzen
 - Open Banking (PSD2) via Enable Banking - automatischer Kontoabgleich
-- Automatische Transaktionskategorisierung (Keyword-basiert)
-- Multi-Konto-Verwaltung (Giro, Spar, Kreditkarte, Depot)
-- Budget-Tracking mit Fortschrittsanzeige und Warnungen
+- Automatische Transaktionskategorisierung (Keyword-basiert, inkl. System-Kategorien)
+- Multi-Konto-Verwaltung (Giro, Spar, Kreditkarte, Depot, Kredit/Darlehen, Sonstiges)
+- Manuelle Konten editierbar (Bankname, Saldo, Typ, IBAN); Bank-synchronisierte
+  Konten bleiben sync/delete-only
+- Transaktionen vollständig editierbar (Betrag, Datum, Typ, Empfänger, Verwendungszweck,
+  Kategorie, Notizen)
+- Budget-Tracking mit Fortschrittsanzeige, Warnungen und Status-Filter
+  (Alle / Überzogen / Knapp / Im Plan)
+- Sortierung & Filter in der Kontenübersicht (Saldo, Name, Typ)
 - Dashboard mit Diagrammen (Balken, Torte, Trends)
 - CSV-Export (Excel-kompatibel mit BOM und deutschem Zahlenformat)
 
@@ -133,10 +146,14 @@ Orynthia/
 - DSGVO-konform (Self-Hosted, keine Daten an Dritte)
 
 ### Technik
-- Responsive Dark-Theme UI
-- Docker-Deployment (Dev & Prod)
+- Responsive Dark-Theme UI mit Mobile-optimierten Aktions-Buttons
+- Barrierefreie Custom-Dialoge (Esc-to-close, Backdrop, ARIA-Labels) statt Browser-`confirm()`
+- Edit-Modals für Konten und Transaktionen
+- Empty-States mit klarem Call-to-Action auf allen Listen-Seiten
+- Docker-Deployment (Dev & Prod), Migrationen laufen automatisch beim Start
 - Swagger API-Dokumentation
-- Demo-Daten mit Seed-Script
+- Demo-Daten mit Seed-Script (optional)
+- CI: GitHub Actions (Lint, Test, Build) auf Node 24 / pnpm 9.15.0
 
 ## API-Endpunkte
 
@@ -153,9 +170,19 @@ Orynthia/
 - `GET /api/accounts` - Alle Konten
 - `GET /api/accounts/balance` - Gesamtsaldo
 - `POST /api/accounts` - Konto anlegen
+- `PATCH /api/accounts/:id` - Konto bearbeiten
+- `DELETE /api/accounts/:id` - Konto entfernen
+- `GET /api/banking/institutions` - Liste verfügbarer Banken
 - `POST /api/banking/connect` - Bank verbinden (Enable Banking)
-- `POST /api/banking/callback/:id` - Banking-Callback
+- `POST /api/banking/callback/:connectionId` - Banking-Callback
 - `POST /api/banking/sync/:accountId` - Konto synchronisieren
+- `POST /api/banking/sync-all` - Alle verbundenen Konten synchronisieren
+
+### Kategorien
+- `GET /api/categories` - System- und User-Kategorien
+- `POST /api/categories` - Eigene Kategorie anlegen
+- `PATCH /api/categories/:id` - User-Kategorie bearbeiten
+- `DELETE /api/categories/:id` - User-Kategorie löschen (System-Kategorien sind geschützt)
 
 ### Transaktionen
 - `GET /api/transactions` - Liste (mit Filter & Pagination)
@@ -169,6 +196,8 @@ Orynthia/
 ### Budgets & Dashboard
 - `GET /api/budgets` - Alle Budgets mit Fortschritt
 - `POST /api/budgets` - Budget erstellen
+- `PATCH /api/budgets/:id` - Budget bearbeiten
+- `DELETE /api/budgets/:id` - Budget löschen
 - `GET /api/dashboard` - Aggregierte Dashboard-Daten
 
 ### Wiederkehrende Zahlungen

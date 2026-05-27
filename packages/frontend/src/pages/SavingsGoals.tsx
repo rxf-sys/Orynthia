@@ -5,13 +5,14 @@ import { savingsGoalsApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { SavingsGoal, CreateSavingsGoalData } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Progress, Tag } from '@/components/ui';
+import { Card, Btn, Field, PageHead, Progress, Tag, useConfirm } from '@/components/ui';
 
 const defaultIcons = ['🏖️', '🏠', '🚗', '💻', '📱', '🎓', '💍', '🎁', '🏥', '📈'];
 const defaultColors = ['#424769', '#ffb17a', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
 
 export function SavingsGoalsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -256,8 +257,14 @@ export function SavingsGoalsPage() {
                   }}
                   onAddAmountChange={setAddAmountValue}
                   onAddAmount={(amount) => addAmountMutation.mutate({ id: goal.id, amount })}
-                  onDelete={() => {
-                    if (confirm('Sparziel wirklich löschen?')) deleteMutation.mutate(goal.id);
+                  onDelete={async () => {
+                    const ok = await confirm({
+                      title: 'Sparziel löschen?',
+                      description: goal.name,
+                      confirmLabel: 'Löschen',
+                      destructive: true,
+                    });
+                    if (ok) deleteMutation.mutate(goal.id);
                   }}
                   isPending={addAmountMutation.isPending}
                 />
@@ -372,7 +379,7 @@ function GoalCard({
         </div>
         <button
           onClick={onDelete}
-          className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+          className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
           aria-label="Sparziel löschen"
         >
           <Trash2 className="h-4 w-4 text-ink-3" />

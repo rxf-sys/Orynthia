@@ -19,7 +19,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Tag, Avatar } from '@/components/ui';
+import { Card, Btn, Field, PageHead, Tag, Avatar, useConfirm } from '@/components/ui';
 
 type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
 
@@ -70,6 +70,7 @@ export function SettingsPage() {
 
 function ProfileTab() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { user } = useAuthStore();
   const [form, setForm] = useState({
     firstName: user?.firstName || '',
@@ -159,10 +160,15 @@ function ProfileTab() {
         <Btn
           variant="danger"
           icon={Trash2}
-          onClick={() => {
-            if (confirm('Bist du sicher? Alle Daten werden unwiderruflich gelöscht!')) {
-              deleteAccountMutation.mutate();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Konto unwiderruflich löschen?',
+              description:
+                'Alle Konten, Transaktionen, Budgets und Verträge werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+              confirmLabel: 'Endgültig löschen',
+              destructive: true,
+            });
+            if (ok) deleteAccountMutation.mutate();
           }}
         >
           Konto löschen

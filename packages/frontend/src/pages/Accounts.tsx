@@ -12,28 +12,55 @@ import {
   RefreshCw,
   Link2,
   Search,
+  Pencil,
+  Landmark,
+  Wallet,
 } from 'lucide-react';
 import { accountsApi, bankingApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { BankAccount, CreateAccountData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Btn, Field, PageHead, pickCategoryColor } from '@/components/ui';
+import {
+  Card,
+  Btn,
+  Field,
+  PageHead,
+  Modal,
+  EmptyState,
+  useConfirm,
+  pickCategoryColor,
+} from '@/components/ui';
 
 const accountTypeConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   CHECKING: { label: 'Girokonto', icon: <Building2 className="h-5 w-5" /> },
   SAVINGS: { label: 'Sparkonto', icon: <PiggyBank className="h-5 w-5" /> },
   CREDIT_CARD: { label: 'Kreditkarte', icon: <CreditCard className="h-5 w-5" /> },
   DEPOT: { label: 'Depot', icon: <TrendingUp className="h-5 w-5" /> },
+  LOAN: { label: 'Kredit / Darlehen', icon: <Landmark className="h-5 w-5" /> },
+  OTHER: { label: 'Sonstiges', icon: <Wallet className="h-5 w-5" /> },
 };
+
+const accountTypeOptions: { value: BankAccount['accountType']; label: string }[] = [
+  { value: 'CHECKING', label: 'Girokonto' },
+  { value: 'SAVINGS', label: 'Sparkonto' },
+  { value: 'CREDIT_CARD', label: 'Kreditkarte' },
+  { value: 'DEPOT', label: 'Depot' },
+  { value: 'LOAN', label: 'Kredit / Darlehen' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
 
 type Tab = 'manual' | 'bank';
 
 export function AccountsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('bank');
+  const [editing, setEditing] = useState<BankAccount | null>(null);
+  const [sortBy, setSortBy] = useState<'balance-desc' | 'balance-asc' | 'name' | 'type'>('balance-desc');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [form, setForm] = useState({
     bankName: '',
     accountName: '',
@@ -95,6 +122,18 @@ export function AccountsPage() {
     onError: () => toast.error('Fehler beim Hinzufügen'),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateAccountData> }) =>
+      accountsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
+      setEditing(null);
+      toast.success('Konto aktualisiert');
+    },
+    onError: () => toast.error('Fehler beim Aktualisieren'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => accountsApi.remove(id),
     onSuccess: () => {
@@ -147,6 +186,26 @@ export function AccountsPage() {
   const liabilities = (accounts || [])
     .filter((a: BankAccount) => Number(a.balance) < 0)
     .reduce((s: number, a: BankAccount) => s + Number(a.balance), 0);
+
+  const sortedAccounts = (() => {
+    const list = [...(accounts || [])];
+    const filtered = typeFilter ? list.filter((a) => a.accountType === typeFilter) : list;
+    const compare = (a: BankAccount, b: BankAccount) => {
+      switch (sortBy) {
+        case 'balance-desc':
+          return Number(b.balance) - Number(a.balance);
+        case 'balance-asc':
+          return Number(a.balance) - Number(b.balance);
+        case 'name':
+          return a.bankName.localeCompare(b.bankName);
+        case 'type':
+          return a.accountType.localeCompare(b.accountType);
+        default:
+          return 0;
+      }
+    };
+    return filtered.sort(compare);
+  })();
 
   return (
     <div className="space-y-5">
@@ -334,10 +393,11 @@ export function AccountsPage() {
                     onChange={(e) => setForm({ ...form, accountType: e.target.value })}
                     className="select"
                   >
-                    <option value="CHECKING">Girokonto</option>
-                    <option value="SAVINGS">Sparkonto</option>
-                    <option value="CREDIT_CARD">Kreditkarte</option>
-                    <option value="DEPOT">Depot</option>
+                    {accountTypeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </Field>
                 <Field label="Aktueller Kontostand">
@@ -371,14 +431,46 @@ export function AccountsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-indigo" />
         </div>
       ) : accounts?.length === 0 ? (
-        <Card className="text-center" style={{ padding: '48px 24px' }}>
-          <Building2 className="mx-auto mb-3 h-10 w-10 text-ink-4" />
-          <p className="font-semibold text-ink">Noch keine Konten hinzugefügt</p>
-          <p className="mt-1 text-sm text-ink-3">Verbinde deine Bank oder erstelle ein Konto manuell.</p>
-        </Card>
+        <EmptyState
+          icon={Building2}
+          title="Noch keine Konten hinzugefügt"
+          description="Verbinde deine Bank per Open Banking oder lege ein Konto manuell an."
+          action={{ label: 'Konto hinzufügen', icon: Plus, onClick: () => setShowForm(true) }}
+        />
       ) : (
+        <>
+          {(accounts?.length ?? 0) > 1 && (
+            <Card variant="flat" className="!py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="select w-full sm:w-48"
+                  aria-label="Nach Kontotyp filtern"
+                >
+                  <option value="">Alle Kontotypen</option>
+                  {accountTypeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="select w-full sm:w-56"
+                  aria-label="Sortierung"
+                >
+                  <option value="balance-desc">Saldo (hoch → niedrig)</option>
+                  <option value="balance-asc">Saldo (niedrig → hoch)</option>
+                  <option value="name">Bankname (A → Z)</option>
+                  <option value="type">Kontotyp</option>
+                </select>
+              </div>
+            </Card>
+          )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts?.map((acc: BankAccount) => {
+          {sortedAccounts.map((acc: BankAccount) => {
             const cfg = accountTypeConfig[acc.accountType] || accountTypeConfig.CHECKING;
             const color = pickCategoryColor(acc.bankName);
             const isLinked = !!acc.lastSynced;
@@ -431,7 +523,7 @@ export function AccountsPage() {
                       ? `Sync: ${new Date(acc.lastSynced!).toLocaleDateString('de-DE')}`
                       : 'Manuell verwaltet'}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                     {isLinked && (
                       <button
                         onClick={() => syncMutation.mutate(acc.id)}
@@ -443,9 +535,25 @@ export function AccountsPage() {
                         <RefreshCw className={cn('h-4 w-4', syncMutation.isPending && 'animate-spin')} />
                       </button>
                     )}
+                    {!isLinked && (
+                      <button
+                        onClick={() => setEditing(acc)}
+                        className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-indigo"
+                        title="Konto bearbeiten"
+                        aria-label="Konto bearbeiten"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
-                      onClick={() => {
-                        if (confirm('Konto wirklich entfernen?')) deleteMutation.mutate(acc.id);
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: 'Konto entfernen?',
+                          description: `Alle Transaktionen dieses Kontos werden ebenfalls gelöscht. (${acc.bankName} – ${acc.accountName})`,
+                          confirmLabel: 'Entfernen',
+                          destructive: true,
+                        });
+                        if (ok) deleteMutation.mutate(acc.id);
                       }}
                       className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-neg"
                       aria-label="Konto entfernen"
@@ -468,8 +576,121 @@ export function AccountsPage() {
             <span className="text-sm font-semibold">Bank verbinden</span>
           </button>
         </div>
+        </>
+      )}
+
+      {editing && (
+        <EditAccountModal
+          account={editing}
+          onClose={() => setEditing(null)}
+          onSave={(data) => updateMutation.mutate({ id: editing.id, data })}
+          isPending={updateMutation.isPending}
+        />
       )}
     </div>
+  );
+}
+
+function EditAccountModal({
+  account,
+  onClose,
+  onSave,
+  isPending,
+}: {
+  account: BankAccount;
+  onClose: () => void;
+  onSave: (data: Partial<CreateAccountData>) => void;
+  isPending: boolean;
+}) {
+  const [form, setForm] = useState({
+    bankName: account.bankName,
+    accountName: account.accountName,
+    iban: account.iban || '',
+    accountType: account.accountType,
+    balance: String(account.balance ?? ''),
+  });
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Konto bearbeiten"
+      description={`${account.bankName} – ${account.accountName}`}
+      size="md"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose} disabled={isPending}>
+            Abbrechen
+          </Btn>
+          <Btn
+            variant="grad"
+            disabled={isPending}
+            onClick={() =>
+              onSave({
+                bankName: form.bankName,
+                accountName: form.accountName,
+                iban: form.iban || undefined,
+                accountType: form.accountType,
+                balance: form.balance === '' ? undefined : Number(form.balance),
+              })
+            }
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Bankname" required>
+          <input
+            value={form.bankName}
+            onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+            className="input"
+            required
+          />
+        </Field>
+        <Field label="Kontoname" required>
+          <input
+            value={form.accountName}
+            onChange={(e) => setForm({ ...form, accountName: e.target.value })}
+            className="input"
+            required
+          />
+        </Field>
+        <Field label="IBAN">
+          <input
+            value={form.iban}
+            onChange={(e) => setForm({ ...form, iban: e.target.value })}
+            className="input font-mono"
+            placeholder="DE89 3704 0044 …"
+          />
+        </Field>
+        <Field label="Kontotyp">
+          <select
+            value={form.accountType}
+            onChange={(e) =>
+              setForm({ ...form, accountType: e.target.value as BankAccount['accountType'] })
+            }
+            className="select"
+          >
+            {accountTypeOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Kontostand">
+          <input
+            type="number"
+            value={form.balance}
+            onChange={(e) => setForm({ ...form, balance: e.target.value })}
+            className="input tnum"
+            step="0.01"
+          />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

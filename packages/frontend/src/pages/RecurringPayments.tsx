@@ -5,7 +5,7 @@ import { recurringPaymentsApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, CategoryIcon, Tag } from '@/components/ui';
+import { Card, Btn, Field, PageHead, CategoryIcon, Tag, useConfirm } from '@/components/ui';
 
 const frequencyLabels: Record<string, string> = {
   WEEKLY: 'Wöchentlich',
@@ -18,6 +18,7 @@ const frequencyLabels: Record<string, string> = {
 
 export function RecurringPaymentsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -229,8 +230,14 @@ export function RecurringPaymentsPage() {
               key={payment.id}
               payment={payment}
               isLast={i === sorted.length - 1 && inactivePayments.length === 0}
-              onDelete={() => {
-                if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id);
+              onDelete={async () => {
+                const ok = await confirm({
+                  title: 'Zahlung löschen?',
+                  description: payment.name,
+                  confirmLabel: 'Löschen',
+                  destructive: true,
+                });
+                if (ok) deleteMutation.mutate(payment.id);
               }}
               onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: false })}
             />
@@ -248,8 +255,14 @@ export function RecurringPaymentsPage() {
                   <PaymentRow
                     payment={payment}
                     isLast={i === inactivePayments.length - 1}
-                    onDelete={() => {
-                      if (confirm('Zahlung wirklich löschen?')) deleteMutation.mutate(payment.id);
+                    onDelete={async () => {
+                      const ok = await confirm({
+                        title: 'Zahlung endgültig löschen?',
+                        description: payment.name,
+                        confirmLabel: 'Löschen',
+                        destructive: true,
+                      });
+                      if (ok) deleteMutation.mutate(payment.id);
                     }}
                     onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: true })}
                   />
@@ -352,7 +365,7 @@ function PaymentRow({
       </label>
       <button
         onClick={onDelete}
-        className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+        className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
         aria-label="Zahlung löschen"
       >
         <Trash2 className="h-4 w-4 text-ink-3" />

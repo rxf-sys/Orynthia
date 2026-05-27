@@ -2,15 +2,29 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Target } from 'lucide-react';
 import { budgetsApi, categoriesApi } from '@/lib/api';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import type { Budget, Category, CreateBudgetData } from '@/lib/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Progress, Tag, CategoryIcon } from '@/components/ui';
+import {
+  Card,
+  Btn,
+  Field,
+  PageHead,
+  Progress,
+  Tag,
+  CategoryIcon,
+  EmptyState,
+  useConfirm,
+} from '@/components/ui';
+
+type BudgetFilter = 'all' | 'over' | 'warn' | 'ok';
 
 export function BudgetsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [newBudget, setNewBudget] = useState({ categoryId: '', amount: '' });
+  const [statusFilter, setStatusFilter] = useState<BudgetFilter>('all');
 
   const { data: budgets, isLoading } = useQuery({
     queryKey: ['budgets'],
@@ -45,6 +59,13 @@ export function BudgetsPage() {
   const totalSpent = (budgets || []).reduce((s: number, b: Budget) => s + b.spent, 0);
   const overBudgetCount = (budgets || []).filter((b: Budget) => b.percentage > 100).length;
   const overallPercent = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
+
+  const filteredBudgets = (budgets || []).filter((b: Budget) => {
+    if (statusFilter === 'over') return b.percentage > 100;
+    if (statusFilter === 'warn') return b.percentage > 80 && b.percentage <= 100;
+    if (statusFilter === 'ok') return b.percentage <= 80;
+    return true;
+  });
 
   return (
     <div className="space-y-5">
@@ -165,17 +186,56 @@ export function BudgetsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-indigo" />
         </div>
       ) : budgets?.length === 0 ? (
-        <Card className="text-center" style={{ padding: '48px 24px' }}>
-          <Target className="mx-auto mb-3 h-10 w-10 text-ink-4" />
-          <p className="font-semibold text-ink">Noch keine Budgets</p>
-          <p className="mt-1 text-sm text-ink-3">
-            Erstelle dein erstes Budget, um Ausgaben im Griff zu behalten.
-          </p>
-        </Card>
+        <EmptyState
+          icon={Target}
+          title="Noch keine Budgets"
+          description="Erstelle dein erstes Budget, um Ausgaben im Griff zu behalten."
+          action={{ label: 'Budget anlegen', icon: Plus, onClick: () => setShowForm(true) }}
+        />
       ) : (
+        <>
+          {(budgets?.length ?? 0) > 1 && (
+            <Card variant="flat" className="!py-3">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: 'all', label: `Alle (${budgets?.length})` },
+                    { id: 'over', label: `Überzogen (${overBudgetCount})` },
+                    { id: 'warn', label: 'Knapp' },
+                    { id: 'ok', label: 'Im Plan' },
+                  ] as { id: BudgetFilter; label: string }[]
+                ).map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setStatusFilter(f.id)}
+                    className={cn(
+                      'rounded-pill border px-3 py-1 text-xs font-semibold transition',
+                      statusFilter === f.id
+                        ? 'border-transparent bg-indigo text-white'
+                        : 'border-line bg-elev text-ink-2 hover:bg-soft',
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {budgets?.map((b: Budget) => (
-            <BudgetCard key={b.id} budget={b} onDelete={() => deleteMutation.mutate(b.id)} />
+          {filteredBudgets.map((b: Budget) => (
+            <BudgetCard
+              key={b.id}
+              budget={b}
+              onDelete={async () => {
+                const ok = await confirm({
+                  title: 'Budget löschen?',
+                  description: b.category?.name,
+                  confirmLabel: 'Löschen',
+                  destructive: true,
+                });
+                if (ok) deleteMutation.mutate(b.id);
+              }}
+            />
           ))}
           <button
             onClick={() => setShowForm(true)}
@@ -186,6 +246,7 @@ export function BudgetsPage() {
             <span className="text-sm font-semibold">Budget anlegen</span>
           </button>
         </div>
+        </>
       )}
     </div>
   );
@@ -221,7 +282,7 @@ function BudgetCard({ budget, onDelete }: { budget: Budget; onDelete: () => void
           <Tag variant={statusVariant}>{statusLabel}</Tag>
           <button
             onClick={onDelete}
-            className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+            className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
             aria-label="Budget löschen"
           >
             <Trash2 className="h-4 w-4 text-ink-3" />

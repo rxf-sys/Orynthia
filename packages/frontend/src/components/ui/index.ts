@@ -6,4 +6,8 @@ export { Progress } from './Progress';
 export { Field } from './Field';
 export { PageHead } from './PageHead';
 export { CategoryIcon, CategoryDot } from './CategoryIcon';
+export { Modal } from './Modal';
+export { EmptyState } from './EmptyState';
+export { ConfirmProvider } from './ConfirmDialog';
+export { useConfirm } from './useConfirm';
 export { pickCategoryColor } from '@/lib/categoryColors';
