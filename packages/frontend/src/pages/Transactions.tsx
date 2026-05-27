@@ -22,6 +22,7 @@ import {
   PageHead,
   CategoryIcon,
   Modal,
+  EmptyState,
   useConfirm,
   pickCategoryColor,
 } from '@/components/ui';
@@ -348,10 +349,18 @@ export function TransactionsPage() {
             <Loader2 className="h-8 w-8 animate-spin text-indigo" />
           </div>
         ) : transactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-16">
-            <Search className="h-8 w-8 text-ink-4" />
-            <p className="text-sm font-semibold text-ink-2">Keine Transaktionen gefunden</p>
-            <p className="text-xs text-ink-3">Passe deine Filter an oder erstelle eine neue Transaktion.</p>
+          <div className="px-4 py-6">
+            <EmptyState
+              icon={Search}
+              title={debouncedSearch || categoryFilter ? 'Keine Transaktionen gefunden' : 'Noch keine Transaktionen'}
+              description={
+                debouncedSearch || categoryFilter
+                  ? 'Passe deine Filter an oder erstelle eine neue Transaktion.'
+                  : 'Verbinde ein Bankkonto für automatischen Import oder erfasse Transaktionen manuell.'
+              }
+              action={{ label: 'Neue Transaktion', icon: Plus, onClick: () => setShowForm(true) }}
+              compact
+            />
           </div>
         ) : (
           <div>

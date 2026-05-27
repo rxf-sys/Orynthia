@@ -21,7 +21,16 @@ import { formatCurrency, cn } from '@/lib/utils';
 import type { BankAccount, CreateAccountData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Btn, Field, PageHead, Modal, useConfirm, pickCategoryColor } from '@/components/ui';
+import {
+  Card,
+  Btn,
+  Field,
+  PageHead,
+  Modal,
+  EmptyState,
+  useConfirm,
+  pickCategoryColor,
+} from '@/components/ui';
 
 const accountTypeConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   CHECKING: { label: 'Girokonto', icon: <Building2 className="h-5 w-5" /> },
@@ -50,6 +59,8 @@ export function AccountsPage() {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('bank');
   const [editing, setEditing] = useState<BankAccount | null>(null);
+  const [sortBy, setSortBy] = useState<'balance-desc' | 'balance-asc' | 'name' | 'type'>('balance-desc');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [form, setForm] = useState({
     bankName: '',
     accountName: '',
@@ -175,6 +186,26 @@ export function AccountsPage() {
   const liabilities = (accounts || [])
     .filter((a: BankAccount) => Number(a.balance) < 0)
     .reduce((s: number, a: BankAccount) => s + Number(a.balance), 0);
+
+  const sortedAccounts = (() => {
+    const list = [...(accounts || [])];
+    const filtered = typeFilter ? list.filter((a) => a.accountType === typeFilter) : list;
+    const compare = (a: BankAccount, b: BankAccount) => {
+      switch (sortBy) {
+        case 'balance-desc':
+          return Number(b.balance) - Number(a.balance);
+        case 'balance-asc':
+          return Number(a.balance) - Number(b.balance);
+        case 'name':
+          return a.bankName.localeCompare(b.bankName);
+        case 'type':
+          return a.accountType.localeCompare(b.accountType);
+        default:
+          return 0;
+      }
+    };
+    return filtered.sort(compare);
+  })();
 
   return (
     <div className="space-y-5">
@@ -400,14 +431,46 @@ export function AccountsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-indigo" />
         </div>
       ) : accounts?.length === 0 ? (
-        <Card className="text-center" style={{ padding: '48px 24px' }}>
-          <Building2 className="mx-auto mb-3 h-10 w-10 text-ink-4" />
-          <p className="font-semibold text-ink">Noch keine Konten hinzugefügt</p>
-          <p className="mt-1 text-sm text-ink-3">Verbinde deine Bank oder erstelle ein Konto manuell.</p>
-        </Card>
+        <EmptyState
+          icon={Building2}
+          title="Noch keine Konten hinzugefügt"
+          description="Verbinde deine Bank per Open Banking oder lege ein Konto manuell an."
+          action={{ label: 'Konto hinzufügen', icon: Plus, onClick: () => setShowForm(true) }}
+        />
       ) : (
+        <>
+          {(accounts?.length ?? 0) > 1 && (
+            <Card variant="flat" className="!py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="select w-full sm:w-48"
+                  aria-label="Nach Kontotyp filtern"
+                >
+                  <option value="">Alle Kontotypen</option>
+                  {accountTypeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="select w-full sm:w-56"
+                  aria-label="Sortierung"
+                >
+                  <option value="balance-desc">Saldo (hoch → niedrig)</option>
+                  <option value="balance-asc">Saldo (niedrig → hoch)</option>
+                  <option value="name">Bankname (A → Z)</option>
+                  <option value="type">Kontotyp</option>
+                </select>
+              </div>
+            </Card>
+          )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts?.map((acc: BankAccount) => {
+          {sortedAccounts.map((acc: BankAccount) => {
             const cfg = accountTypeConfig[acc.accountType] || accountTypeConfig.CHECKING;
             const color = pickCategoryColor(acc.bankName);
             const isLinked = !!acc.lastSynced;
@@ -513,6 +576,7 @@ export function AccountsPage() {
             <span className="text-sm font-semibold">Bank verbinden</span>
           </button>
         </div>
+        </>
       )}
 
       {editing && (
