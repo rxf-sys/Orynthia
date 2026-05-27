@@ -103,9 +103,15 @@ export class TransactionsService {
   async update(userId: string, id: string, dto: UpdateTransactionDto) {
     await this.findById(userId, id); // Ownership check
 
+    const { date, ...rest } = dto;
+    const data: Prisma.TransactionUpdateInput = {
+      ...rest,
+      ...(date !== undefined && { date: new Date(date) }),
+    };
+
     return this.prisma.transaction.update({
       where: { id },
-      data: dto,
+      data,
       include: { category: true },
     });
   }
@@ -229,7 +235,7 @@ export class TransactionsService {
 
   private async autoCategorize(userId: string, counterpartName: string, purpose?: string): Promise<string | undefined> {
     const categories = await this.prisma.category.findMany({
-      where: { userId },
+      where: { OR: [{ userId }, { isSystem: true }] },
     });
 
     const searchText = `${counterpartName} ${purpose || ''}`.toLowerCase();

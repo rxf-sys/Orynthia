@@ -55,6 +55,26 @@ export class CreateTransactionDto {
 
 export class UpdateTransactionDto {
   @IsOptional()
+  @IsNumber()
+  amount?: number;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsString()
+  purpose?: string;
+
+  @IsOptional()
+  @IsString()
+  counterpartName?: string;
+
+  @IsOptional()
+  @IsString()
+  counterpartIban?: string;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
 
