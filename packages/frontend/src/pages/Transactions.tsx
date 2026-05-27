@@ -7,6 +7,7 @@ import {
   Plus,
   X,
   Trash2,
+  Pencil,
   Download,
   Loader2,
 } from 'lucide-react';
@@ -20,16 +21,20 @@ import {
   Field,
   PageHead,
   CategoryIcon,
+  Modal,
+  useConfirm,
   pickCategoryColor,
 } from '@/components/ui';
 
 export function TransactionsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [newTx, setNewTx] = useState({
     bankAccountId: '',
     amount: '',
@@ -77,8 +82,12 @@ export function TransactionsPage() {
       transactionsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setEditing(null);
       toast.success('Transaktion aktualisiert');
     },
+    onError: () => toast.error('Fehler beim Aktualisieren'),
   });
 
   const createMutation = useMutation({
@@ -380,6 +389,7 @@ export function TransactionsPage() {
                             })
                           }
                           className="hidden max-w-[160px] rounded-md border border-line bg-elev px-2 py-1 text-xs text-ink-2 md:block"
+                          aria-label="Kategorie ändern"
                         >
                           <option value="">Unkategorisiert</option>
                           {categories?.map((cat: Category) => (
@@ -388,24 +398,42 @@ export function TransactionsPage() {
                             </option>
                           ))}
                         </select>
+                        {tx.category && (
+                          <span className="hidden truncate rounded-pill bg-soft px-2 py-0.5 text-[0.7rem] text-ink-2 sm:inline md:hidden">
+                            {tx.category.icon} {tx.category.name}
+                          </span>
+                        )}
                         <div
-                          className="tnum w-28 text-right text-sm font-bold"
+                          className="tnum w-24 text-right text-sm font-bold sm:w-28"
                           style={isIncome ? { color: 'var(--pos)' } : undefined}
                         >
                           {isIncome ? '+' : ''}
                           {formatCurrency(amount)}
                         </div>
-                        <button
-                          onClick={() => {
-                            if (confirm('Transaktion wirklich löschen?')) {
-                              deleteMutation.mutate(tx.id);
-                            }
-                          }}
-                          className="text-ink-3 opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
-                          aria-label="Transaktion löschen"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+                          <button
+                            onClick={() => setEditing(tx)}
+                            className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-indigo"
+                            aria-label="Transaktion bearbeiten"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Transaktion löschen?',
+                                description: tx.counterpartName || tx.purpose || formatCurrency(amount),
+                                confirmLabel: 'Löschen',
+                                destructive: true,
+                              });
+                              if (ok) deleteMutation.mutate(tx.id);
+                            }}
+                            className="rounded p-1.5 text-ink-3 hover:bg-soft hover:text-neg"
+                            aria-label="Transaktion löschen"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -443,7 +471,172 @@ export function TransactionsPage() {
           </div>
         )}
       </Card>
+
+      {editing && (
+        <EditTransactionModal
+          tx={editing}
+          accounts={accounts || []}
+          categories={categories || []}
+          onClose={() => setEditing(null)}
+          onSave={(data) => updateMutation.mutate({ id: editing.id, data })}
+          isPending={updateMutation.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+function EditTransactionModal({
+  tx,
+  accounts,
+  categories,
+  onClose,
+  onSave,
+  isPending,
+}: {
+  tx: Transaction;
+  accounts: BankAccount[];
+  categories: Category[];
+  onClose: () => void;
+  onSave: (data: Partial<CreateTransactionData>) => void;
+  isPending: boolean;
+}) {
+  const initialAmount = Number(tx.amount);
+  const [form, setForm] = useState({
+    amount: String(Math.abs(initialAmount)),
+    date: tx.date.split('T')[0],
+    purpose: tx.purpose || '',
+    counterpartName: tx.counterpartName || '',
+    categoryId: tx.categoryId || '',
+    type: (initialAmount >= 0 ? 'INCOME' : 'EXPENSE') as 'INCOME' | 'EXPENSE',
+    notes: tx.notes || '',
+  });
+
+  const handleSubmit = () => {
+    const amt = Math.abs(Number(form.amount));
+    if (!amt || amt <= 0) {
+      toast.error('Bitte gültigen Betrag eingeben');
+      return;
+    }
+    onSave({
+      amount: form.type === 'EXPENSE' ? -amt : amt,
+      date: form.date,
+      purpose: form.purpose || undefined,
+      counterpartName: form.counterpartName || undefined,
+      categoryId: form.categoryId || undefined,
+      type: form.type,
+      notes: form.notes || undefined,
+    });
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Transaktion bearbeiten"
+      size="lg"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose} disabled={isPending}>
+            Abbrechen
+          </Btn>
+          <Btn variant="grad" onClick={handleSubmit} disabled={isPending}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Typ">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, type: 'EXPENSE' })}
+              className={cn(
+                'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                form.type === 'EXPENSE'
+                  ? 'border-transparent bg-indigo text-white'
+                  : 'border-line bg-elev text-ink-2',
+              )}
+            >
+              Ausgabe
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, type: 'INCOME' })}
+              className={cn(
+                'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                form.type === 'INCOME'
+                  ? 'border-transparent text-white'
+                  : 'border-line bg-elev text-ink-2',
+              )}
+              style={form.type === 'INCOME' ? { background: 'var(--pos)' } : undefined}
+            >
+              Einnahme
+            </button>
+          </div>
+        </Field>
+        <Field label="Betrag (EUR)" required>
+          <input
+            type="number"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            className="input tnum"
+            step="0.01"
+            min="0.01"
+          />
+        </Field>
+        <Field label="Datum" required>
+          <input
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            className="input"
+          />
+        </Field>
+        <Field label="Empfänger / Auftraggeber">
+          <input
+            value={form.counterpartName}
+            onChange={(e) => setForm({ ...form, counterpartName: e.target.value })}
+            className="input"
+          />
+        </Field>
+        <Field label="Verwendungszweck">
+          <input
+            value={form.purpose}
+            onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+            className="input"
+          />
+        </Field>
+        <Field label="Kategorie">
+          <select
+            value={form.categoryId}
+            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+            className="select"
+          >
+            <option value="">Unkategorisiert</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon} {cat.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Notizen" className="sm:col-span-2">
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            className="input min-h-[80px]"
+          />
+        </Field>
+      </div>
+      {accounts.length > 0 && (
+        <p className="mt-3 text-xs text-ink-3">
+          Konto: <strong>{accounts.find((a) => a.id === tx.bankAccountId)?.bankName}</strong> –{' '}
+          {accounts.find((a) => a.id === tx.bankAccountId)?.accountName} (Konto-Zuordnung ist nicht änderbar)
+        </p>
+      )}
+    </Modal>
   );
 }
 
