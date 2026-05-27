@@ -390,7 +390,7 @@ export function ContractsPage() {
                             });
                             if (ok) deleteMutation.mutate(contract.id);
                           }}
-                          className="opacity-0 transition-opacity hover:text-neg group-hover:opacity-100"
+                          className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
                           aria-label="Vertrag löschen"
                         >
                           <Trash2 className="h-4 w-4 text-ink-3" />
