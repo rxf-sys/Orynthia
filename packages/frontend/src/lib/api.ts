@@ -87,8 +87,28 @@ export const authApi = {
   enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
 };
 
+export interface ForecastResponse {
+  horizonDays: number;
+  startBalance: number;
+  endBalance: number;
+  lowestBalance: number;
+  lowestDate: string;
+  totalIn: number;
+  totalOut: number;
+  medianDailySpend: number;
+  points: Array<{
+    date: string;
+    projectedBalance: number;
+    scheduledIn: number;
+    scheduledOut: number;
+    estimatedVariableSpend: number;
+    items: Array<{ name: string; amount: number; source: 'recurring' | 'contract' }>;
+  }>;
+}
+
 export const dashboardApi = {
   getData: () => api.get<DashboardData>('/dashboard'),
+  getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
 };
 
 export const accountsApi = {

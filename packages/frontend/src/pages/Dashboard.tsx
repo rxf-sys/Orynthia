@@ -26,6 +26,7 @@ import { formatCurrency, formatDateRelative } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import type { MonthlyOverview, BankAccount, Transaction } from '@/lib/types';
 import { Card, Btn, PageHead, Tag, CategoryIcon, CategoryDot, pickCategoryColor } from '@/components/ui';
+import { ForecastCard } from '@/components/ForecastCard';
 
 const CHART_COLORS = {
   income: 'var(--pos)',
@@ -291,6 +292,9 @@ export function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* Forecast */}
+      <ForecastCard />
 
       {/* Accounts strip */}
       <Card>
