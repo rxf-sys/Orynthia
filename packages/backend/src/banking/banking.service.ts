@@ -5,6 +5,7 @@ import { Category } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EnableBankingProvider } from './providers/enable-banking.provider';
 import { Institution } from './providers/banking-provider.interface';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BankingService {
@@ -14,6 +15,7 @@ export class BankingService {
     private prisma: PrismaService,
     private config: ConfigService,
     private enableBanking: EnableBankingProvider,
+    private notifications: NotificationsService,
   ) {
     this.logger.log(`Banking-Provider: ${this.enableBanking.name}`);
   }
@@ -265,7 +267,19 @@ export class BankingService {
         await this.syncAccount(account.userId, account.id);
         this.logger.log(`Sync erfolgreich: ${account.accountName} (${account.id})`);
       } catch (error: unknown) {
-        this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${error}`);
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${reason}`);
+        const todayKey = new Date().toISOString().slice(0, 10);
+        await this.notifications
+          .create({
+            userId: account.userId,
+            type: 'SYNC_ERROR',
+            title: `Bank-Sync fehlgeschlagen: ${account.bankName}`,
+            message: `Konto "${account.accountName}" konnte nicht aktualisiert werden. ${reason}`,
+            dedupeKey: `sync-error-${account.id}-${todayKey}`,
+            data: { bankAccountId: account.id, error: reason },
+          })
+          .catch(() => undefined);
       }
     }
 

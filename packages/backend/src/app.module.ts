@@ -14,6 +14,7 @@ import { BankingModule } from './banking/banking.module';
 import { RecurringPaymentsModule } from './recurring-payments/recurring-payments.module';
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { ContractsModule } from './contracts/contracts.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 
 @Module({
@@ -54,6 +55,7 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
     RecurringPaymentsModule,
     SavingsGoalsModule,
     ContractsModule,
+    NotificationsModule,
     DemoSeedModule,
   ],
 })
