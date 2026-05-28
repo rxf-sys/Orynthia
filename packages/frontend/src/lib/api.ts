@@ -13,6 +13,7 @@ import type {
   DashboardData,
   DetectedContract,
   MonthlyOverview,
+  Notification,
   PaginatedResult,
   ProviderComparison,
   RecurringPayment,
@@ -166,4 +167,15 @@ export const contractsApi = {
     frequency: string; contractType: string; name?: string; provider?: string;
   }) => api.post<Contract>('/contracts/from-detection', data),
   compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
+};
+
+export const notificationsApi = {
+  list: (opts: { unread?: boolean; limit?: number } = {}) =>
+    api.get<Notification[]>('/notifications', {
+      params: { ...(opts.unread ? { unread: 'true' } : {}), ...(opts.limit ? { limit: opts.limit } : {}) },
+    }),
+  count: () => api.get<{ count: number }>('/notifications/count'),
+  markAsRead: (id: string) => api.post<Notification>(`/notifications/${id}/read`),
+  markAllAsRead: () => api.post<{ updated: number }>('/notifications/read-all'),
+  remove: (id: string) => api.delete(`/notifications/${id}`),
 };
