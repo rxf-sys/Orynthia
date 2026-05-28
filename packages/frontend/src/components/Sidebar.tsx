@@ -9,6 +9,7 @@ import {
   Repeat,
   FileText,
   Sparkles,
+  Bot,
   Settings,
   Search,
   MoreHorizontal,
@@ -43,6 +44,8 @@ const NAV: NavItem[] = [
   { section: 'Verträge' },
   { to: '/contracts', icon: FileText, label: 'Verträge', badge: 'Neu' },
   { to: '/savings-potential', icon: Sparkles, label: 'Sparpotenzial' },
+  { section: 'Assistent' },
+  { to: '/assistant', icon: Bot, label: 'KI-Assistent', badge: 'Beta' },
   { section: 'Konto' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];

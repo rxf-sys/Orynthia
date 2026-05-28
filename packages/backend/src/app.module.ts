@@ -16,6 +16,7 @@ import { RecurringPaymentsModule } from './recurring-payments/recurring-payments
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChatModule } from './chat/chat.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 
 @Module({
@@ -58,6 +59,7 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
     SavingsGoalsModule,
     ContractsModule,
     NotificationsModule,
+    ChatModule,
     DemoSeedModule,
   ],
 })

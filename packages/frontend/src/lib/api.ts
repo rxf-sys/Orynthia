@@ -221,6 +221,16 @@ export const contractsApi = {
   compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
 };
 
+export const chatApi = {
+  status: () => api.get<{ enabled: boolean }>('/chat/status'),
+  send: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    api.post<{
+      role: 'assistant';
+      content: string;
+      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    }>('/chat/message', { messages }),
+};
+
 export const notificationsApi = {
   list: (opts: { unread?: boolean; limit?: number } = {}) =>
     api.get<Notification[]>('/notifications', {
