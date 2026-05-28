@@ -8,6 +8,7 @@ import {
   PiggyBank,
   Repeat,
   FileText,
+  Sparkles,
   Settings,
   Search,
   MoreHorizontal,
@@ -41,6 +42,7 @@ const NAV: NavItem[] = [
   { to: '/recurring', icon: Repeat, label: 'Wiederkehrend' },
   { section: 'Verträge' },
   { to: '/contracts', icon: FileText, label: 'Verträge', badge: 'Neu' },
+  { to: '/savings-potential', icon: Sparkles, label: 'Sparpotenzial' },
   { section: 'Konto' },
   { to: '/settings', icon: Settings, label: 'Einstellungen' },
 ];

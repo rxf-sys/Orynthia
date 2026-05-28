@@ -20,4 +20,9 @@ export class DashboardController {
   async getForecast(@Req() req: Request, @Query('days') days?: string) {
     return this.dashboardService.getForecast(req.user!.id, days ? parseInt(days, 10) : 30);
   }
+
+  @Get('savings-potential')
+  async getSavingsPotential(@Req() req: Request) {
+    return this.dashboardService.getSavingsPotential(req.user!.id);
+  }
 }

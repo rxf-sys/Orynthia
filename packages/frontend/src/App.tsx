@@ -15,6 +15,7 @@ import { AccountsPage } from '@/pages/Accounts';
 import { RecurringPaymentsPage } from '@/pages/RecurringPayments';
 import { SavingsGoalsPage } from '@/pages/SavingsGoals';
 import { ContractsPage } from '@/pages/Contracts';
+import { SavingsPotentialPage } from '@/pages/SavingsPotential';
 import { SettingsPage } from '@/pages/Settings';
 import { ConfirmProvider } from '@/components/ui';
 
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="recurring" element={<RecurringPaymentsPage />} />
           <Route path="savings" element={<SavingsGoalsPage />} />
           <Route path="contracts" element={<ContractsPage />} />
+          <Route path="savings-potential" element={<SavingsPotentialPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

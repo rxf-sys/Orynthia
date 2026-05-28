@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ContractsService } from '../contracts/contracts.service';
+
+const SUBSCRIPTION_TYPES = new Set(['STREAMING', 'GYM', 'SUBSCRIPTION']);
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private contracts: ContractsService,
+  ) {}
 
   async getDashboardData(userId: string) {
     const now = new Date();
@@ -252,6 +258,165 @@ export class DashboardService {
       medianDailySpend: Math.round(medianDailySpend * 100) / 100,
       points,
     };
+  }
+
+  /**
+   * Sparpotenzial-Analyse: Aggregierte Sicht aller wiederkehrenden
+   * Posten + Anbietervergleich + Kategorien über Schnitt.
+   */
+  async getSavingsPotential(userId: string) {
+    const [activeRecurring, activeContracts, comparison, txLastSixMonths] = await Promise.all([
+      this.prisma.recurringPayment.findMany({
+        where: { userId, isActive: true },
+        include: { category: { select: { id: true, name: true, icon: true, color: true } } },
+      }),
+      this.prisma.contract.findMany({ where: { userId, isActive: true } }),
+      this.contracts.compareProviders(userId),
+      this.prisma.transaction.findMany({
+        where: {
+          bankAccount: { userId },
+          amount: { lt: 0 },
+          date: { gte: monthsAgo(6) },
+        },
+        select: { amount: true, date: true, categoryId: true },
+      }),
+    ]);
+
+    const recurringMonthly = activeRecurring.reduce((sum, r) => {
+      return sum + frequencyToMonthly(Math.abs(Number(r.amount)), r.frequency);
+    }, 0);
+    const contractMonthly = activeContracts.reduce(
+      (sum, c) => sum + Number(c.monthlyCost ?? 0),
+      0,
+    );
+    const totalFixedMonthly = recurringMonthly + contractMonthly;
+
+    // Abo-Übersicht (Streaming / Gym / Subscription + Verträge mit niedrigem monatlichen Cost)
+    const subscriptionContracts = activeContracts
+      .filter((c) => SUBSCRIPTION_TYPES.has(c.contractType))
+      .map((c) => ({
+        id: c.id,
+        kind: 'contract' as const,
+        name: c.name,
+        provider: c.provider,
+        contractType: c.contractType,
+        monthlyCost: Number(c.monthlyCost ?? 0),
+        lastChargeDate: c.lastChargeDate,
+      }));
+    const subscriptionRecurring = activeRecurring
+      .filter((r) =>
+        r.category?.name === 'Abonnements' || r.category?.name === 'Freizeit & Unterhaltung',
+      )
+      .map((r) => ({
+        id: r.id,
+        kind: 'recurring' as const,
+        name: r.name,
+        provider: r.counterpartName ?? r.name,
+        contractType: 'SUBSCRIPTION',
+        monthlyCost: frequencyToMonthly(Math.abs(Number(r.amount)), r.frequency),
+        lastChargeDate: r.lastChargeDate,
+      }));
+    const subscriptions = [...subscriptionContracts, ...subscriptionRecurring].sort(
+      (a, b) => b.monthlyCost - a.monthlyCost,
+    );
+    const subscriptionTotal = subscriptions.reduce((s, x) => s + x.monthlyCost, 0);
+
+    // Kategorien-Median (letzte 5 abgeschlossene Monate) vs. aktueller Monat
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlySumByCat = new Map<string, Map<string, number>>(); // monthKey -> categoryId -> sum
+    for (const tx of txLastSixMonths) {
+      if (!tx.categoryId) continue;
+      const d = tx.date;
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlySumByCat.has(monthKey)) monthlySumByCat.set(monthKey, new Map());
+      const inner = monthlySumByCat.get(monthKey)!;
+      inner.set(tx.categoryId, (inner.get(tx.categoryId) ?? 0) + Math.abs(Number(tx.amount)));
+    }
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthSums = monthlySumByCat.get(currentMonthKey) ?? new Map();
+
+    const categoryMedians = new Map<string, number>();
+    const allCategoryIds = new Set<string>();
+    for (const [, inner] of monthlySumByCat) for (const cid of inner.keys()) allCategoryIds.add(cid);
+    for (const cid of allCategoryIds) {
+      const values: number[] = [];
+      for (const [mk, inner] of monthlySumByCat) {
+        if (mk === currentMonthKey) continue;
+        values.push(inner.get(cid) ?? 0);
+      }
+      if (values.length === 0) continue;
+      values.sort((a, b) => a - b);
+      categoryMedians.set(cid, values[Math.floor(values.length / 2)]);
+    }
+
+    const categoryDetails = await this.prisma.category.findMany({
+      where: { id: { in: [...allCategoryIds] } },
+      select: { id: true, name: true, icon: true, color: true },
+    });
+    const catMap = new Map(categoryDetails.map((c) => [c.id, c]));
+
+    const overspendingCategories = [...categoryMedians.entries()]
+      .map(([cid, median]) => ({
+        category: catMap.get(cid),
+        median: Math.round(median * 100) / 100,
+        currentMonth: Math.round((currentMonthSums.get(cid) ?? 0) * 100) / 100,
+      }))
+      .filter((row) => row.category && row.median > 0 && row.currentMonth > row.median * 1.2)
+      .map((row) => ({
+        ...row,
+        overBy: Math.round((row.currentMonth - row.median) * 100) / 100,
+        overByPercent: Math.round(((row.currentMonth - row.median) / row.median) * 100),
+      }))
+      .sort((a, b) => b.overBy - a.overBy)
+      .slice(0, 8);
+
+    const totalSavingsMonthly = comparison.totalSavingsMonthly;
+    const totalSavingsYearly = comparison.totalSavingsYearly;
+
+    void currentMonthStart; // keep tree-shake happy
+    return {
+      totalFixedMonthly: Math.round(totalFixedMonthly * 100) / 100,
+      totalFixedYearly: Math.round(totalFixedMonthly * 12 * 100) / 100,
+      breakdown: {
+        recurringMonthly: Math.round(recurringMonthly * 100) / 100,
+        contractMonthly: Math.round(contractMonthly * 100) / 100,
+      },
+      subscriptions: {
+        total: Math.round(subscriptionTotal * 100) / 100,
+        count: subscriptions.length,
+        items: subscriptions.map((s) => ({
+          ...s,
+          monthlyCost: Math.round(s.monthlyCost * 100) / 100,
+        })),
+      },
+      providerSavings: {
+        totalMonthly: totalSavingsMonthly,
+        totalYearly: totalSavingsYearly,
+        topCandidates: comparison.comparisons
+          .filter((c) => c.savingsPotentialYearly > 0)
+          .slice(0, 5),
+      },
+      overspendingCategories,
+    };
+  }
+}
+
+function monthsAgo(months: number): Date {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d;
+}
+
+function frequencyToMonthly(amount: number, freq: string): number {
+  switch (freq) {
+    case 'WEEKLY': return amount * (52 / 12);
+    case 'BIWEEKLY': return amount * (26 / 12);
+    case 'MONTHLY': return amount;
+    case 'QUARTERLY': return amount / 3;
+    case 'BIANNUALLY': return amount / 6;
+    case 'YEARLY': return amount / 12;
+    default: return amount;
   }
 }
 

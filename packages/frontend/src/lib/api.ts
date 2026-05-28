@@ -109,7 +109,39 @@ export interface ForecastResponse {
 export const dashboardApi = {
   getData: () => api.get<DashboardData>('/dashboard'),
   getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
+  getSavingsPotential: () => api.get<SavingsPotentialResponse>('/dashboard/savings-potential'),
 };
+
+export interface SavingsPotentialResponse {
+  totalFixedMonthly: number;
+  totalFixedYearly: number;
+  breakdown: { recurringMonthly: number; contractMonthly: number };
+  subscriptions: {
+    total: number;
+    count: number;
+    items: Array<{
+      id: string;
+      kind: 'contract' | 'recurring';
+      name: string;
+      provider: string;
+      contractType: string;
+      monthlyCost: number;
+      lastChargeDate?: string | null;
+    }>;
+  };
+  providerSavings: {
+    totalMonthly: number;
+    totalYearly: number;
+    topCandidates: ProviderComparison[];
+  };
+  overspendingCategories: Array<{
+    category?: { id: string; name: string; icon?: string; color?: string };
+    median: number;
+    currentMonth: number;
+    overBy: number;
+    overByPercent: number;
+  }>;
+}
 
 export const accountsApi = {
   getAll: () => api.get<BankAccount[]>('/accounts'),
