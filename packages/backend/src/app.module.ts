@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -44,6 +45,7 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
 
     // Core Modules
     PrismaModule,
+    MailModule,
     AuthModule,
     UsersModule,
     TransactionsModule,

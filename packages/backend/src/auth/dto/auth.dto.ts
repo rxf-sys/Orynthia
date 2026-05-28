@@ -65,3 +65,22 @@ export class TokenResponseDto {
   refreshToken: string;
   expiresIn: number;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  @Transform(({ value }) => value?.trim().toLowerCase())
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  token: string;
+
+  @ApiProperty({ example: 'neuesPasswort123!' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password: string;
+}

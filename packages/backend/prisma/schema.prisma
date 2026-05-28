@@ -25,7 +25,11 @@ model User {
   
   // Refresh Token
   refreshToken   String?   @map("refresh_token")
-  
+
+  // Passwort-Reset
+  passwordResetToken   String?   @map("password_reset_token")
+  passwordResetExpires DateTime? @map("password_reset_expires")
+
   // Status
   isActive       Boolean   @default(true) @map("is_active")
   isEmailVerified Boolean  @default(false) @map("is_email_verified")

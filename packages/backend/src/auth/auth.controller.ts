@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, Enable2FADto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, Enable2FADto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const COOKIE_OPTIONS = {
@@ -94,6 +94,24 @@ export class AuthController {
   async disable2FA(@Req() req: Request) {
     await this.authService.disable2FA(req.user!.id);
     return { message: '2FA deaktiviert' };
+  }
+
+  @Post('forgot-password')
+  @Throttle({ short: { ttl: 60000, limit: 3 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Passwort-Reset anfordern (E-Mail)' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.requestPasswordReset(dto.email);
+    return { message: 'Wenn ein Account mit dieser E-Mail existiert, wurde eine Reset-Mail verschickt.' };
+  }
+
+  @Post('reset-password')
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Passwort mit Reset-Token setzen' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.password);
+    return { message: 'Passwort erfolgreich geändert. Bitte neu anmelden.' };
   }
 
   @Get('me')

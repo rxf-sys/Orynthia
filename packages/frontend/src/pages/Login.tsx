@@ -137,9 +137,9 @@ export function LoginPage() {
                 />
                 Angemeldet bleiben
               </label>
-              <a href="#" className="text-indigo hover:underline">
+              <Link to="/forgot-password" className="text-indigo hover:underline">
                 Passwort vergessen?
-              </a>
+              </Link>
             </div>
 
             {show2FA && (
