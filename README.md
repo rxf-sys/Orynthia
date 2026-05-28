@@ -158,7 +158,12 @@ Orynthia/
 - Budget-Tracking mit Fortschrittsanzeige, Warnungen und Status-Filter
   (Alle / Überzogen / Knapp / Im Plan)
 - Sortierung & Filter in der Kontenübersicht (Saldo, Name, Typ)
-- Dashboard mit Diagrammen (Balken, Torte, Trends)
+- Dashboard mit Diagrammen (Balken, Torte, Trends) und Liquiditäts-Forecast
+  (30/60/90 Tage, basiert auf wiederkehrenden Zahlungen, Verträgen und Tages-Median)
+- Sparpotenzial-Analyse: Fixkosten, Abo-Übersicht, Anbieterwechsel-Tipps,
+  Kategorien mit überdurchschnittlichen Ausgaben
+- Wertpapier-/Depot-Tracking: manuelle Positionen (Aktien, ETFs, Krypto, Fonds, Anleihen),
+  Gewinn-/Verlust-Berechnung, Allokation, Kurs-Update per Klick
 - CSV-Export (Excel-kompatibel mit BOM und deutschem Zahlenformat)
 
 ### Verträge & Abos
@@ -170,8 +175,23 @@ Orynthia/
 
 ### Sparen & Planung
 - Sparziele mit Fortschrittsbalken
-- Wiederkehrende Zahlungen verwalten
+- Wiederkehrende Zahlungen verwalten (mit Erinnerungen vor Fälligkeit)
 - Einnahmen/Ausgaben-Übersicht
+
+### Benachrichtigungen (automatisch)
+- Bell-Icon im Header mit Inbox + Badge für ungelesene Einträge
+- Live: ungewöhnlich hohe Buchungen (> 200 € und > 2× Median der letzten 90 Tage)
+- Cron (täglich 08:00): Budget-Warnungen (≥ 80 %) und -Überzüge (≥ 100 %),
+  bald fällige wiederkehrende Zahlungen
+- Alle 6 h: Banking-Auto-Sync, mit SYNC_ERROR-Notification bei Fehlern
+- Alle Trigger sind idempotent (dedupeKey) – keine doppelten Benachrichtigungen
+
+### KI-Assistent (Beta)
+- Chat-Oberfläche unter /assistant, beantwortet Fragen zu Konten, Ausgaben,
+  Budgets, Verträgen, Sparzielen anhand deiner echten Daten
+- Modell: Anthropic Claude Opus 4.7 mit adaptive thinking + Prompt-Caching
+- Aktiviert sich, sobald `ANTHROPIC_API_KEY` in der .env gesetzt ist
+  (Key holen: https://console.anthropic.com)
 
 ### Sicherheit
 - JWT-Authentifizierung mit Refresh Tokens
@@ -183,12 +203,17 @@ Orynthia/
 
 ### Technik
 - Responsive Dark-Theme UI mit Mobile-optimierten Aktions-Buttons
+- **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop), Service-Worker
+  cached statische Assets, /api bleibt live
+- **E-Mail-Versand** via SMTP (nodemailer) – Passwort-Reset-Mails (sobald SMTP
+  konfiguriert; ohne SMTP wird der Reset-Link ins Backend-Log geschrieben)
 - Barrierefreie Custom-Dialoge (Esc-to-close, Backdrop, ARIA-Labels) statt Browser-`confirm()`
-- Edit-Modals für Konten und Transaktionen
+- Edit-Modals für Konten, Transaktionen, Verträge, Depot-Positionen
 - Empty-States mit klarem Call-to-Action auf allen Listen-Seiten
 - Docker-Deployment (Dev & Prod), Migrationen laufen automatisch beim Start
 - Swagger API-Dokumentation
-- Demo-Daten mit Seed-Script (optional)
+- Demo-Daten via `SEED_DEMO_USER=true` (Boot-Hook, reset-at-restart)
+- Optionaler Prisma-Studio-Container (`docker compose --profile tools up -d prisma-studio`)
 - CI: GitHub Actions (Lint, Test, Build) auf Node 24 / pnpm 9.15.0
 
 ## API-Endpunkte
@@ -197,7 +222,10 @@ Orynthia/
 - `POST /api/auth/register` - Registrierung
 - `POST /api/auth/login` - Anmeldung (mit optionalem 2FA)
 - `POST /api/auth/refresh` - Token erneuern
+- `POST /api/auth/logout` - Abmelden
 - `GET /api/auth/me` - Aktueller Benutzer
+- `POST /api/auth/forgot-password` - Reset-Link per E-Mail anfordern
+- `POST /api/auth/reset-password` - Passwort mit Reset-Token setzen
 - `GET /api/auth/2fa/generate` - QR-Code für 2FA
 - `POST /api/auth/2fa/enable` - 2FA aktivieren
 - `POST /api/auth/2fa/disable` - 2FA deaktivieren
@@ -257,6 +285,28 @@ Orynthia/
 - `GET /api/contracts/compare` - Anbietervergleich
 - `PATCH /api/contracts/:id` - Vertrag bearbeiten
 - `DELETE /api/contracts/:id` - Vertrag löschen
+
+### Benachrichtigungen
+- `GET /api/notifications` - Liste (`?unread=true&limit=N`)
+- `GET /api/notifications/count` - Anzahl ungelesener
+- `POST /api/notifications/:id/read` - Als gelesen markieren
+- `POST /api/notifications/read-all` - Alle als gelesen markieren
+- `DELETE /api/notifications/:id` - Löschen
+
+### Forecast / Sparpotenzial
+- `GET /api/dashboard/forecast?days=30` - Liquiditätsvorschau (7–180 Tage)
+- `GET /api/dashboard/savings-potential` - Fixkosten, Abos, Wechsel-Potenzial
+
+### Depot
+- `GET /api/investments` - Positionen + Summary + Allokation
+- `POST /api/investments` - Position anlegen
+- `PATCH /api/investments/:id` - Position bearbeiten
+- `POST /api/investments/:id/price` - Aktuellen Kurs setzen
+- `DELETE /api/investments/:id` - Position löschen
+
+### KI-Assistent
+- `GET /api/chat/status` - Aktiviert? (true/false)
+- `POST /api/chat/message` - Nachricht senden (history-aware, kontext-injiziert)
 
 ## Enable Banking einrichten
 

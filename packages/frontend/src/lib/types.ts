@@ -254,6 +254,53 @@ export interface Notification {
   createdAt: string;
 }
 
+export type InvestmentType = 'STOCK' | 'ETF' | 'FUND' | 'CRYPTO' | 'BOND' | 'OTHER';
+
+export interface InvestmentPosition {
+  id: string;
+  symbol: string;
+  name: string;
+  type: InvestmentType;
+  quantity: number;
+  averagePrice: number;
+  currentPrice: number | null;
+  currency: string;
+  purchaseDate?: string;
+  lastPriceUpdate?: string;
+  notes?: string;
+  bankAccountId?: string | null;
+  bankAccount?: { id: string; accountName: string; bankName: string } | null;
+  invested: number;
+  currentValue: number;
+  gainLoss: number;
+  gainLossPercent: number;
+}
+
+export interface InvestmentsResponse {
+  positions: InvestmentPosition[];
+  summary: {
+    totalInvested: number;
+    totalValue: number;
+    totalGainLoss: number;
+    totalGainLossPercent: number;
+    positionCount: number;
+  };
+  allocation: Array<{ type: InvestmentType; value: number; count: number; percent: number }>;
+}
+
+export interface CreateInvestmentData {
+  symbol: string;
+  name: string;
+  type?: InvestmentType;
+  quantity: number;
+  averagePrice: number;
+  currentPrice?: number;
+  currency?: string;
+  purchaseDate?: string;
+  bankAccountId?: string;
+  notes?: string;
+}
+
 export interface TransactionFilters {
   page?: number;
   limit?: number;

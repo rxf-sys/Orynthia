@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -15,6 +16,8 @@ import { RecurringPaymentsModule } from './recurring-payments/recurring-payments
 import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChatModule } from './chat/chat.module';
+import { InvestmentsModule } from './investments/investments.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 
 @Module({
@@ -44,6 +47,7 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
 
     // Core Modules
     PrismaModule,
+    MailModule,
     AuthModule,
     UsersModule,
     TransactionsModule,
@@ -56,6 +60,8 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
     SavingsGoalsModule,
     ContractsModule,
     NotificationsModule,
+    ChatModule,
+    InvestmentsModule,
     DemoSeedModule,
   ],
 })

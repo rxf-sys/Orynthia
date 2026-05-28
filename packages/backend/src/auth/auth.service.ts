@@ -1,18 +1,25 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto, LoginDto, TokenResponseDto } from './dto/auth.dto';
+
+const PASSWORD_RESET_TTL_MIN = 60;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private mail: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenResponseDto> {
@@ -174,6 +181,66 @@ export class AuthService {
       data: {
         twoFactorEnabled: false,
         twoFactorSecret: null,
+      },
+    });
+  }
+
+  /**
+   * Passwort-Reset anfordern. Antwortet immer 200 (kein User-Enumeration-Leak).
+   * Wenn ein Account existiert, wird ein Token erzeugt, gehasht abgelegt und
+   * per E-Mail versendet (falls SMTP konfiguriert; sonst geloggt im Backend).
+   */
+  async requestPasswordReset(emailRaw: string): Promise<void> {
+    const email = emailRaw.toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive) return;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expires = new Date(Date.now() + PASSWORD_RESET_TTL_MIN * 60_000);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetToken: tokenHash, passwordResetExpires: expires },
+    });
+
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173').replace(/\/+$/, '');
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    const sent = await this.mail.send({
+      to: user.email,
+      subject: 'Passwort zurücksetzen – Orynthia',
+      html: `
+        <p>Hallo${user.firstName ? ` ${user.firstName}` : ''},</p>
+        <p>du hast eine Passwort-Zurücksetzung für deinen Orynthia-Account angefordert.</p>
+        <p><a href="${resetLink}">Passwort jetzt zurücksetzen</a></p>
+        <p>Der Link ist ${PASSWORD_RESET_TTL_MIN} Minuten gültig. Falls du diese Anfrage nicht ausgelöst hast, ignoriere diese E-Mail – dein Passwort bleibt unverändert.</p>
+        <p style="color:#888;font-size:12px">Orynthia – Self-Hosted Persönliche Finanzverwaltung</p>
+      `,
+    });
+    if (!sent) {
+      this.logger.warn(`Passwort-Reset-Token für ${user.email}: ${resetLink}`);
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Passwort muss mindestens 8 Zeichen lang sein.');
+    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await this.prisma.user.findFirst({
+      where: { passwordResetToken: tokenHash, passwordResetExpires: { gt: new Date() } },
+    });
+    if (!user) throw new BadRequestException('Token ungültig oder abgelaufen.');
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        refreshToken: null,
       },
     });
   }

@@ -7,11 +7,13 @@ import type {
   CreateAccountData,
   CreateBudgetData,
   CreateContractData,
+  CreateInvestmentData,
   CreateRecurringPaymentData,
   CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
   DetectedContract,
+  InvestmentsResponse,
   MonthlyOverview,
   Notification,
   PaginatedResult,
@@ -87,9 +89,61 @@ export const authApi = {
   enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
 };
 
+export interface ForecastResponse {
+  horizonDays: number;
+  startBalance: number;
+  endBalance: number;
+  lowestBalance: number;
+  lowestDate: string;
+  totalIn: number;
+  totalOut: number;
+  medianDailySpend: number;
+  points: Array<{
+    date: string;
+    projectedBalance: number;
+    scheduledIn: number;
+    scheduledOut: number;
+    estimatedVariableSpend: number;
+    items: Array<{ name: string; amount: number; source: 'recurring' | 'contract' }>;
+  }>;
+}
+
 export const dashboardApi = {
   getData: () => api.get<DashboardData>('/dashboard'),
+  getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
+  getSavingsPotential: () => api.get<SavingsPotentialResponse>('/dashboard/savings-potential'),
 };
+
+export interface SavingsPotentialResponse {
+  totalFixedMonthly: number;
+  totalFixedYearly: number;
+  breakdown: { recurringMonthly: number; contractMonthly: number };
+  subscriptions: {
+    total: number;
+    count: number;
+    items: Array<{
+      id: string;
+      kind: 'contract' | 'recurring';
+      name: string;
+      provider: string;
+      contractType: string;
+      monthlyCost: number;
+      lastChargeDate?: string | null;
+    }>;
+  };
+  providerSavings: {
+    totalMonthly: number;
+    totalYearly: number;
+    topCandidates: ProviderComparison[];
+  };
+  overspendingCategories: Array<{
+    category?: { id: string; name: string; icon?: string; color?: string };
+    median: number;
+    currentMonth: number;
+    overBy: number;
+    overByPercent: number;
+  }>;
+}
 
 export const accountsApi = {
   getAll: () => api.get<BankAccount[]>('/accounts'),
@@ -167,6 +221,26 @@ export const contractsApi = {
     frequency: string; contractType: string; name?: string; provider?: string;
   }) => api.post<Contract>('/contracts/from-detection', data),
   compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
+};
+
+export const investmentsApi = {
+  getAll: () => api.get<InvestmentsResponse>('/investments'),
+  create: (data: CreateInvestmentData) => api.post<InvestmentsResponse['positions'][number]>('/investments', data),
+  update: (id: string, data: Partial<CreateInvestmentData>) =>
+    api.patch<InvestmentsResponse['positions'][number]>(`/investments/${id}`, data),
+  updatePrice: (id: string, currentPrice: number) =>
+    api.post<InvestmentsResponse['positions'][number]>(`/investments/${id}/price`, { currentPrice }),
+  remove: (id: string) => api.delete(`/investments/${id}`),
+};
+
+export const chatApi = {
+  status: () => api.get<{ enabled: boolean }>('/chat/status'),
+  send: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    api.post<{
+      role: 'assistant';
+      content: string;
+      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    }>('/chat/message', { messages }),
 };
 
 export const notificationsApi = {
