@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -10,6 +11,7 @@ import {
   Settings,
   Search,
   MoreHorizontal,
+  LogOut,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { Btn } from './ui/Btn';
 import { Avatar } from './ui/Avatar';
+import { useConfirm } from './ui/useConfirm';
 
 interface NavItem {
   section?: string;
@@ -49,12 +52,47 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   const fullName =
     user?.firstName || user?.lastName
       ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
       : user?.email?.split('@')[0] ?? 'Konto';
+
+  const handleLogout = async () => {
+    setMenuOpen(false);
+    const ok = await confirm({
+      title: 'Abmelden?',
+      description: 'Du wirst zur Anmeldeseite weitergeleitet.',
+      confirmLabel: 'Abmelden',
+    });
+    if (!ok) return;
+    await logout();
+    onClose();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <>
@@ -154,20 +192,52 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* User row */}
-        <button
-          onClick={() => {
-            navigate('/settings');
-            onClose();
-          }}
-          className="mt-3 flex items-center gap-2.5 rounded-md border border-line p-2.5 text-left transition-colors hover:bg-soft"
-        >
-          <Avatar name={fullName} size={32} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[0.85rem] font-semibold text-ink">{fullName}</div>
-            <div className="truncate text-[0.72rem] text-ink-3">{user?.email}</div>
-          </div>
-          <MoreHorizontal className="h-4 w-4 text-ink-3" />
-        </button>
+        <div ref={menuRef} className="relative mt-3">
+          {menuOpen && (
+            <div
+              className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-md border border-line bg-elev shadow-lg animate-fade-in"
+              role="menu"
+            >
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate('/settings');
+                  onClose();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-soft"
+              >
+                <Settings className="h-4 w-4 text-ink-3" />
+                Einstellungen
+              </button>
+              <button
+                role="menuitem"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 border-t border-line px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-soft hover:text-neg"
+              >
+                <LogOut className="h-4 w-4 text-ink-3" />
+                Abmelden
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="Konto-Menü öffnen"
+            className={cn(
+              'flex w-full items-center gap-2.5 rounded-md border border-line p-2.5 text-left transition-colors hover:bg-soft',
+              menuOpen && 'bg-soft',
+            )}
+          >
+            <Avatar name={fullName} size={32} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[0.85rem] font-semibold text-ink">{fullName}</div>
+              <div className="truncate text-[0.72rem] text-ink-3">{user?.email}</div>
+            </div>
+            <MoreHorizontal className="h-4 w-4 text-ink-3" />
+          </button>
+        </div>
       </aside>
     </>
   );

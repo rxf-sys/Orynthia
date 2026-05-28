@@ -46,16 +46,33 @@ Beim Container-Start läuft automatisch `prisma migrate deploy` — die Tabellen
 "Lebensmittel", "Miete & Wohnen", …) werden beim ersten App-Boot idempotent über
 `CategoriesService.onModuleInit` angelegt; ein manueller Seed-Aufruf ist nicht nötig.
 
-Optional (nur für Demo-Daten):
+### 4. Demo-Daten (optional)
 
-```bash
-docker compose exec backend npx prisma db seed
+Für Tests und Demonstration kannst du einen kompletten Demo-User mit realistischen Daten
+beim Boot anlegen lassen. In `.env`:
+
+```env
+SEED_DEMO_USER=true
 ```
 
-### 4. Demo-Login (nur nach `db seed`)
+Dann Container neu starten. Bei jedem Boot mit gesetzter Flag wird der Demo-User samt
+aller Daten **frisch erzeugt** (vorherige Demo-Daten werden gelöscht).
 
-- **E-Mail:** demo@orynthia.local
-- **Passwort:** demo1234
+**Login:**
+- **E-Mail:** `demo@orynthia.local`
+- **Passwort:** `demo1234`
+
+**Was enthalten ist:**
+- 3 Konten: Girokonto (+3.847 €), Tagesgeld (+12.500 €), KFZ-Kredit (-8.200 €)
+- ~60 Transaktionen über die letzten 3 Monate
+- 6 Budgets (Lebensmittel, Restaurant, Transport, Shopping, Freizeit, Abos)
+- 3 Sparziele (Urlaub, Notgroschen ✓, E-Bike)
+- 4 Verträge (Haftpflicht, Netflix, Spotify, Mobilfunk)
+- 4 wiederkehrende Zahlungen (Miete, Netflix, Spotify, Fitness)
+
+> Setze `SEED_DEMO_USER=false` (oder entferne die Variable) wieder, sobald du deine
+> echten Daten anlegst — sonst werden Test-Änderungen am Demo-User beim nächsten
+> Container-Start überschrieben.
 
 ## Produktion (Proxmox / Homeserver)
 
@@ -66,6 +83,25 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 Die App ist dann über NGINX auf **Port 80** erreichbar.
+
+### Datenbank-UI (optional)
+
+Für visuellen Zugriff auf die Datenbank gibt es einen optionalen Prisma-Studio-Container.
+Er ist über das Compose-Profil `tools` aktivierbar und läuft nicht im Standard-Stack mit:
+
+```bash
+docker compose --profile tools up -d prisma-studio
+# Web-UI: http://localhost:5555
+```
+
+Anhalten:
+```bash
+docker compose stop prisma-studio
+```
+
+Prisma Studio zeigt alle Tabellen (Users, BankAccounts, Transactions, Budgets, …),
+erlaubt Filtern, Sortieren und Editieren von Datensätzen. Der Container braucht keine
+Dev-Dependencies des Backends — er lädt das Prisma-CLI selbstständig beim Start.
 
 ### SSL/HTTPS einrichten (optional)
 
