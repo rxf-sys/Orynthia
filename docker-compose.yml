@@ -66,6 +66,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Swagger UI aktivieren (nur für Entwicklung empfohlen)
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      # Demo-User mit Test-Daten beim Boot anlegen (zerstört alte Demo-Daten!)
+      SEED_DEMO_USER: ${SEED_DEMO_USER:-false}
     volumes:
       - ./packages/backend:/app
       - /app/node_modules
@@ -96,6 +98,30 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+    networks:
+      - orynthia-net
+
+  # ---------- Prisma Studio (optional, profile "tools") ----------
+  # Start mit: docker compose --profile tools up -d prisma-studio
+  # Web-UI:    http://localhost:5555
+  prisma-studio:
+    image: node:20-alpine
+    container_name: orynthia-prisma-studio
+    profiles: ["tools"]
+    working_dir: /work
+    volumes:
+      - ./packages/backend/prisma:/work/prisma:ro
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
+    ports:
+      - "5555:5555"
+    command:
+      - sh
+      - -c
+      - "npx -y prisma@5.22.0 studio --port 5555 --hostname 0.0.0.0 --browser none"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - orynthia-net
 
