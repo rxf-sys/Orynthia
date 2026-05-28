@@ -234,6 +234,26 @@ export interface ProviderComparison {
   compareUrls: string[];
 }
 
+export type NotificationType =
+  | 'BUDGET_WARNING'
+  | 'BUDGET_EXCEEDED'
+  | 'LARGE_TRANSACTION'
+  | 'RECURRING_DETECTED'
+  | 'SAVINGS_MILESTONE'
+  | 'SYNC_ERROR'
+  | 'SYSTEM';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+}
+
 export interface TransactionFilters {
   page?: number;
   limit?: number;

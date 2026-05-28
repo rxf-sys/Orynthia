@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
 import { Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async create(userId: string, dto: CreateTransactionDto) {
     // Prüfe ob Konto dem User gehört
@@ -17,7 +21,7 @@ export class TransactionsService {
       categoryId = await this.autoCategorize(userId, dto.counterpartName, dto.purpose);
     }
 
-    return this.prisma.transaction.create({
+    const tx = await this.prisma.transaction.create({
       data: {
         bankAccountId: dto.bankAccountId,
         categoryId,
@@ -32,6 +36,19 @@ export class TransactionsService {
       },
       include: { category: true, bankAccount: { select: { accountName: true, bankName: true } } },
     });
+
+    // Live-Hook: ungewöhnlich hohe Buchung benachrichtigen
+    this.notifications
+      .maybeNotifyLargeTransaction({
+        userId,
+        transactionId: tx.id,
+        amount: Number(tx.amount),
+        counterpartName: tx.counterpartName,
+        purpose: tx.purpose,
+      })
+      .catch(() => undefined);
+
+    return tx;
   }
 
   async findAll(userId: string, filters: TransactionFilterDto) {

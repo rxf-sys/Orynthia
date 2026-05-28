@@ -1,8 +1,9 @@
-import { Menu, Search, Bell, HelpCircle, Plus, Sun, Moon } from 'lucide-react';
+import { Menu, Search, HelpCircle, Plus, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useThemeStore } from '@/stores/themeStore';
 import { cn } from '@/lib/utils';
 import { Btn, IconBtn } from './ui/Btn';
+import { NotificationBell } from './NotificationBell';
 
 const TITLE_MAP: Record<string, string> = {
   '/': 'Dashboard',
@@ -70,13 +71,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <IconBtn icon={HelpCircle} aria-label="Hilfe" variant="ghost" className="hidden sm:grid" />
-      <div className="relative">
-        <IconBtn icon={Bell} aria-label="Benachrichtigungen" variant="ghost" />
-        <span
-          className="absolute right-2 top-2 h-2 w-2 rounded-full"
-          style={{ background: 'var(--peach)', boxShadow: '0 0 0 2px var(--bg-elev)' }}
-        />
-      </div>
+      <NotificationBell />
 
       <Btn
         variant="grad"
