@@ -7,11 +7,13 @@ import type {
   CreateAccountData,
   CreateBudgetData,
   CreateContractData,
+  CreateInvestmentData,
   CreateRecurringPaymentData,
   CreateSavingsGoalData,
   CreateTransactionData,
   DashboardData,
   DetectedContract,
+  InvestmentsResponse,
   MonthlyOverview,
   Notification,
   PaginatedResult,
@@ -219,6 +221,16 @@ export const contractsApi = {
     frequency: string; contractType: string; name?: string; provider?: string;
   }) => api.post<Contract>('/contracts/from-detection', data),
   compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
+};
+
+export const investmentsApi = {
+  getAll: () => api.get<InvestmentsResponse>('/investments'),
+  create: (data: CreateInvestmentData) => api.post<InvestmentsResponse['positions'][number]>('/investments', data),
+  update: (id: string, data: Partial<CreateInvestmentData>) =>
+    api.patch<InvestmentsResponse['positions'][number]>(`/investments/${id}`, data),
+  updatePrice: (id: string, currentPrice: number) =>
+    api.post<InvestmentsResponse['positions'][number]>(`/investments/${id}/price`, { currentPrice }),
+  remove: (id: string) => api.delete(`/investments/${id}`),
 };
 
 export const chatApi = {

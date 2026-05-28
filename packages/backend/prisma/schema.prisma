@@ -48,8 +48,47 @@ model User {
   notifications  Notification[]
   bankConnections BankConnection[]
   contracts      Contract[]
+  investments    InvestmentPosition[]
 
   @@map("users")
+}
+
+// ---------- Wertanlagen / Depot ----------
+enum InvestmentType {
+  STOCK
+  ETF
+  FUND
+  CRYPTO
+  BOND
+  OTHER
+}
+
+model InvestmentPosition {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  bankAccountId   String?  @map("bank_account_id")
+
+  symbol          String   // z.B. AAPL, BTC, IE00B4L5Y983
+  name            String   // z.B. "Apple Inc.", "iShares Core MSCI World"
+  type            InvestmentType @default(STOCK)
+  quantity        Decimal  @db.Decimal(20, 8)
+  averagePrice    Decimal  @map("average_price") @db.Decimal(20, 8)
+  currentPrice    Decimal? @map("current_price") @db.Decimal(20, 8)
+  currency        String   @default("EUR")
+
+  purchaseDate    DateTime? @map("purchase_date")
+  lastPriceUpdate DateTime? @map("last_price_update")
+  notes           String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankAccount     BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, type])
+  @@map("investment_positions")
 }
 
 // ---------- Bankkonten ----------
@@ -84,6 +123,7 @@ model BankAccount {
   // Relations
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions    Transaction[]
+  investments     InvestmentPosition[]
 
   @@index([userId])
   @@map("bank_accounts")
