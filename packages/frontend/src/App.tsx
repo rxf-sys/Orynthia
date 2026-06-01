@@ -20,6 +20,7 @@ import { AssistantPage } from '@/pages/Assistant';
 import { InvestmentsPage } from '@/pages/Investments';
 import { SettingsPage } from '@/pages/Settings';
 import { ConfirmProvider } from '@/components/ui';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -56,8 +57,9 @@ export default function App() {
   }, [checkAuth]);
 
   return (
-    <ConfirmProvider>
-      <Routes>
+    <ErrorBoundary>
+      <ConfirmProvider>
+        <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
@@ -81,7 +83,8 @@ export default function App() {
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </ConfirmProvider>
+        </Routes>
+      </ConfirmProvider>
+    </ErrorBoundary>
   );
 }

@@ -39,3 +39,18 @@ export function getInitials(firstName?: string | null, lastName?: string | null)
   const l = lastName?.charAt(0)?.toUpperCase() || '';
   return f + l || '?';
 }
+
+/**
+ * Extrahiert eine sinnvolle Fehlermeldung aus einem Axios- oder beliebigen Error.
+ * Reihenfolge: response.data.message → response.data.error → err.message → fallback.
+ */
+export function parseApiError(err: unknown, fallback = 'Unbekannter Fehler'): string {
+  if (!err) return fallback;
+  const e = err as {
+    response?: { data?: { message?: string | string[]; error?: string } };
+    message?: string;
+  };
+  const data = e?.response?.data;
+  const msg = Array.isArray(data?.message) ? data.message.join(', ') : data?.message;
+  return msg || data?.error || e?.message || fallback;
+}

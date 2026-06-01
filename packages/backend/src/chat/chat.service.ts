@@ -65,24 +65,33 @@ export class ChatService {
       content: m.content,
     }));
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 1024,
-      system: [
-        {
-          type: 'text',
-          text: SYSTEM_PROMPT_STATIC,
-          cache_control: { type: 'ephemeral' },
-        },
-        {
-          type: 'text',
-          text: `--- Nutzer-Kontext (Stand: ${new Date().toLocaleString('de-DE')}) ---\n${context}`,
-        },
-      ],
-      messages: apiMessages,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
-    });
+    let response: Anthropic.Message;
+    try {
+      response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 1024,
+        system: [
+          {
+            type: 'text',
+            text: SYSTEM_PROMPT_STATIC,
+            cache_control: { type: 'ephemeral' },
+          },
+          {
+            type: 'text',
+            text: `--- Nutzer-Kontext (Stand: ${new Date().toLocaleString('de-DE')}) ---\n${context}`,
+          },
+        ],
+        messages: apiMessages,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium' },
+      });
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Anthropic-API-Fehler (user=${userId}): ${reason}`);
+      throw new ServiceUnavailableException(
+        'KI-Assistent ist gerade nicht erreichbar. Bitte später erneut versuchen.',
+      );
+    }
 
     const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
     return {

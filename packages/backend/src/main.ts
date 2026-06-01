@@ -1,11 +1,12 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
   // Global Prefix
@@ -48,11 +49,11 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
-    console.log(`📚 API Docs: http://localhost:${port}/api/docs`);
+    logger.log(`API Docs: http://localhost:${port}/api/docs`);
   }
 
   await app.listen(port);
-  console.log(`🚀 Orynthia API läuft auf Port ${port}`);
+  logger.log(`Orynthia API läuft auf Port ${port}`);
 }
 
 bootstrap();

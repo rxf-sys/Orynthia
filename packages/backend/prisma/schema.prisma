@@ -157,7 +157,6 @@ model Transaction {
   
   // Typ & Status
   type            TransactionType @default(OTHER)
-  isRecurring     Boolean   @default(false) @map("is_recurring")
   recurringPaymentId String? @map("recurring_payment_id")
   
   // Externe Referenz
@@ -179,6 +178,7 @@ model Transaction {
   @@index([bankAccountId, date])
   @@index([categoryId])
   @@index([date])
+  @@index([type])
   @@map("transactions")
 }
 
@@ -218,6 +218,7 @@ model Category {
   recurringPayments RecurringPayment[]
 
   @@unique([userId, name])
+  @@index([userId])
   @@map("categories")
 }
 

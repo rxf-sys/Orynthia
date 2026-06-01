@@ -3,7 +3,14 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, Enable2FADto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  Enable2FADto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ProfileResponseDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const COOKIE_OPTIONS = {
@@ -118,8 +125,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Aktueller Benutzer' })
-  async getProfile(@Req() req: Request) {
-    return req.user;
+  async getProfile(@Req() req: Request): Promise<ProfileResponseDto> {
+    const u = req.user!;
+    return {
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName ?? null,
+      lastName: u.lastName ?? null,
+      twoFactorEnabled: u.twoFactorEnabled,
+    };
   }
 
   private setTokenCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {

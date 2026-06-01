@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { authenticator } from 'otplib';
@@ -8,6 +9,7 @@ import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RegisterDto, LoginDto, TokenResponseDto } from './dto/auth.dto';
+import { encrypt, decrypt, isEncrypted } from '../common/crypto/encryption';
 
 const PASSWORD_RESET_TTL_MIN = 60;
 
@@ -87,7 +89,7 @@ export class AuthService {
       }
       const isValid = authenticator.verify({
         token: dto.twoFactorCode,
-        secret: user.twoFactorSecret!,
+        secret: this.readTwoFactorSecret(user.twoFactorSecret),
       });
       if (!isValid) {
         throw new UnauthorizedException('Ungültiger 2FA-Code');
@@ -145,7 +147,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret },
+      data: { twoFactorSecret: encrypt(secret) },
     });
 
     const qrCode = await QRCode.toDataURL(otpauthUrl);
@@ -160,7 +162,7 @@ export class AuthService {
 
     const isValid = authenticator.verify({
       token: code,
-      secret: user.twoFactorSecret,
+      secret: this.readTwoFactorSecret(user.twoFactorSecret),
     });
 
     if (!isValid) {
@@ -245,7 +247,47 @@ export class AuthService {
     });
   }
 
+  /**
+   * Räumt abgelaufene Passwort-Reset-Tokens auf. Tokens wachsen sonst monatlich an
+   * (jeder Reset-Request hinterlässt einen Eintrag bis 60min später) und der
+   * `passwordResetToken`-Index wird unnötig groß.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async cleanupExpiredPasswordResets() {
+    try {
+      const result = await this.prisma.user.updateMany({
+        where: { passwordResetExpires: { lt: new Date() } },
+        data: { passwordResetToken: null, passwordResetExpires: null },
+      });
+      if (result.count > 0) {
+        this.logger.log(`Abgelaufene Passwort-Reset-Tokens bereinigt: ${result.count}`);
+      }
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Cleanup expired password resets fehlgeschlagen: ${reason}`);
+    }
+  }
+
   // --- Private Helpers ---
+
+  /**
+   * Akzeptiert sowohl verschlüsselte (neue) als auch Klartext-Secrets (Bestand).
+   * Bei Klartext: einmaliges, transparentes Re-Encrypt in der DB wird beim
+   * nächsten generate2FASecret-Aufruf erledigt; hier nur Read-Path.
+   */
+  private readTwoFactorSecret(stored: string | null): string {
+    if (!stored) throw new BadRequestException('2FA Secret fehlt');
+    if (isEncrypted(stored)) {
+      try {
+        return decrypt(stored);
+      } catch (err) {
+        this.logger.error(`2FA-Secret-Decrypt fehlgeschlagen: ${err}`);
+        throw new UnauthorizedException('2FA-Daten beschädigt – bitte 2FA neu einrichten.');
+      }
+    }
+    // Legacy: Klartext-Secret aus pre-encryption Bestand
+    return stored;
+  }
 
   private async generateTokens(userId: string, email: string): Promise<TokenResponseDto> {
     const payload = { sub: userId, email };

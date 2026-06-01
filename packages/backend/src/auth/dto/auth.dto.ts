@@ -84,3 +84,20 @@ export class ResetPasswordDto {
   @MaxLength(128)
   password: string;
 }
+
+export class ProfileResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty({ required: false })
+  firstName?: string | null;
+
+  @ApiProperty({ required: false })
+  lastName?: string | null;
+
+  @ApiProperty()
+  twoFactorEnabled: boolean;
+}

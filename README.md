@@ -194,11 +194,12 @@ Orynthia/
   (Key holen: https://console.anthropic.com)
 
 ### Sicherheit
-- JWT-Authentifizierung mit Refresh Tokens
-- Zwei-Faktor-Authentifizierung (TOTP)
-- AES-256 Verschlüsselung sensibler Daten
+- JWT-Authentifizierung mit Refresh Tokens (Refresh-Hash bcrypt in DB)
+- Zwei-Faktor-Authentifizierung (TOTP), Secret AES-256-GCM verschlüsselt at rest
+- Banking-Session-IDs (Enable Banking) AES-256-GCM verschlüsselt at rest
 - Rate Limiting (NGINX + NestJS Throttler)
-- Helmet Security Headers
+- Helmet Security Headers, restriktive CSP (kein `unsafe-eval`)
+- `/api/health` (Liveness) + `/api/ready` (DB-Probe) für Container-Healthchecks
 - DSGVO-konform (Self-Hosted, keine Daten an Dritte)
 
 ### Technik
@@ -308,17 +309,69 @@ Orynthia/
 - `GET /api/chat/status` - Aktiviert? (true/false)
 - `POST /api/chat/message` - Nachricht senden (history-aware, kontext-injiziert)
 
-## Enable Banking einrichten
+## Automatischer Konten-Import (Enable Banking)
 
-1. Account erstellen auf [enablebanking.com](https://enablebanking.com)
-2. API Application erstellen (Control Panel -> API Applications)
-3. RSA Private Key wird automatisch generiert (PEM-Format)
-4. In `.env` eintragen:
-   ```
-   ENABLE_BANKING_APP_ID=deine_application_id
-   ENABLE_BANKING_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----"
-   ```
-5. In der App unter "Konten" eine Bank verbinden
+Orynthia bezieht Kontostände und Buchungen direkt von deiner Bank über die
+**Enable Banking PSD2-API** – kostenlos für private Nutzung. Setup-Aufwand
+einmalig ca. 15 Minuten.
+
+### 1. Enable-Banking-Account anlegen
+
+1. Auf [enablebanking.com](https://enablebanking.com/sign-in/) registrieren
+   (Self-Service, kostenlos für "Personal Use")
+2. Im Control Panel → **API Applications** → "Create application"
+   - **Application type:** `Personal`
+   - **Redirect URLs:** deine Frontend-URL, z. B.
+     `http://localhost:5173/accounts` (Dev) und/oder
+     `https://orynthia.deine-domain.tld/accounts` (Prod)
+3. Beim Anlegen wird automatisch ein **RSA Private Key** (PEM-Format)
+   generiert. **Einmalig herunterladen** – kann nachträglich nicht mehr
+   eingesehen werden.
+
+### 2. Credentials in `.env` eintragen
+
+Den heruntergeladenen Private Key einzeilig (mit `\n` als Zeilenumbruch)
+in `.env` setzen:
+
+```env
+ENABLE_BANKING_APP_ID=deine_application_id
+ENABLE_BANKING_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----"
+
+# Frontend-Origin muss zu einer in Enable Banking hinterlegten Redirect-URL passen
+FRONTEND_URL=http://localhost:5173
+```
+
+> Tipp: Mit `awk 'NF {sub(/\r/,""); printf "%s\\n",$0}' private_key.pem`
+> kannst du den PEM-Key direkt für `.env` formatieren.
+
+### 3. Bank verbinden
+
+1. Container neu starten (`docker compose up -d`)
+2. In der App: **Konten** → Tab **Bank** → Bank auswählen
+3. Du wirst zur Bank-Login-Seite umgeleitet, autorisierst dort den Zugriff
+4. Bank leitet zurück auf `…/accounts?code=…&bankConnected=true` – Orynthia
+   importiert automatisch Konten + Buchungen der letzten 30 Tage
+5. Folge-Syncs alle 6 h automatisch (Cron), oder manuell per Sync-Button
+
+### Begrenzungen (PSD2-bedingt, nicht von Orynthia)
+
+- **Consent läuft alle 90 Tage ab** (gesetzlich vorgeschrieben). Du musst die
+  Verbindung dann neu autorisieren – du bekommst rechtzeitig eine
+  Benachrichtigung im UI.
+- **Free-Tier-Limit** (Personal-Use bei Enable Banking): mehrere hundert
+  Aufrufe/Monat – reicht für 3–5 Konten mit Cron-Sync alle 6 h locker.
+- Manche Sparkassen/VR-Banken fordern bei jedem Sync eine TAN-Bestätigung.
+  Falls deine Bank Probleme macht, ist der Code so geschnitten, dass ein
+  zweiter Provider (z. B. GoCardless / Nordigen) hinter dem
+  `BankingProviderInterface` ohne Schema-Änderung ergänzt werden kann.
+
+### Sicherheit at rest
+
+- Banking-Session-IDs werden vor dem Schreiben in die DB AES-256-GCM
+  verschlüsselt (`ENCRYPTION_KEY` in `.env`, 64 Hex-Zeichen).
+- 2FA-Secrets ebenfalls verschlüsselt at rest.
+- Bei Rotation von `ENCRYPTION_KEY` werden bestehende Banking-Verbindungen
+  und 2FA-Setups unlesbar – beides muss dann neu eingerichtet werden.
 
 ## Lizenz
 
