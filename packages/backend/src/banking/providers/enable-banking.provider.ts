@@ -219,6 +219,19 @@ export class EnableBankingProvider implements BankingProvider {
   async createSession(code: string): Promise<{ sessionId: string; accounts: ExternalAccount[] }> {
     const data = await this.request<SessionResponse>('POST', '/sessions', { code });
 
+    if (!data?.session_id) {
+      this.logger.error(
+        `createSession: session_id fehlt in Response. Felder: ${Object.keys(data || {}).join(', ')}`,
+      );
+      throw new Error(
+        'Enable Banking hat keine session_id zurückgegeben. Möglicherweise ist die Authentifizierung noch nicht abgeschlossen oder der Code wurde bereits verwendet.',
+      );
+    }
+
+    this.logger.log(
+      `createSession OK: session_id=${data.session_id.slice(0, 8)}…, ${(data.accounts || []).length} Konten`,
+    );
+
     const accounts: ExternalAccount[] = (data.accounts || []).map((acc) => ({
       id: acc.uid,
       iban: acc.account_id?.iban,
