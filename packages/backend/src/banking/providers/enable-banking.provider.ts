@@ -182,9 +182,13 @@ export class EnableBankingProvider implements BankingProvider {
     // institutionId = "Bankname:::Country" (aus getInstitutions)
     const [bankName, country] = params.institutionId.split(':::');
 
+    // Enable Banking erwartet valid_until als ISO-8601 datetime *mit* Timezone,
+    // nicht nur ein Date. PSD2-Maximum: 180 Tage; wir nutzen 90 Tage (üblich).
+    const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
     const authResponse = await this.request<AuthResponse>('POST', '/auth', {
       access: {
-        valid_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        valid_until: validUntil,
       },
       aspsp: {
         name: bankName,
