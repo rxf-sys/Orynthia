@@ -15,6 +15,8 @@ import {
   Pencil,
   Landmark,
   Wallet,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { accountsApi, bankingApi } from '@/lib/api';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -71,6 +73,14 @@ export function AccountsPage() {
   const [bankSearch, setBankSearch] = useState('');
   const [selectedBank, setSelectedBank] = useState<{ id: string; name: string; logo?: string } | null>(null);
 
+  // Banking-Callback-State: nach Redirect von der Bank wird hier die Status-UI gezeigt.
+  type CallbackState =
+    | { phase: 'idle' }
+    | { phase: 'connecting' }
+    | { phase: 'success'; message: string; accountsCount: number }
+    | { phase: 'error'; message: string };
+  const [callback, setCallback] = useState<CallbackState>({ phase: 'idle' });
+
   const { data: accounts, isLoading } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => accountsApi.getAll().then((r) => r.data),
@@ -96,23 +106,45 @@ export function AccountsPage() {
   useEffect(() => {
     const code = searchParams.get('code');
     const bankConnected = searchParams.get('bankConnected');
-    if (code || bankConnected === 'true') {
-      bankingApi.getConnections().then((r) => {
-        const latest = r.data?.[0];
-        if (latest?.externalConnectionId) {
-          bankingApi
-            .handleCallback(latest.externalConnectionId, code || undefined)
-            .then((res) => {
-              toast.success(res.data?.message || 'Konten importiert');
-              queryClient.invalidateQueries({ queryKey: ['accounts'] });
-              queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
-              queryClient.invalidateQueries({ queryKey: ['bank-connections'] });
-            })
-            .catch(() => toast.error('Fehler beim Importieren der Konten'));
+    if (!code && bankConnected !== 'true') return;
+
+    // URL sofort säubern, damit der Effect nicht bei Rerender erneut feuert.
+    setSearchParams({}, { replace: true });
+    setCallback({ phase: 'connecting' });
+
+    (async () => {
+      try {
+        const conns = await bankingApi.getConnections();
+        const latest = conns.data?.[0];
+        if (!latest?.externalConnectionId) {
+          setCallback({
+            phase: 'error',
+            message: 'Keine offene Bank-Verbindung gefunden. Bitte erneut starten.',
+          });
+          return;
         }
-      });
-      setSearchParams({}, { replace: true });
-    }
+        const res = await bankingApi.handleCallback(latest.externalConnectionId, code || undefined);
+        const accountsCount = res.data?.accounts?.length ?? 0;
+        setCallback({
+          phase: 'success',
+          message: res.data?.message || `${accountsCount} Konto(en) importiert`,
+          accountsCount,
+        });
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
+        queryClient.invalidateQueries({ queryKey: ['bank-connections'] });
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { message?: string } } };
+        setCallback({
+          phase: 'error',
+          message:
+            e?.response?.data?.message ||
+            'Konten konnten nicht importiert werden. Der Authorization-Code ist evtl. abgelaufen oder bereits verwendet.',
+        });
+      }
+    })();
   }, [searchParams, setSearchParams, queryClient]);
 
   const createMutation = useMutation({
@@ -211,6 +243,11 @@ export function AccountsPage() {
     };
     return filtered.sort(compare);
   })();
+
+  // Während Banking-Callback läuft: Vollbild-Status-Page statt Konten-Liste.
+  if (callback.phase !== 'idle') {
+    return <BankingCallbackPage state={callback} onDismiss={() => setCallback({ phase: 'idle' })} />;
+  }
 
   return (
     <div className="space-y-5">
@@ -747,5 +784,86 @@ function KpiTile({
         {isNumber ? value : formatCurrency(value)}
       </div>
     </Card>
+  );
+}
+
+type BankingCallbackState =
+  | { phase: 'connecting' }
+  | { phase: 'success'; message: string; accountsCount: number }
+  | { phase: 'error'; message: string };
+
+function BankingCallbackPage({
+  state,
+  onDismiss,
+}: {
+  state: BankingCallbackState;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
+      <Card className="w-full max-w-md p-8 text-center">
+        {state.phase === 'connecting' && (
+          <>
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-indigo/10">
+              <Loader2 className="h-7 w-7 animate-spin text-indigo" />
+            </div>
+            <h2 className="text-xl font-semibold text-ink">Verbindung wird hergestellt</h2>
+            <p className="mt-2 text-sm text-ink-3">
+              Deine Konten und Buchungen der letzten 30 Tage werden importiert. Bitte schließe
+              dieses Fenster nicht.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <div className="flex gap-1">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo" />
+                <span
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo"
+                  style={{ animationDelay: '0.2s' }}
+                />
+                <span
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo"
+                  style={{ animationDelay: '0.4s' }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {state.phase === 'success' && (
+          <>
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10">
+              <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+            </div>
+            <h2 className="text-xl font-semibold text-ink">Bank erfolgreich verbunden</h2>
+            <p className="mt-2 text-sm text-ink-3">{state.message}</p>
+            {state.accountsCount > 0 && (
+              <p className="mt-1 text-xs text-ink-3">
+                Folge-Synchronisationen laufen automatisch alle 6 Stunden.
+              </p>
+            )}
+            <Btn variant="grad" className="mt-6 w-full" onClick={onDismiss}>
+              Zu meinen Konten
+            </Btn>
+          </>
+        )}
+
+        {state.phase === 'error' && (
+          <>
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10">
+              <AlertTriangle className="h-8 w-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-semibold text-ink">Verbindung fehlgeschlagen</h2>
+            <p className="mt-2 text-sm text-ink-3">{state.message}</p>
+            <div className="mt-6 flex gap-2">
+              <Btn variant="ghost" className="flex-1" onClick={onDismiss}>
+                Schließen
+              </Btn>
+              <Btn variant="grad" className="flex-1" onClick={onDismiss}>
+                Erneut versuchen
+              </Btn>
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
