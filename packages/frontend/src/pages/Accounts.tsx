@@ -287,8 +287,18 @@ export function AccountsPage() {
               {selectedBank ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 rounded-md border border-line bg-soft p-4">
-                    {selectedBank.logo && (
-                      <img src={selectedBank.logo} alt="" className="h-8 w-8 rounded" />
+                    {selectedBank.logo ? (
+                      <img
+                        src={selectedBank.logo}
+                        alt=""
+                        className="h-8 w-8 rounded object-contain"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Building2 className="h-8 w-8 text-ink-3" />
                     )}
                     <div>
                       <p className="font-semibold text-ink">{selectedBank.name}</p>
@@ -351,7 +361,19 @@ export function AccountsPage() {
                           onClick={() => setSelectedBank(inst)}
                           className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-soft"
                         >
-                          {inst.logo && <img src={inst.logo} alt="" className="h-6 w-6 rounded" />}
+                          {inst.logo ? (
+                            <img
+                              src={inst.logo}
+                              alt=""
+                              className="h-6 w-6 rounded object-contain"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Building2 className="h-6 w-6 text-ink-3" />
+                          )}
                           <span className="text-sm text-ink">{inst.name}</span>
                         </button>
                       ))}
