@@ -19,14 +19,22 @@ function loadKey(): Buffer {
 
   let key: Buffer;
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+    // Optimal: 64 Hex-Zeichen = 32 Byte AES-256-Key
     key = Buffer.from(raw, 'hex');
   } else if (raw.length === KEY_BYTES) {
-    // Backwards-Compat: 32 ASCII-Zeichen werden als UTF-8-Bytes interpretiert.
+    // Akzeptiert: 32 ASCII-Zeichen werden als UTF-8-Bytes interpretiert.
     key = Buffer.from(raw, 'utf8');
   } else {
-    throw new Error(
-      `ENCRYPTION_KEY hat ungültiges Format. Erwartet: 64 Hex-Zeichen (empfohlen) oder 32 ASCII-Zeichen. Aktuell: ${raw.length} Zeichen.`,
+    // Fallback für nicht-konforme Längen: SHA-256-Hash des Inputs als 32-Byte-Key.
+    // Sicherheit ist nur so gut wie die Entropie des Original-Strings — bitte
+    // mit `openssl rand -hex 32` einen korrekten Key generieren.
+     
+    console.warn(
+      `[encryption] ENCRYPTION_KEY hat ungewöhnliche Länge (${raw.length}). ` +
+        'Fallback: SHA-256-Hash des Inputs wird als Key verwendet. ' +
+        'Empfohlen: `openssl rand -hex 32` in .env eintragen.',
     );
+    key = crypto.createHash('sha256').update(raw, 'utf8').digest();
   }
 
   if (key.length !== KEY_BYTES) {
