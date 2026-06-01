@@ -19,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { InvestmentsModule } from './investments/investments.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { DemoSeedModule } from './demo-seed/demo-seed.module';
     ChatModule,
     InvestmentsModule,
     DemoSeedModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

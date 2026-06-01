@@ -14,6 +14,14 @@ export class DemoSeedService implements OnModuleInit {
   async onModuleInit() {
     if (process.env.SEED_DEMO_USER !== 'true') return;
 
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.error(
+        'SEED_DEMO_USER=true ist in NODE_ENV=production blockiert. ' +
+          'Demo-Daten würden bekannte Zugangsdaten in die Live-DB schreiben. Aktion abgebrochen.',
+      );
+      return;
+    }
+
     this.logger.log(`SEED_DEMO_USER=true – Demo-Daten werden neu erstellt …`);
 
     const existing = await this.prisma.user.findUnique({ where: { email: DEMO_EMAIL } });

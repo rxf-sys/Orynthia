@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EnableBankingProvider } from './providers/enable-banking.provider';
 import { Institution } from './providers/banking-provider.interface';
 import { NotificationsService } from '../notifications/notifications.service';
+import { encrypt } from '../common/crypto/encryption';
 
 @Injectable()
 export class BankingService {
@@ -70,12 +71,12 @@ export class BankingService {
     // Enable Banking: Session mit dem Authorization-Code erstellen
     const session = await this.enableBanking.createSession(code);
 
-    // Session-ID in der Verbindung speichern
+    // Session-ID in der Verbindung speichern (verschlüsselt)
     await this.prisma.bankConnection.update({
       where: { id: connection.id },
       data: {
         status: 'LINKED',
-        sessionId: session.sessionId,
+        sessionId: encrypt(session.sessionId),
       },
     });
 
@@ -93,13 +94,25 @@ export class BankingService {
         continue;
       }
 
-      // Kontostand abrufen
-      let balance = 0;
+      // Kontostand abrufen – bei Fehler: Konto trotzdem mit balance=null markieren
+      // (statt 0, was eine valide Bilanz vortäuschen würde)
+      let balance: number | null = null;
       try {
         const balanceData = await this.enableBanking.getBalances(ext.id);
         balance = balanceData.current;
       } catch (error: unknown) {
-        this.logger.warn(`Kontostand für ${ext.id} nicht abrufbar: ${error}`);
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Initialer Kontostand für ${ext.id} nicht abrufbar: ${reason}`);
+        await this.notifications
+          .create({
+            userId,
+            type: 'SYNC_ERROR',
+            title: `Kontostand nicht verfügbar: ${ext.name ?? ext.iban ?? 'Konto'}`,
+            message: `Beim Import konnte der Kontostand nicht abgerufen werden (${reason}). Bitte später manuell synchronisieren.`,
+            dedupeKey: `balance-init-${ext.id}`,
+            data: { externalId: ext.id, error: reason },
+          })
+          .catch(() => undefined);
       }
 
       // Konto anlegen
@@ -110,10 +123,10 @@ export class BankingService {
           accountName: ext.product || ext.name || 'Konto',
           iban: ext.iban,
           accountType: this.guessAccountType(ext.product),
-          balance,
+          balance: balance ?? 0,
           currency: ext.currency,
           externalId: ext.id,
-          lastSynced: new Date(),
+          lastSynced: balance !== null ? new Date() : null,
         },
       });
 
@@ -145,71 +158,81 @@ export class BankingService {
     if (!account) throw new NotFoundException('Konto nicht gefunden');
     if (!account.externalId) throw new BadRequestException('Konto ist nicht mit einer Bank verbunden');
 
-    // Kontostand aktualisieren
+    // Kontostand abrufen (außerhalb der Transaktion – externer Call)
+    let newBalance: number | null = null;
     try {
       const balance = await this.enableBanking.getBalances(account.externalId);
-      await this.prisma.bankAccount.update({
-        where: { id: accountId },
-        data: { balance: balance.current, lastSynced: new Date() },
-      });
+      newBalance = balance.current;
     } catch (error: unknown) {
-      this.logger.warn(`Kontostand-Sync für ${accountId} fehlgeschlagen: ${error}`);
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Kontostand-Sync für ${accountId} fehlgeschlagen: ${reason}`);
     }
 
     // Transaktionen abrufen (letzte 30 Tage als Standard)
     const from = dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const transactions = await this.enableBanking.getTransactions(account.externalId, from);
 
-    let newCount = 0;
-    let updatedCount = 0;
-
     // Auto-Kategorisierung laden
     const categories = await this.prisma.category.findMany({
       where: { OR: [{ userId }, { isSystem: true }] },
     });
 
-    for (const tx of transactions) {
-      // Prüfe ob Transaktion schon existiert
-      const existing = await this.prisma.transaction.findUnique({
-        where: { externalId: tx.externalId },
-      });
+    // DB-Schreibvorgänge atomar: Balance + alle neuen Transaktionen in einer Transaction.
+    // Verhindert Duplikate bei parallelen Syncs (Cron + manueller Aufruf) und macht
+    // Teil-Schreibstände unmöglich.
+    const result = await this.prisma.$transaction(async (tx) => {
+      let newCount = 0;
+      let updatedCount = 0;
 
-      if (existing) {
-        updatedCount++;
-        continue;
+      for (const txData of transactions) {
+        const existing = await tx.transaction.findUnique({
+          where: { externalId: txData.externalId },
+        });
+        if (existing) {
+          updatedCount++;
+          continue;
+        }
+
+        const categoryId = this.autoMatchCategory(
+          txData.purpose || '',
+          txData.counterpartName || '',
+          categories,
+        );
+
+        await tx.transaction.create({
+          data: {
+            bankAccountId: accountId,
+            amount: txData.amount,
+            currency: txData.currency,
+            date: new Date(txData.date),
+            valueDate: txData.bookingDate ? new Date(txData.bookingDate) : undefined,
+            purpose: txData.purpose,
+            counterpartName: txData.counterpartName,
+            counterpartIban: txData.counterpartIban,
+            type: txData.type,
+            externalId: txData.externalId,
+            categoryId,
+          },
+        });
+        newCount++;
       }
 
-      // Auto-Kategorisierung
-      const categoryId = this.autoMatchCategory(tx.purpose || '', tx.counterpartName || '', categories);
-
-      await this.prisma.transaction.create({
+      await tx.bankAccount.update({
+        where: { id: accountId },
         data: {
-          bankAccountId: accountId,
-          amount: tx.amount,
-          currency: tx.currency,
-          date: new Date(tx.date),
-          valueDate: tx.bookingDate ? new Date(tx.bookingDate) : undefined,
-          purpose: tx.purpose,
-          counterpartName: tx.counterpartName,
-          counterpartIban: tx.counterpartIban,
-          type: tx.type,
-          externalId: tx.externalId,
-          categoryId,
+          balance: newBalance ?? account.balance,
+          lastSynced: new Date(),
         },
       });
 
-      newCount++;
-    }
-
-    await this.prisma.bankAccount.update({
-      where: { id: accountId },
-      data: { lastSynced: new Date() },
+      return { newCount, updatedCount };
     });
 
     return {
-      newTransactions: newCount,
-      existingTransactions: updatedCount,
+      newTransactions: result.newCount,
+      existingTransactions: result.updatedCount,
       totalFetched: transactions.length,
+      balanceUpdated: newBalance !== null,
     };
   }
 

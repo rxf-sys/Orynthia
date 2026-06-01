@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-orynthia}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}
       POSTGRES_DB: ${POSTGRES_DB:-orynthia}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -34,13 +34,13 @@ services:
     image: redis:7-alpine
     container_name: orynthia-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,10 +58,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}
       # Cookies über HTTP zulassen (false für Homeserver ohne HTTPS)
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Swagger UI aktivieren (nur für Entwicklung empfohlen)
@@ -73,6 +73,12 @@ services:
       - /app/node_modules
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,7 +118,7 @@ services:
     volumes:
       - ./packages/backend/prisma:/work/prisma:ro
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
     ports:
       - "5555:5555"
     command:
