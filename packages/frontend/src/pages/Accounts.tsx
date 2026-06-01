@@ -81,7 +81,12 @@ export function AccountsPage() {
     queryFn: () => accountsApi.getBalance().then((r) => r.data),
   });
 
-  const { data: institutions, isLoading: loadingBanks } = useQuery({
+  const {
+    data: institutions,
+    isLoading: loadingBanks,
+    isError: institutionsError,
+    error: institutionsErrorObj,
+  } = useQuery({
     queryKey: ['institutions'],
     queryFn: () => bankingApi.getInstitutions('DE').then((r) => r.data),
     enabled: showForm && activeTab === 'bank',
@@ -325,6 +330,19 @@ export function AccountsPage() {
                     <div className="flex justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-ink-3" />
                     </div>
+                  ) : institutionsError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                      <p className="font-semibold">Banken konnten nicht geladen werden</p>
+                      <p className="mt-1 text-red-300/80">
+                        {(institutionsErrorObj as { response?: { data?: { message?: string } } })
+                          ?.response?.data?.message ||
+                          'Prüfe ENABLE_BANKING_APP_ID und ENABLE_BANKING_PRIVATE_KEY in der .env, danach Backend neu starten.'}
+                      </p>
+                    </div>
+                  ) : (institutions?.length ?? 0) === 0 ? (
+                    <p className="py-4 text-center text-sm text-ink-3">
+                      Keine Banken verfügbar – ist die Enable-Banking-App freigeschaltet?
+                    </p>
                   ) : (
                     <div className="max-h-64 space-y-1 overflow-y-auto">
                       {filteredInstitutions.slice(0, 50).map((inst) => (
@@ -338,7 +356,9 @@ export function AccountsPage() {
                         </button>
                       ))}
                       {filteredInstitutions.length === 0 && bankSearch && (
-                        <p className="py-4 text-center text-sm text-ink-3">Keine Bank gefunden</p>
+                        <p className="py-4 text-center text-sm text-ink-3">
+                          Keine Bank gefunden für „{bankSearch}". {institutions?.length} Banken insgesamt verfügbar.
+                        </p>
                       )}
                     </div>
                   )}
