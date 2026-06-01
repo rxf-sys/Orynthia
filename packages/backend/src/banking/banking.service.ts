@@ -28,8 +28,11 @@ export class BankingService {
 
   /** Bank-Verbindung starten - gibt Auth-URL zurück */
   async connectBank(userId: string, institutionId: string) {
-    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:5173';
-    const redirectUrl = `${frontendUrl}/accounts?bankConnected=true`;
+    // Enable Banking erfordert exakten Match mit den Redirect-URLs, die in der
+    // App-Registrierung hinterlegt sind. Wir senden daher nur die saubere
+    // Basis-URL ohne Query-Params – Enable Banking hängt code + state selbst an.
+    const frontendUrl = (this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173').replace(/\/+$/, '');
+    const redirectUrl = `${frontendUrl}/accounts`;
 
     const result = await this.enableBanking.createConnection({
       institutionId,
