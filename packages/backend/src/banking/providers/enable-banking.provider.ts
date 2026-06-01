@@ -22,6 +22,10 @@ interface AspspResponse {
   logo?: string;
 }
 
+interface AspspsListResponse {
+  aspsps: AspspResponse[];
+}
+
 interface AuthResponse {
   authorization_id: string;
   url: string;
@@ -160,8 +164,11 @@ export class EnableBankingProvider implements BankingProvider {
   }
 
   async getInstitutions(countryCode: string): Promise<Institution[]> {
-    const data = await this.request<AspspResponse[]>('GET', `/aspsps?country=${countryCode}`);
-    return data.map((aspsp) => ({
+    // Enable Banking wrappt die Bank-Liste in { aspsps: [...] } — kein blankes Array.
+    const data = await this.request<AspspsListResponse>('GET', `/aspsps?country=${countryCode}`);
+    const list = Array.isArray(data?.aspsps) ? data.aspsps : [];
+    this.logger.log(`getInstitutions(${countryCode}): ${list.length} Banken`);
+    return list.map((aspsp) => ({
       // Enable Banking identifiziert Banken über name+country Kombination
       id: `${aspsp.name}:::${aspsp.country}`,
       name: aspsp.name,
