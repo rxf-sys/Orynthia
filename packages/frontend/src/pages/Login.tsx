@@ -167,16 +167,6 @@ export function LoginPage() {
               Jetzt registrieren
             </Link>
           </p>
-
-          <div
-            className="mt-6 rounded-md border border-line p-4 text-center"
-            style={{ background: 'var(--bg-soft)' }}
-          >
-            <p className="text-xs text-ink-3">
-              Demo-Zugang: <span className="text-ink-2 font-mono">demo@orynthia.local</span> /{' '}
-              <span className="text-ink-2 font-mono">demo1234</span>
-            </p>
-          </div>
         </div>
       </div>
     </div>
