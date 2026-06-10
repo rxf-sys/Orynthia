@@ -23,7 +23,11 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET'] as const) {
     const value = config[key];
     if (typeof value === 'string' && value.length > 0 && value.length < MIN_SECRET_LENGTH) {
-      errors.push(`${key} muss mindestens ${MIN_SECRET_LENGTH} Zeichen lang sein (aktuell ${value.length}).`);
+      errors.push(
+        `${key} muss mindestens ${MIN_SECRET_LENGTH} Zeichen lang sein (aktuell ${value.length}). ` +
+          `Neu generieren: \`openssl rand -hex 32\` — Achtung: Rotation meldet alle Nutzer ab ` +
+          `(ENCRYPTION_KEY dabei NICHT ändern, sonst werden 2FA/Banking-Daten unlesbar).`,
+      );
     }
   }
 
