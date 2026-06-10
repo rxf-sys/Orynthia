@@ -177,3 +177,21 @@ Geringe Relevanz (App hinter Login, `lang="de"`, Meta-Description vorhanden). Fe
 ---
 
 *Hinweis zur Reproduzierbarkeit: Alle Findings referenzieren Datei und Zeile auf Stand des Branches `claude/determined-fermi-8l09ai` (Basis: `f46d8e9`). Vier als nicht haltbar erkannte Verdachtsfälle aus den Audit-Durchläufen (u. a. ein vermeintlich falscher `EmptyState`-Icon-Prop und fehlender Pagination-Reset bei Filterwechsel) wurden gegen den Code geprüft und verworfen.*
+
+---
+
+# Umsetzungsstatus (2026-06-10)
+
+Alle Findings wurden auf dem Branch `claude/determined-fermi-8l09ai` umgesetzt, mit folgenden Ausnahmen/Abweichungen:
+
+| Punkt | Status |
+| --- | --- |
+| K1–K6, M1, M3–M13, L1–L12, SEO (document.title) | ✅ umgesetzt |
+| K5 Ergebnis | Initial-JS 892 kB → ~330 kB (108 kB gzip); Recharts (114 kB gzip) lädt nur auf Chart-Seiten |
+| K6 | Als echte ⌘K-Command-Palette umgesetzt (Navigation + Transaktionssuche via `?search=`) |
+| M2 (zod + react-hook-form) | Abgewandelt: Feld-Level-Validierung mit `Field error`-Prop + tolerantem `parseDecimal`, ohne RHF-Umbau — Backend-DTOs validieren jetzt serverseitig vollständig |
+| M4 aria-current | Entfiel: React-Router-`NavLink` setzt `aria-current="page"` automatisch (Finding war insoweit falsch); Skip-Link + Menü-Tastaturnavigation umgesetzt |
+| M14 Tests | Grundstock: authStore (5), parseDecimal (3) — 20 Frontend-Tests grün; volle Interceptor-/Guard-Suite offen |
+| M15 PNG-Icons | Offen: braucht ein echtes Icon-Asset (kein Bild-Tooling in der Build-Umgebung); SVG ist bereits `purpose: any maskable` |
+| E2E (Playwright) | Offen: in dieser Umgebung ohne DB/Backend nicht verifizierbar — bewusst nicht blind aufgesetzt |
+| CSP nonce-basiert | Offen (braucht Template-Pipeline); CSP wurde verschärft (`connect-src 'self'`, kein `unsafe-eval`) |

@@ -129,3 +129,22 @@ Diese Behauptungen aus den Audit-Durchläufen wurden gegen den Code geprüft und
 ---
 
 *Alle Findings referenzieren Datei und Zeile auf Stand des Branches `claude/determined-fermi-8l09ai`. Siehe auch `docs/FRONTEND_AUDIT.md` für das Frontend-Gegenstück; mehrere Findings korrespondieren (Doppel-Submit ↔ B7, Passwort-Policy ↔ L1, Account-Delete-Dialog ↔ B4).*
+
+---
+
+# Umsetzungsstatus (2026-06-10)
+
+Alle Findings wurden auf dem Branch `claude/determined-fermi-8l09ai` umgesetzt, mit folgenden Ausnahmen/Abweichungen:
+
+| Punkt | Status |
+| --- | --- |
+| B1–B7, M1–M10, M12, L1–L3, L5, L7–L9 | ✅ umgesetzt (inkl. Ownership-Check auch bei RecurringPayments) |
+| M5 | Migration `4_audit_fixes`: `@@unique([bankAccountId, externalId])` + `users.notification_settings`; muss beim Deploy via `prisma migrate deploy` laufen. Vorbedingung: keine kontoübergreifenden externalId-Duplikate im Bestand (bei global-unique-Altbestand per Definition erfüllt) |
+| M9 | Redis-Check optional via `REDIS_URL`; Hinweis: ioredis/bullmq sind installiert, werden aber von keinem Code-Pfad genutzt — Crons laufen über @nestjs/schedule |
+| M11 Tests | 4 neue Spec-Dateien (users, categories, savings-goals, transactions): 27 Backend-Tests grün |
+| K2-Gegenstück | Notification-Settings: Schema-Feld + GET/PATCH `/users/notification-settings`, Frontend persistiert echt |
+| Chat | Modell via `ANTHROPIC_MODEL` (Default `claude-opus-4-8`), Kontext-Limits, Usage-Logging, optionales Tages-Token-Budget via `CHAT_DAILY_TOKEN_LIMIT` (in-memory, pro Prozess) |
+| L4 (Token-Blacklist) | Bewusst offen gelassen (stateless-JWT-Trade-off, 15-min-Fenster) |
+| L6 Banker's Rounding / Decimal-Lib | Offen: Anzeige-Aggregationen nutzen weiterhin Number (Beträge selbst liegen als Decimal in der DB) |
+| Soft-Delete/DSGVO-Export vor Kontolöschung | Offen (Produktentscheidung); Hard-Delete jetzt durch Passwort-Recheck geschützt |
+| nginx-unprivileged-Frontend-Image | Offen: Basis-Image-Wechsel ändert Port-Layout (80→8080) und ist hier nicht verifizierbar; Healthchecks + Backend-non-root umgesetzt |
