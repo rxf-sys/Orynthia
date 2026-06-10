@@ -23,9 +23,14 @@ cp .env.example .env
 
 Öffne `.env` und setze sichere Werte für:
 - `JWT_SECRET` und `JWT_REFRESH_SECRET` (jeweils min. 32 Zeichen)
-- `ENCRYPTION_KEY` (64 Hex-Zeichen für AES-256)
-- `POSTGRES_PASSWORD`
+- `ENCRYPTION_KEY` (64 Hex-Zeichen für AES-256, generieren: `openssl rand -hex 32`)
+- `POSTGRES_PASSWORD` und `REDIS_PASSWORD`
 - `ENABLE_BANKING_APP_ID` und `ENABLE_BANKING_PRIVATE_KEY` (für Bankanbindung)
+
+> Das Backend **validiert die Pflicht-Variablen beim Start** (`DATABASE_URL`,
+> `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY`) und bricht mit einer
+> klaren Fehlermeldung ab, wenn etwas fehlt oder zu kurz ist. Die vollständige
+> Referenz aller Variablen steht unten unter [Umgebungsvariablen](#umgebungsvariablen).
 
 ### 2. Development starten
 
@@ -60,7 +65,10 @@ aller Daten **frisch erzeugt** (vorherige Demo-Daten werden gelöscht).
 
 **Login:**
 - **E-Mail:** `demo@orynthia.local`
-- **Passwort:** `demo1234`
+- **Passwort:** `demo1234` (überschreibbar via `DEMO_PASSWORD` in `.env`)
+
+> Der Demo-Seed ist bei `NODE_ENV=production` **hart blockiert** — bekannte
+> Zugangsdaten landen damit nie in einer Live-Datenbank.
 
 **Was enthalten ist:**
 - 3 Konten: Girokonto (+3.847 €), Tagesgeld (+12.500 €), KFZ-Kredit (-8.200 €)
@@ -76,13 +84,69 @@ aller Daten **frisch erzeugt** (vorherige Demo-Daten werden gelöscht).
 
 ## Produktion (Proxmox / Homeserver)
 
+### Produktions-Checkliste
+
+Vor dem ersten produktiven Start einmal durchgehen:
+
+- [ ] `.env` aus `.env.example` erstellt, **alle** `CHANGE_ME`-Werte ersetzt
+      (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `ENCRYPTION_KEY`, `POSTGRES_PASSWORD`,
+      `REDIS_PASSWORD`) — die App verweigert den Start bei fehlenden Secrets
+- [ ] `NODE_ENV=production`
+- [ ] `SEED_DEMO_USER=false` (in Production ohnehin blockiert)
+- [ ] `SWAGGER_ENABLED=false` (in Production ohnehin deaktiviert)
+- [ ] `MAIL_FALLBACK_LOG=false` — Reset-Links inkl. Token gehören nicht in Logs
+- [ ] `FRONTEND_URL` auf die echte öffentliche URL gesetzt (CORS + Banking-Redirect)
+- [ ] Bei HTTPS: `COOKIE_SECURE=true` und HSTS im NGINX-HTTPS-Block aktivieren
+      (siehe unten); ohne HTTPS bleibt `COOKIE_SECURE=false`
+- [ ] SMTP konfiguriert, sonst funktioniert "Passwort vergessen" nicht
+      (alternativ bewusst `MAIL_FALLBACK_LOG=true` für Einzel-Setups ohne Log-Aggregation)
+- [ ] Backups eingerichtet (siehe unten)
+
 ### Build & Start
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Die App ist dann über NGINX auf **Port 80** erreichbar.
+Die App ist dann über NGINX auf **Port 80** erreichbar. Datenbank-Migrationen
+laufen beim Backend-Start automatisch (`prisma migrate deploy`); Postgres,
+Redis und Prisma Studio sind in Production **nicht** nach außen exponiert
+(im Dev-Compose nur auf `127.0.0.1` gebunden).
+
+**Healthchecks:** Beide Images bringen Docker-`HEALTHCHECK`s mit; zusätzlich
+gibt es `GET /api/health` (Liveness) und `GET /api/ready` (DB-Probe, plus
+Redis-Status sofern `REDIS_URL` gesetzt ist) für externes Monitoring.
+Das Backend läuft im Container als unprivilegierter `node`-User.
+
+### Backups
+
+Alle Daten liegen im Postgres-Volume. Tägliches Dump-Backup, z. B. per Cron:
+
+```bash
+docker exec orynthia-postgres pg_dump -U orynthia orynthia \
+  | gzip > /backup/orynthia-$(date +%F).sql.gz
+```
+
+Wiederherstellen:
+
+```bash
+gunzip -c /backup/orynthia-2026-06-10.sql.gz \
+  | docker exec -i orynthia-postgres psql -U orynthia orynthia
+```
+
+> Zusätzlich die `.env` sichern — **ohne `ENCRYPTION_KEY` sind Banking-Verbindungen
+> und 2FA-Secrets aus einem DB-Backup nicht wiederherstellbar.**
+
+### Updates einspielen
+
+```bash
+git pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Neue Migrationen werden beim Start automatisch angewendet. Der Service Worker
+des Frontends lädt HTML network-first — Nutzer bekommen nach einem Deploy beim
+nächsten Aufruf automatisch die neue Version (kein Cache-Leeren nötig).
 
 ### Datenbank-UI (optional)
 
@@ -103,12 +167,40 @@ Prisma Studio zeigt alle Tabellen (Users, BankAccounts, Transactions, Budgets, �
 erlaubt Filtern, Sortieren und Editieren von Datensätzen. Der Container braucht keine
 Dev-Dependencies des Backends — er lädt das Prisma-CLI selbstständig beim Start.
 
-### SSL/HTTPS einrichten (optional)
+### SSL/HTTPS einrichten (empfohlen für Produktion)
 
 1. SSL-Zertifikat beschaffen (z.B. Let's Encrypt mit Certbot)
-2. In `nginx/nginx.conf` den HTTPS-Block einkommentieren
-3. Zertifikat-Pfade anpassen
+2. In `nginx/nginx.conf` den HTTPS-Block einkommentieren und die
+   Zertifikat-Pfade anpassen
+3. Im HTTPS-Block die auskommentierte HSTS-Zeile
+   (`Strict-Transport-Security`) aktivieren — sie gehört bewusst **nur** in
+   den HTTPS-Block (Browser ignorieren HSTS über HTTP)
 4. Port 443 in `docker-compose.prod.yml` freigeben
+5. `COOKIE_SECURE=true` in `.env` setzen
+
+## Umgebungsvariablen
+
+Vollständige Vorlage mit Kommentaren: [`.env.example`](.env.example).
+
+| Variable | Pflicht | Zweck |
+|----------|---------|-------|
+| `DATABASE_URL`, `POSTGRES_*` | ✅ | PostgreSQL-Verbindung (beim Start validiert) |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET` | ✅ | Token-Signierung, je min. 32 Zeichen (validiert) |
+| `ENCRYPTION_KEY` | ✅ | AES-256-GCM für 2FA-Secrets & Banking-Sessions, 64 Hex-Zeichen |
+| `REDIS_PASSWORD` | ✅ | Redis-Absicherung im Compose-Stack |
+| `FRONTEND_URL` | ✅ (Prod) | CORS-Origin + Banking-Redirect + Reset-Links |
+| `NODE_ENV`, `APP_PORT` | – | Laufzeitumgebung (Default: `production` / `3000`) |
+| `COOKIE_SECURE` | – | `true` bei HTTPS-Deployments |
+| `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | – | Token-Lebensdauern (Default: `15m` / `7d`) |
+| `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_PRIVATE_KEY` | – | Open Banking (PSD2); ohne sie nur manuelle Konten |
+| `ANTHROPIC_API_KEY` | – | Aktiviert den KI-Assistenten |
+| `ANTHROPIC_MODEL` | – | Claude-Modell (Default: `claude-opus-4-8`) |
+| `CHAT_DAILY_TOKEN_LIMIT` | – | Tages-Token-Budget pro User für den Assistenten (0 = unbegrenzt) |
+| `SMTP_HOST/PORT/USER/PASSWORD/FROM` | – | E-Mail-Versand (Passwort-Reset) |
+| `MAIL_FALLBACK_LOG` | – | Ohne SMTP: Reset-Link ins Log schreiben (Default `false`) |
+| `REDIS_URL` | – | Wenn gesetzt, prüft `/api/ready` zusätzlich Redis |
+| `SEED_DEMO_USER`, `DEMO_PASSWORD` | – | Demo-Daten beim Boot (nur außerhalb von Production) |
+| `SWAGGER_ENABLED` | – | API-Doku unter `/api/docs` (nur außerhalb von Production) |
 
 ## Projektstruktur
 
@@ -135,14 +227,23 @@ Orynthia/
 │   │       ├── recurring-payments/ # Wiederkehrende Zahlungen
 │   │       ├── savings-goals/  # Sparziele
 │   │       ├── contracts/      # Vertragsmanagement & Anbietervergleich
-│   │       └── dashboard/      # Aggregierte Übersicht
+│   │       ├── investments/    # Depot-Positionen
+│   │       ├── notifications/  # Benachrichtigungen (Inbox + Cron-Trigger)
+│   │       ├── chat/           # KI-Assistent (Anthropic)
+│   │       ├── dashboard/      # Aggregierte Übersicht + Forecast
+│   │       ├── health/         # Liveness/Readiness-Endpoints
+│   │       ├── config/         # ENV-Validierung beim Bootstrap
+│   │       └── demo-seed/      # Demo-Daten (nur Nicht-Production)
 │   └── frontend/
 │       └── src/
 │           ├── pages/          # Dashboard, Transaktionen, Budgets, etc.
-│           ├── components/     # Layout, Sidebar, Header
-│           │   └── ui/         # Btn, Card, Modal, ConfirmDialog, EmptyState, …
+│           ├── components/     # Layout, Sidebar, Header, CommandPalette (⌘K)
+│           │   └── ui/         # Btn, Card, Modal, Field, ConfirmDialog, …
 │           ├── stores/         # Zustand: Auth, Theme
 │           └── lib/            # API Client, Types, Utilities
+└── docs/
+    ├── FRONTEND_AUDIT.md       # Frontend-Audit inkl. Umsetzungsstatus
+    └── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
 ```
 
 ## Features
@@ -185,37 +286,67 @@ Orynthia/
   bald fällige wiederkehrende Zahlungen
 - Alle 6 h: Banking-Auto-Sync, mit SYNC_ERROR-Notification bei Fehlern
 - Alle Trigger sind idempotent (dedupeKey) – keine doppelten Benachrichtigungen
+- Benachrichtigungs-Einstellungen pro User serverseitig persistiert
+  (Settings → Benachrichtigungen, überleben Reload und Gerätewechsel)
 
 ### KI-Assistent (Beta)
 - Chat-Oberfläche unter /assistant, beantwortet Fragen zu Konten, Ausgaben,
   Budgets, Verträgen, Sparzielen anhand deiner echten Daten
-- Modell: Anthropic Claude Opus 4.7 mit adaptive thinking + Prompt-Caching
+- Modell konfigurierbar via `ANTHROPIC_MODEL` (Default: Claude Opus 4.8),
+  mit adaptive thinking + Prompt-Caching
+- Kostenkontrolle: Token-Usage wird pro Anfrage geloggt; optionales
+  Tages-Budget pro User via `CHAT_DAILY_TOKEN_LIMIT`
 - Aktiviert sich, sobald `ANTHROPIC_API_KEY` in der .env gesetzt ist
   (Key holen: https://console.anthropic.com)
 
 ### Sicherheit
-- JWT-Authentifizierung mit Refresh Tokens (Refresh-Hash bcrypt in DB)
+- JWT-Authentifizierung mit Refresh-Token-Rotation (Hash bcrypt in DB),
+  Refresh ausschließlich über httpOnly-Cookie
+- Passwortwechsel und Passwort-Reset invalidieren bestehende Sessions;
+  Konto-Löschung erfordert Passwort-Bestätigung
 - Zwei-Faktor-Authentifizierung (TOTP), Secret AES-256-GCM verschlüsselt at rest
 - Banking-Session-IDs (Enable Banking) AES-256-GCM verschlüsselt at rest
-- Rate Limiting (NGINX + NestJS Throttler)
-- Helmet Security Headers, restriktive CSP (kein `unsafe-eval`)
-- `/api/health` (Liveness) + `/api/ready` (DB-Probe) für Container-Healthchecks
-- DSGVO-konform (Self-Hosted, keine Daten an Dritte)
+- Ownership-Checks auf allen Ressourcen-Relationen (kein Zugriff auf fremde
+  Kategorien/Konten, auch nicht über Relations-IDs)
+- Strikte DTO-Validierung app-weit (Betrags-/Längen-Limits, Enums,
+  Pagination-Obergrenzen, `whitelist` + `forbidNonWhitelisted`)
+- ENV-Validierung beim Bootstrap — fehlende/zu kurze Secrets verhindern den Start
+- Rate Limiting (NGINX + NestJS Throttler, verschärft auf Auth- und 2FA-Endpoints)
+- Helmet Security Headers, restriktive CSP (kein `unsafe-eval`,
+  `connect-src 'self'`), `Referrer-Policy: no-referrer`
+- `/api/health` (Liveness) + `/api/ready` (DB-Probe, optional Redis) für
+  Container-Healthchecks; Backend-Container läuft als non-root
+- DSGVO-konform (Self-Hosted, keine Daten an Dritte, Fonts self-hosted)
 
 ### Technik
-- Responsive Dark-Theme UI mit Mobile-optimierten Aktions-Buttons
-- **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop), Service-Worker
-  cached statische Assets, /api bleibt live
-- **E-Mail-Versand** via SMTP (nodemailer) – Passwort-Reset-Mails (sobald SMTP
-  konfiguriert; ohne SMTP wird der Reset-Link ins Backend-Log geschrieben)
-- Barrierefreie Custom-Dialoge (Esc-to-close, Backdrop, ARIA-Labels) statt Browser-`confirm()`
+- Responsive Light/Dark-Theme UI mit Mobile-Tabbar inkl. „Mehr“-Sheet
+  (alle Bereiche mobil erreichbar)
+- **⌘K-Befehlspalette**: Seiten öffnen + Transaktionen durchsuchen von überall
+- **Performance**: Route-basiertes Code-Splitting (Initial-JS ~330 kB statt
+  892 kB; Charts laden nur auf Chart-Seiten), Fonts self-hosted
+- **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop); Service
+  Worker lädt HTML network-first (deploy-sicher, keine veralteten Versionen)
+  und cached nur unveränderliche Assets, /api bleibt live
+- **Barrierefreiheit**: Fokus-Trap + Fokus-Rückgabe in allen Dialogen,
+  Label-/Fehler-Verknüpfung an allen Formularfeldern (`aria-describedby`,
+  `role="alert"`), Skip-Link, Tastaturnavigation in Menüs,
+  `prefers-reduced-motion` wird respektiert
+- **Formular-Härtung**: Eingaben während laufender Requests gesperrt
+  (kein Doppel-Submit), tolerantes Dezimal-Parsing (Komma & Punkt),
+  Feld-Level-Fehlermeldungen
+- **E-Mail-Versand** via SMTP (nodemailer) – Passwort-Reset-Mails; ohne SMTP
+  wird der Reset-Link nur mit explizitem `MAIL_FALLBACK_LOG=true` ins
+  Backend-Log geschrieben
 - Edit-Modals für Konten, Transaktionen, Verträge, Depot-Positionen
 - Empty-States mit klarem Call-to-Action auf allen Listen-Seiten
-- Docker-Deployment (Dev & Prod), Migrationen laufen automatisch beim Start
-- Swagger API-Dokumentation
-- Demo-Daten via `SEED_DEMO_USER=true` (Boot-Hook, reset-at-restart)
-- Optionaler Prisma-Studio-Container (`docker compose --profile tools up -d prisma-studio`)
-- CI: GitHub Actions (Lint, Test, Build) auf Node 24 / pnpm 9.15.0
+- Docker-Deployment (Dev & Prod) mit Healthchecks, Migrationen laufen
+  automatisch beim Start
+- Swagger API-Dokumentation (nur außerhalb von Production)
+- Demo-Daten via `SEED_DEMO_USER=true` (Boot-Hook, reset-at-restart,
+  in Production blockiert)
+- Optionaler Prisma-Studio-Container (`docker compose --profile tools up -d
+  prisma-studio`, nur auf `127.0.0.1` gebunden)
+- CI: GitHub Actions (Lint, Test, Build) auf Node 20 / pnpm 9.15.0
 
 ## API-Endpunkte
 
@@ -230,6 +361,18 @@ Orynthia/
 - `GET /api/auth/2fa/generate` - QR-Code für 2FA
 - `POST /api/auth/2fa/enable` - 2FA aktivieren
 - `POST /api/auth/2fa/disable` - 2FA deaktivieren
+
+### Benutzer
+- `GET /api/users/profile` - Profil abrufen
+- `PATCH /api/users/profile` - Profil bearbeiten
+- `POST /api/users/change-password` - Passwort ändern (invalidiert andere Sessions)
+- `GET /api/users/notification-settings` - Benachrichtigungs-Einstellungen
+- `PATCH /api/users/notification-settings` - Einstellungen speichern
+- `DELETE /api/users/account` - Konto endgültig löschen (Body: `{ "password": "…" }`)
+
+### Health
+- `GET /api/health` - Liveness (Prozess antwortet)
+- `GET /api/ready` - Readiness (DB-Probe; Redis-Status sofern `REDIS_URL` gesetzt)
 
 ### Konten & Banking
 - `GET /api/accounts` - Alle Konten
@@ -372,6 +515,27 @@ FRONTEND_URL=http://localhost:5173
 - 2FA-Secrets ebenfalls verschlüsselt at rest.
 - Bei Rotation von `ENCRYPTION_KEY` werden bestehende Banking-Verbindungen
   und 2FA-Setups unlesbar – beides muss dann neu eingerichtet werden.
+
+## Tests & Qualität
+
+```bash
+# Backend (Jest): 27 Tests in 6 Suiten — Auth-/Ownership-Pfade abgedeckt
+cd packages/backend && pnpm test
+
+# Frontend (Vitest): 20 Tests — Auth-Store, Format-/Parsing-Utilities
+cd packages/frontend && pnpm test
+
+# Lint (beide Pakete, 0 Warnungen erlaubt)
+pnpm lint
+```
+
+CI (GitHub Actions) führt Lint, Tests und Builds bei jedem Push/PR auf `main` aus.
+
+Die App wurde einem vollständigen Frontend- und Backend-Audit unterzogen
+(Security, Autorisierung, Accessibility, Performance, Datenschicht) — Reports
+inkl. Umsetzungsstatus und bewusst offener Punkte liegen unter
+[`docs/FRONTEND_AUDIT.md`](docs/FRONTEND_AUDIT.md) und
+[`docs/BACKEND_AUDIT.md`](docs/BACKEND_AUDIT.md).
 
 ## Lizenz
 
