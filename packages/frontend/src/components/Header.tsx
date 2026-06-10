@@ -5,7 +5,8 @@ import { useThemeStore } from '@/stores/themeStore';
 import { cn } from '@/lib/utils';
 import { Btn, IconBtn } from './ui/Btn';
 import { NotificationBell } from './NotificationBell';
-import { CommandPalette, useCommandPalette } from './CommandPalette';
+import { CommandPalette } from './CommandPalette';
+import { useCommandPalette } from './useCommandPalette';
 
 const TITLE_MAP: Record<string, string> = {
   '/': 'Dashboard',
