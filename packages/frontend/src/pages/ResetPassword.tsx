@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { parseApiError } from '@/lib/utils';
 import { Btn, Field } from '@/components/ui';
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const token = params.get('token') ?? '';
+  // Token einmalig aus der URL sichern, danach wird die URL bereinigt.
+  const [token] = useState(() => params.get('token') ?? '');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Token aus der URL entfernen, damit er nicht in History/Referer landet.
+    if (token) window.history.replaceState(null, '', '/reset-password');
+  }, [token]);
+
+  const passwordMismatch = confirm.length > 0 && password !== confirm;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +39,7 @@ export function ResetPasswordPage() {
       toast.success('Passwort geändert – bitte neu anmelden.');
       navigate('/login', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Reset fehlgeschlagen';
-      toast.error(msg);
+      toast.error(parseApiError(err, 'Reset fehlgeschlagen'));
     } finally {
       setLoading(false);
     }
@@ -56,6 +62,7 @@ export function ResetPasswordPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset disabled={loading} className="contents space-y-4">
             <Field label="Neues Passwort" required>
               <div className="relative">
                 <input
@@ -63,6 +70,7 @@ export function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input pr-10"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                   autoFocus
@@ -77,19 +85,30 @@ export function ResetPasswordPage() {
                 </button>
               </div>
             </Field>
-            <Field label="Passwort wiederholen" required>
+            <Field
+              label="Passwort wiederholen"
+              required
+              error={passwordMismatch ? 'Passwörter stimmen nicht überein' : undefined}
+            >
               <input
                 type={show ? 'text' : 'password'}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className="input"
+                autoComplete="new-password"
                 required
                 minLength={8}
               />
             </Field>
-            <Btn type="submit" variant="grad" disabled={loading} className="w-full justify-center">
+            <Btn
+              type="submit"
+              variant="grad"
+              disabled={loading || passwordMismatch}
+              className="w-full justify-center"
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Passwort speichern'}
             </Btn>
+            </fieldset>
           </form>
         )}
       </div>

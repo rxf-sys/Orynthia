@@ -17,6 +17,8 @@ export function Avatar({ name, size = 36, className, color }: AvatarProps) {
   return (
     <div
       className={cn('grid place-items-center rounded-full font-bold text-white', className)}
+      role="img"
+      aria-label={name || 'Unbekannter Benutzer'}
       style={{
         width: size,
         height: size,

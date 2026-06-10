@@ -19,7 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { accountsApi, bankingApi } from '@/lib/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, parseDecimal, parseApiError } from '@/lib/utils';
 import type { BankAccount, CreateAccountData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
@@ -70,6 +70,7 @@ export function AccountsPage() {
     accountType: 'CHECKING',
     balance: '',
   });
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [bankSearch, setBankSearch] = useState('');
   const [selectedBank, setSelectedBank] = useState<{ id: string; name: string; logo?: string } | null>(null);
 
@@ -136,12 +137,12 @@ export function AccountsPage() {
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
         setCallback({
           phase: 'error',
-          message:
-            e?.response?.data?.message ||
+          message: parseApiError(
+            err,
             'Konten konnten nicht importiert werden. Der Authorization-Code ist evtl. abgelaufen oder bereits verwendet.',
+          ),
         });
       }
     })();
@@ -154,6 +155,7 @@ export function AccountsPage() {
       queryClient.invalidateQueries({ queryKey: ['accounts-balance'] });
       setShowForm(false);
       setForm({ bankName: '', accountName: '', iban: '', accountType: 'CHECKING', balance: '' });
+      setBalanceError(null);
       toast.success('Konto hinzugefügt');
     },
     onError: () => toast.error('Fehler beim Hinzufügen'),
@@ -371,9 +373,10 @@ export function AccountsPage() {
                     <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
                       <p className="font-semibold">Banken konnten nicht geladen werden</p>
                       <p className="mt-1 text-red-300/80">
-                        {(institutionsErrorObj as { response?: { data?: { message?: string } } })
-                          ?.response?.data?.message ||
-                          'Prüfe ENABLE_BANKING_APP_ID und ENABLE_BANKING_PRIVATE_KEY in der .env, danach Backend neu starten.'}
+                        {parseApiError(
+                          institutionsErrorObj,
+                          'Prüfe ENABLE_BANKING_APP_ID und ENABLE_BANKING_PRIVATE_KEY in der .env, danach Backend neu starten.',
+                        )}
                       </p>
                     </div>
                   ) : (institutions?.length ?? 0) === 0 ? (
@@ -412,14 +415,20 @@ export function AccountsPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  const balance = form.balance.trim() ? parseDecimal(form.balance) : 0;
+                  if (balance === null || !Number.isFinite(balance)) {
+                    setBalanceError('Ungültiger Betrag');
+                    return;
+                  }
                   createMutation.mutate({
                     ...form,
-                    balance: Number(form.balance) || 0,
+                    balance,
                     accountType: form.accountType as CreateAccountData['accountType'],
                   });
                 }}
                 className="grid gap-4 sm:grid-cols-2"
               >
+                <fieldset disabled={createMutation.isPending} className="contents">
                 <Field label="Bankname" required>
                   <input
                     value={form.bankName}
@@ -459,14 +468,17 @@ export function AccountsPage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Aktueller Kontostand">
+                <Field label="Aktueller Kontostand" error={balanceError}>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={form.balance}
-                    onChange={(e) => setForm({ ...form, balance: e.target.value })}
+                    onChange={(e) => {
+                      setForm({ ...form, balance: e.target.value });
+                      setBalanceError(null);
+                    }}
                     className="input tnum"
                     placeholder="0,00"
-                    step="0.01"
                   />
                 </Field>
                 <div className="flex items-end">
@@ -478,6 +490,7 @@ export function AccountsPage() {
                     )}
                   </Btn>
                 </div>
+                </fieldset>
               </form>
             </div>
           )}
@@ -700,6 +713,7 @@ function EditAccountModal({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset disabled={isPending} className="contents">
         <Field label="Bankname" required>
           <input
             value={form.bankName}
@@ -748,6 +762,7 @@ function EditAccountModal({
             step="0.01"
           />
         </Field>
+        </fieldset>
       </div>
     </Modal>
   );

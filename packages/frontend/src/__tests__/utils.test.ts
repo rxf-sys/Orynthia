@@ -66,3 +66,24 @@ describe('cn', () => {
     expect(result).toBe('base extra');
   });
 });
+
+describe('parseDecimal', () => {
+  it('parst deutsches Komma', async () => {
+    const { parseDecimal } = await import('@/lib/utils');
+    expect(parseDecimal('12,50')).toBe(12.5);
+    expect(parseDecimal('1.234,56')).toBe(1234.56);
+  });
+
+  it('parst Punkt-Notation', async () => {
+    const { parseDecimal } = await import('@/lib/utils');
+    expect(parseDecimal('12.50')).toBe(12.5);
+    expect(parseDecimal('-3.99')).toBe(-3.99);
+  });
+
+  it('gibt null für leere oder ungültige Eingaben zurück', async () => {
+    const { parseDecimal } = await import('@/lib/utils');
+    expect(parseDecimal('')).toBeNull();
+    expect(parseDecimal('   ')).toBeNull();
+    expect(parseDecimal('abc')).toBeNull();
+  });
+});

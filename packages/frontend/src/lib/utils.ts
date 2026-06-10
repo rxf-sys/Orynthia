@@ -41,6 +41,23 @@ export function getInitials(firstName?: string | null, lastName?: string | null)
 }
 
 /**
+ * Parst Dezimaleingaben tolerant: akzeptiert deutsches Komma ("12,50"),
+ * Punkt ("12.50") und Tausendertrenner ("1.234,56"). Gibt null zurück,
+ * wenn die Eingabe leer oder keine endliche Zahl ist.
+ */
+export function parseDecimal(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let normalized = trimmed.replace(/\s/g, '');
+  if (normalized.includes(',')) {
+    // Komma als Dezimaltrennzeichen → Punkte sind Tausendertrenner
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  }
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : null;
+}
+
+/**
  * Extrahiert eine sinnvolle Fehlermeldung aus einem Axios- oder beliebigen Error.
  * Reihenfolge: response.data.message → response.data.error → err.message → fallback.
  */

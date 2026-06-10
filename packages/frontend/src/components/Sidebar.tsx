@@ -12,7 +12,6 @@ import {
   Bot,
   LineChart,
   Settings,
-  Search,
   MoreHorizontal,
   LogOut,
   X,
@@ -73,10 +72,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        return;
+      }
+      // Pfeiltasten-Navigation gemäß WAI-ARIA-Menu-Pattern
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      const items = Array.from(
+        menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+      );
+      if (items.length === 0) return;
+      e.preventDefault();
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      let next = 0;
+      if (e.key === 'ArrowDown') next = idx < 0 ? 0 : (idx + 1) % items.length;
+      else if (e.key === 'ArrowUp') next = idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length;
+      else if (e.key === 'End') next = items.length - 1;
+      items[next].focus();
     };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
+    // Erstes Menü-Item fokussieren, damit Tastaturnutzer direkt im Menü sind
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     return () => {
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown', onKey);
@@ -134,15 +151,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           >
             <X className="h-5 w-5" />
           </button>
-        </div>
-
-        {/* Mobile search */}
-        <div className="mb-2 flex items-center gap-2 rounded-pill border border-line bg-soft px-3 py-2 text-sm text-ink-3 lg:hidden">
-          <Search className="h-4 w-4" />
-          <input
-            className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-4"
-            placeholder="Suchen…"
-          />
         </div>
 
         {/* Nav */}

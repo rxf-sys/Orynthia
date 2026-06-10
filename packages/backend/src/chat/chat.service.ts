@@ -1,4 +1,4 @@
-import { Injectable, Logger, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,12 +26,17 @@ Antworte nicht auf Themen außerhalb persönlicher Finanzen – lenke dann freun
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private client: Anthropic | null = null;
-  private readonly model = 'claude-opus-4-7';
+  private readonly model: string;
+  // Kostenkontrolle: Tages-Token-Budget pro User (0 = unbegrenzt).
+  private readonly dailyTokenLimit: number;
+  private usageByUser = new Map<string, { day: string; tokens: number }>();
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
+    this.model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-opus-4-8';
+    this.dailyTokenLimit = Number(this.config.get('CHAT_DAILY_TOKEN_LIMIT') || 0);
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (apiKey && apiKey.trim().length > 0) {
       this.client = new Anthropic({ apiKey });
@@ -58,6 +63,8 @@ export class ChatService {
     if (!last || last.role !== 'user' || !last.content?.trim()) {
       throw new BadRequestException('Die letzte Nachricht muss vom Typ "user" sein und Inhalt haben.');
     }
+
+    this.assertWithinDailyBudget(userId);
 
     const context = await this.buildUserContext(userId);
     const apiMessages: Anthropic.MessageParam[] = messages.slice(-20).map((m) => ({
@@ -93,6 +100,12 @@ export class ChatService {
       );
     }
 
+    this.trackUsage(userId, response.usage.input_tokens + response.usage.output_tokens);
+    this.logger.log(
+      `Chat-Usage user=${userId}: in=${response.usage.input_tokens} out=${response.usage.output_tokens} ` +
+        `cacheRead=${response.usage.cache_read_input_tokens ?? 0} cacheWrite=${response.usage.cache_creation_input_tokens ?? 0}`,
+    );
+
     const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
     return {
       role: 'assistant' as const,
@@ -106,6 +119,26 @@ export class ChatService {
     };
   }
 
+  private assertWithinDailyBudget(userId: string) {
+    if (this.dailyTokenLimit <= 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const entry = this.usageByUser.get(userId);
+    if (entry && entry.day === today && entry.tokens >= this.dailyTokenLimit) {
+      throw new HttpException(
+        'Tageslimit für den KI-Assistenten erreicht. Bitte morgen erneut versuchen.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private trackUsage(userId: string, tokens: number) {
+    if (this.dailyTokenLimit <= 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const entry = this.usageByUser.get(userId);
+    if (entry && entry.day === today) entry.tokens += tokens;
+    else this.usageByUser.set(userId, { day: today, tokens });
+  }
+
   /** Aggregiert eine kompakte Finanzübersicht des Users als Markdown. */
   private async buildUserContext(userId: string): Promise<string> {
     const now = new Date();
@@ -116,10 +149,12 @@ export class ChatService {
         this.prisma.bankAccount.findMany({
           where: { userId, isActive: true },
           select: { bankName: true, accountName: true, accountType: true, balance: true },
+          take: 20,
         }),
         this.prisma.budget.findMany({
           where: { userId, isActive: true },
           include: { category: { select: { name: true } } },
+          take: 25,
         }),
         this.prisma.transaction.findMany({
           where: { bankAccount: { userId } },
@@ -145,14 +180,17 @@ export class ChatService {
         this.prisma.recurringPayment.findMany({
           where: { userId, isActive: true },
           select: { name: true, amount: true, frequency: true, nextDueDate: true },
+          take: 30,
         }),
         this.prisma.contract.findMany({
           where: { userId, isActive: true },
           select: { name: true, provider: true, monthlyCost: true, billingCycle: true },
+          take: 30,
         }),
         this.prisma.savingsGoal.findMany({
           where: { userId, isCompleted: false },
           select: { name: true, targetAmount: true, currentAmount: true, deadline: true },
+          take: 20,
         }),
       ]);
 

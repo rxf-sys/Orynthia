@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { differenceInCalendarMonths } from 'date-fns';
 import { Plus, Trash2, X, Loader2, Check, Minus, Lightbulb, PiggyBank } from 'lucide-react';
 import { savingsGoalsApi } from '@/lib/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, parseDecimal } from '@/lib/utils';
 import type { SavingsGoal, CreateSavingsGoalData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, Progress, Tag, useConfirm } from '@/components/ui';
@@ -22,6 +23,7 @@ export function SavingsGoalsPage() {
     icon: '🏖️',
     color: '#424769',
   });
+  const [targetAmountError, setTargetAmountError] = useState<string | null>(null);
   const [addAmountId, setAddAmountId] = useState<string | null>(null);
   const [addAmountValue, setAddAmountValue] = useState('');
 
@@ -36,6 +38,7 @@ export function SavingsGoalsPage() {
       queryClient.invalidateQueries({ queryKey: ['savings-goals'] });
       setShowForm(false);
       setForm({ name: '', targetAmount: '', currentAmount: '', deadline: '', icon: '🏖️', color: '#424769' });
+      setTargetAmountError(null);
       toast.success('Sparziel erstellt');
     },
     onError: () => toast.error('Fehler beim Erstellen'),
@@ -130,15 +133,16 @@ export function SavingsGoalsPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const targetAmount = Number(form.targetAmount);
-              if (!targetAmount || targetAmount <= 0) {
-                toast.error('Bitte Zielbetrag eingeben');
+              const targetAmount = parseDecimal(form.targetAmount);
+              if (targetAmount === null || targetAmount <= 0) {
+                setTargetAmountError('Bitte Zielbetrag eingeben');
                 return;
               }
               createMutation.mutate({
                 name: form.name,
                 targetAmount,
                 currentAmount: Number(form.currentAmount) || 0,
+                // Leerer String würde @IsDateString im Backend verletzen.
                 deadline: form.deadline || undefined,
                 icon: form.icon,
                 color: form.color,
@@ -146,6 +150,7 @@ export function SavingsGoalsPage() {
             }}
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
+            <fieldset disabled={createMutation.isPending} className="contents">
             <Field label="Name" required>
               <input
                 value={form.name}
@@ -155,15 +160,17 @@ export function SavingsGoalsPage() {
                 required
               />
             </Field>
-            <Field label="Zielbetrag" required>
+            <Field label="Zielbetrag" required error={targetAmountError}>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.targetAmount}
-                onChange={(e) => setForm({ ...form, targetAmount: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, targetAmount: e.target.value });
+                  setTargetAmountError(null);
+                }}
                 className="input tnum"
                 placeholder="3.000"
-                min="1"
-                step="0.01"
                 required
               />
             </Field>
@@ -193,6 +200,7 @@ export function SavingsGoalsPage() {
                     key={icon}
                     type="button"
                     onClick={() => setForm({ ...form, icon })}
+                    aria-label={`Icon ${icon} wählen`}
                     className={cn(
                       'grid h-9 w-9 place-items-center rounded-md border text-lg transition',
                       form.icon === icon
@@ -214,7 +222,7 @@ export function SavingsGoalsPage() {
                     onClick={() => setForm({ ...form, color: c })}
                     aria-label={`Farbe ${c}`}
                     className={cn(
-                      'h-9 w-9 rounded-md border-2 transition',
+                      'h-9 w-9 rounded-md border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--peach)]',
                       form.color === c ? 'border-ink' : 'border-transparent',
                     )}
                     style={{ background: c }}
@@ -227,6 +235,7 @@ export function SavingsGoalsPage() {
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sparziel anlegen'}
               </Btn>
             </div>
+            </fieldset>
           </form>
         </Card>
       )}
@@ -345,12 +354,7 @@ function GoalCard({
   const color = goal.color || '#424769';
 
   const monthsRemaining = goal.deadline
-    ? Math.max(
-        1,
-        Math.ceil(
-          (new Date(goal.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30),
-        ),
-      )
+    ? Math.max(1, differenceInCalendarMonths(new Date(goal.deadline), new Date()))
     : null;
   const perMonth = monthsRemaining ? goal.remaining / monthsRemaining : null;
 
@@ -426,20 +430,23 @@ function GoalCard({
         >
           <div className="flex gap-2">
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={addAmountValue}
               onChange={(e) => onAddAmountChange(e.target.value)}
               placeholder="Betrag"
               className="input tnum flex-1 text-sm"
-              step="0.01"
               autoFocus
             />
             <Btn
               size="sm"
               variant="primary"
               onClick={() => {
-                const val = Number(addAmountValue);
-                if (!val) return;
+                const val = parseDecimal(addAmountValue);
+                if (val === null || !val) {
+                  toast.error('Ungültiger Betrag');
+                  return;
+                }
                 onAddAmount(val);
               }}
               disabled={isPending}
@@ -451,8 +458,11 @@ function GoalCard({
               variant="ghost"
               aria-label="Abheben"
               onClick={() => {
-                const val = Number(addAmountValue);
-                if (!val || val <= 0) return;
+                const val = parseDecimal(addAmountValue);
+                if (val === null || val <= 0) {
+                  toast.error('Ungültiger Betrag');
+                  return;
+                }
                 onAddAmount(-val);
               }}
               disabled={isPending}

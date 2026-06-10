@@ -88,6 +88,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: '2FA aktivieren' })
   async enable2FA(@Req() req: Request, @Body() dto: Enable2FADto) {
     return this.authService.enable2FA(req.user!.id, dto.code);
@@ -97,6 +98,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: '2FA deaktivieren' })
   async disable2FA(@Req() req: Request) {
     await this.authService.disable2FA(req.user!.id);

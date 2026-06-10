@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BudgetsService } from './budgets.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('BudgetsService', () => {
   let service: BudgetsService;
@@ -15,7 +15,10 @@ describe('BudgetsService', () => {
       delete: jest.fn(),
     },
     transaction: {
-      aggregate: jest.fn(),
+      groupBy: jest.fn(),
+    },
+    category: {
+      findFirst: jest.fn(),
     },
   };
 
@@ -50,9 +53,9 @@ describe('BudgetsService', () => {
       ];
 
       mockPrisma.budget.findMany.mockResolvedValue(mockBudgets);
-      mockPrisma.transaction.aggregate.mockResolvedValue({
-        _sum: { amount: -300 },
-      });
+      mockPrisma.transaction.groupBy.mockResolvedValue([
+        { categoryId: 'cat1', _sum: { amount: -300 } },
+      ]);
 
       const result = await service.findAll('user1');
 
@@ -81,6 +84,7 @@ describe('BudgetsService', () => {
         period: 'MONTHLY',
       };
 
+      mockPrisma.category.findFirst.mockResolvedValue({ id: 'cat1', userId: 'user1' });
       mockPrisma.budget.create.mockResolvedValue(mockBudget);
 
       const result = await service.create('user1', {
@@ -98,6 +102,15 @@ describe('BudgetsService', () => {
           }),
         }),
       );
+    });
+
+    it('should reject a category that does not belong to the user', async () => {
+      mockPrisma.category.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create('user1', { categoryId: 'foreign-cat', amount: 500 }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.budget.create).not.toHaveBeenCalled();
     });
   });
 

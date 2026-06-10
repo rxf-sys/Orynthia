@@ -115,7 +115,9 @@ export class BankingService {
             dedupeKey: `balance-init-${ext.id}`,
             data: { externalId: ext.id, error: reason },
           })
-          .catch(() => undefined);
+          .catch((err: unknown) => {
+            this.logger.warn(`Import-Benachrichtigung fehlgeschlagen: ${err}`);
+          });
       }
 
       // Konto anlegen
@@ -189,7 +191,9 @@ export class BankingService {
 
       for (const txData of transactions) {
         const existing = await tx.transaction.findUnique({
-          where: { externalId: txData.externalId },
+          // externalId ist nur pro Konto eindeutig — verschiedene Banken
+          // können identische IDs vergeben.
+          where: { bankAccountId_externalId: { bankAccountId: accountId, externalId: txData.externalId } },
         });
         if (existing) {
           updatedCount++;
@@ -288,25 +292,35 @@ export class BankingService {
       include: { user: { select: { id: true } } },
     });
 
-    for (const account of accounts) {
-      try {
-        await this.syncAccount(account.userId, account.id);
-        this.logger.log(`Sync erfolgreich: ${account.accountName} (${account.id})`);
-      } catch (error: unknown) {
-        const reason = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${reason}`);
-        const todayKey = new Date().toISOString().slice(0, 10);
-        await this.notifications
-          .create({
-            userId: account.userId,
-            type: 'SYNC_ERROR',
-            title: `Bank-Sync fehlgeschlagen: ${account.bankName}`,
-            message: `Konto "${account.accountName}" konnte nicht aktualisiert werden. ${reason}`,
-            dedupeKey: `sync-error-${account.id}-${todayKey}`,
-            data: { bankAccountId: account.id, error: reason },
-          })
-          .catch(() => undefined);
-      }
+    // Begrenzte Parallelität: schneller als sequenziell, ohne die Banking-API
+    // mit allen Konten gleichzeitig zu fluten.
+    const CONCURRENCY = 5;
+    for (let i = 0; i < accounts.length; i += CONCURRENCY) {
+      const chunk = accounts.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(
+        chunk.map(async (account) => {
+          try {
+            await this.syncAccount(account.userId, account.id);
+            this.logger.log(`Sync erfolgreich: ${account.accountName} (${account.id})`);
+          } catch (error: unknown) {
+            const reason = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Auto-Sync fehlgeschlagen für ${account.id}: ${reason}`);
+            const todayKey = new Date().toISOString().slice(0, 10);
+            await this.notifications
+              .create({
+                userId: account.userId,
+                type: 'SYNC_ERROR',
+                title: `Bank-Sync fehlgeschlagen: ${account.bankName}`,
+                message: `Konto "${account.accountName}" konnte nicht aktualisiert werden. ${reason}`,
+                dedupeKey: `sync-error-${account.id}-${todayKey}`,
+                data: { bankAccountId: account.id, error: reason },
+              })
+              .catch((err: unknown) => {
+                this.logger.warn(`Sync-Fehler-Benachrichtigung fehlgeschlagen: ${err}`);
+              });
+          }
+        }),
+      );
     }
 
     this.logger.log(`Auto-Sync abgeschlossen: ${accounts.length} Konten verarbeitet`);

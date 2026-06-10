@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, ShieldCheck, Lock, ServerCog } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Btn, Field } from '@/components/ui';
 
@@ -22,13 +23,12 @@ export function LoginPage() {
       await login(email, password, twoFactorCode || undefined);
       toast.success('Willkommen zurück!');
     } catch (err: unknown) {
-      const axiosMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      if (axiosMessage === '2FA-Code erforderlich') {
+      const message = parseApiError(err, 'Anmeldung fehlgeschlagen');
+      if (message === '2FA-Code erforderlich') {
         setShow2FA(true);
         toast('Bitte 2FA-Code eingeben', { icon: '🔐' });
       } else {
-        const message = err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen';
-        toast.error(axiosMessage || message);
+        toast.error(message);
       }
     } finally {
       setLoading(false);
@@ -93,6 +93,7 @@ export function LoginPage() {
           <p className="mb-6 text-sm text-ink-3">Melde dich an, um deine Finanzen zu verwalten.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset disabled={loading} className="contents space-y-4">
             <Field label="E-Mail">
               <input
                 type="email"
@@ -100,6 +101,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="input"
                 placeholder="deine@email.de"
+                autoComplete="email"
                 required
                 autoFocus
               />
@@ -113,6 +115,7 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="input pr-10"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                   minLength={8}
                 />
@@ -159,6 +162,7 @@ export function LoginPage() {
             <Btn type="submit" variant="grad" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Anmelden'}
             </Btn>
+            </fieldset>
           </form>
 
           <p className="mt-5 text-center text-sm text-ink-3">

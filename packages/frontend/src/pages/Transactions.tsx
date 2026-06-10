@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
@@ -12,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { transactionsApi, categoriesApi, accountsApi } from '@/lib/api';
-import { formatCurrency, formatDate, formatDateRelative, cn } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateRelative, parseDecimal, cn } from '@/lib/utils';
 import type { Transaction, Category, CreateTransactionData, BankAccount } from '@/lib/types';
 import toast from 'react-hot-toast';
 import {
@@ -24,18 +25,20 @@ import {
   Modal,
   EmptyState,
   useConfirm,
-  pickCategoryColor,
 } from '@/components/ui';
 
 export function TransactionsPage() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [newTx, setNewTx] = useState({
     bankAccountId: '',
     amount: '',
@@ -46,6 +49,16 @@ export function TransactionsPage() {
     categoryId: '',
   });
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // ⌘K-Palette navigiert mit /transactions?search=… hierher: Param einmalig
+  // in den Such-State übernehmen und aus der URL entfernen.
+  useEffect(() => {
+    const param = searchParams.get('search');
+    if (param !== null) {
+      setSearch(param);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     debounceTimer.current = setTimeout(() => {
@@ -91,6 +104,32 @@ export function TransactionsPage() {
     onError: () => toast.error('Fehler beim Aktualisieren'),
   });
 
+  const inlineCategoryMutation = useMutation({
+    mutationFn: ({ id, categoryId }: { id: string; categoryId: string; previousCategoryId: string }) =>
+      transactionsApi.update(id, { categoryId: categoryId || undefined }),
+    onSuccess: (_res, { id, previousCategoryId }) => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      toast.success((t) => (
+        <span>
+          Kategorie geändert{' '}
+          <button
+            type="button"
+            className="font-semibold underline"
+            onClick={() => {
+              updateMutation.mutate({ id, data: { categoryId: previousCategoryId || undefined } });
+              toast.dismiss(t.id);
+            }}
+          >
+            Rückgängig
+          </button>
+        </span>
+      ));
+    },
+    onError: () => toast.error('Fehler beim Aktualisieren'),
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: CreateTransactionData) => transactionsApi.create(data),
     onSuccess: () => {
@@ -132,11 +171,13 @@ export function TransactionsPage() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = Math.abs(Number(newTx.amount));
-    if (!amount || amount <= 0) {
-      toast.error('Bitte gültigen Betrag eingeben');
+    const parsed = parseDecimal(newTx.amount);
+    const amount = parsed === null ? null : Math.abs(parsed);
+    if (amount === null || amount <= 0) {
+      setAmountError('Ungültiger Betrag');
       return;
     }
+    setAmountError(null);
     createMutation.mutate({
       bankAccountId: newTx.bankAccountId,
       amount: newTx.type === 'EXPENSE' ? -amount : amount,
@@ -208,105 +249,114 @@ export function TransactionsPage() {
         >
           <h3 className="mb-4 text-lg font-bold text-ink">Neue Transaktion</h3>
           <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Typ">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNewTx({ ...newTx, type: 'EXPENSE' })}
-                  className={cn(
-                    'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
-                    newTx.type === 'EXPENSE'
-                      ? 'border-transparent bg-indigo text-white'
-                      : 'border-line bg-elev text-ink-2',
-                  )}
+            <fieldset disabled={createMutation.isPending} className="contents">
+              <Field label="Typ">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewTx({ ...newTx, type: 'EXPENSE' })}
+                    className={cn(
+                      'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                      newTx.type === 'EXPENSE'
+                        ? 'border-transparent bg-indigo text-white'
+                        : 'border-line bg-elev text-ink-2',
+                    )}
+                  >
+                    Ausgabe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewTx({ ...newTx, type: 'INCOME' })}
+                    className={cn(
+                      'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                      newTx.type === 'INCOME'
+                        ? 'border-transparent text-white'
+                        : 'border-line bg-elev text-ink-2',
+                    )}
+                    style={newTx.type === 'INCOME' ? { background: 'var(--pos)' } : undefined}
+                  >
+                    Einnahme
+                  </button>
+                </div>
+              </Field>
+              <Field label="Betrag (EUR)" required error={amountError}>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={newTx.amount}
+                  onChange={(e) => {
+                    setNewTx({ ...newTx, amount: e.target.value });
+                    setAmountError(null);
+                  }}
+                  className="input tnum"
+                  placeholder="0,00"
+                  required
+                />
+              </Field>
+              <Field label="Datum" required>
+                <input
+                  type="date"
+                  value={newTx.date}
+                  onChange={(e) => setNewTx({ ...newTx, date: e.target.value })}
+                  className="input"
+                  required
+                />
+              </Field>
+              <Field label="Empfänger / Auftraggeber">
+                <input
+                  value={newTx.counterpartName}
+                  onChange={(e) => setNewTx({ ...newTx, counterpartName: e.target.value })}
+                  className="input"
+                  placeholder="z. B. REWE, Arbeitgeber"
+                />
+              </Field>
+              <Field label="Verwendungszweck">
+                <input
+                  value={newTx.purpose}
+                  onChange={(e) => setNewTx({ ...newTx, purpose: e.target.value })}
+                  className="input"
+                  placeholder="z. B. Wocheneinkauf"
+                />
+              </Field>
+              <Field label="Konto" required>
+                <select
+                  value={newTx.bankAccountId}
+                  onChange={(e) => setNewTx({ ...newTx, bankAccountId: e.target.value })}
+                  className="select"
+                  required
                 >
-                  Ausgabe
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewTx({ ...newTx, type: 'INCOME' })}
-                  className={cn(
-                    'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
-                    newTx.type === 'INCOME'
-                      ? 'border-transparent text-white'
-                      : 'border-line bg-elev text-ink-2',
-                  )}
-                  style={newTx.type === 'INCOME' ? { background: 'var(--pos)' } : undefined}
+                  {accounts?.map((acc: BankAccount) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.bankName} — {acc.accountName}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Kategorie">
+                <select
+                  value={newTx.categoryId}
+                  onChange={(e) => setNewTx({ ...newTx, categoryId: e.target.value })}
+                  className="select"
                 >
-                  Einnahme
-                </button>
+                  <option value="">Automatisch zuordnen</option>
+                  {categories?.map((cat: Category) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="flex items-end">
+                <Btn
+                  type="submit"
+                  variant="grad"
+                  disabled={createMutation.isPending || !newTx.bankAccountId}
+                  className="w-full"
+                >
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
+                </Btn>
               </div>
-            </Field>
-            <Field label="Betrag (EUR)" required>
-              <input
-                type="number"
-                value={newTx.amount}
-                onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })}
-                className="input tnum"
-                placeholder="0,00"
-                step="0.01"
-                min="0.01"
-                required
-              />
-            </Field>
-            <Field label="Datum" required>
-              <input
-                type="date"
-                value={newTx.date}
-                onChange={(e) => setNewTx({ ...newTx, date: e.target.value })}
-                className="input"
-                required
-              />
-            </Field>
-            <Field label="Empfänger / Auftraggeber">
-              <input
-                value={newTx.counterpartName}
-                onChange={(e) => setNewTx({ ...newTx, counterpartName: e.target.value })}
-                className="input"
-                placeholder="z. B. REWE, Arbeitgeber"
-              />
-            </Field>
-            <Field label="Verwendungszweck">
-              <input
-                value={newTx.purpose}
-                onChange={(e) => setNewTx({ ...newTx, purpose: e.target.value })}
-                className="input"
-                placeholder="z. B. Wocheneinkauf"
-              />
-            </Field>
-            <Field label="Konto" required>
-              <select
-                value={newTx.bankAccountId}
-                onChange={(e) => setNewTx({ ...newTx, bankAccountId: e.target.value })}
-                className="select"
-                required
-              >
-                {accounts?.map((acc: BankAccount) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.bankName} — {acc.accountName}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Kategorie">
-              <select
-                value={newTx.categoryId}
-                onChange={(e) => setNewTx({ ...newTx, categoryId: e.target.value })}
-                className="select"
-              >
-                <option value="">Automatisch zuordnen</option>
-                {categories?.map((cat: Category) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className="flex items-end">
-              <Btn type="submit" variant="grad" disabled={createMutation.isPending} className="w-full">
-                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
-              </Btn>
-            </div>
+            </fieldset>
           </form>
         </Card>
       )}
@@ -392,9 +442,10 @@ export function TransactionsPage() {
                         <select
                           value={tx.categoryId || ''}
                           onChange={(e) =>
-                            updateMutation.mutate({
+                            inlineCategoryMutation.mutate({
                               id: tx.id,
-                              data: { categoryId: e.target.value || undefined },
+                              categoryId: e.target.value,
+                              previousCategoryId: tx.categoryId || '',
                             })
                           }
                           className="hidden max-w-[160px] rounded-md border border-line bg-elev px-2 py-1 text-xs text-ink-2 md:block"
@@ -556,88 +607,90 @@ function EditTransactionModal({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Typ">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, type: 'EXPENSE' })}
-              className={cn(
-                'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
-                form.type === 'EXPENSE'
-                  ? 'border-transparent bg-indigo text-white'
-                  : 'border-line bg-elev text-ink-2',
-              )}
+        <fieldset disabled={isPending} className="contents">
+          <Field label="Typ">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, type: 'EXPENSE' })}
+                className={cn(
+                  'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                  form.type === 'EXPENSE'
+                    ? 'border-transparent bg-indigo text-white'
+                    : 'border-line bg-elev text-ink-2',
+                )}
+              >
+                Ausgabe
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, type: 'INCOME' })}
+                className={cn(
+                  'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
+                  form.type === 'INCOME'
+                    ? 'border-transparent text-white'
+                    : 'border-line bg-elev text-ink-2',
+                )}
+                style={form.type === 'INCOME' ? { background: 'var(--pos)' } : undefined}
+              >
+                Einnahme
+              </button>
+            </div>
+          </Field>
+          <Field label="Betrag (EUR)" required>
+            <input
+              type="number"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              className="input tnum"
+              step="0.01"
+              min="0.01"
+            />
+          </Field>
+          <Field label="Datum" required>
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              className="input"
+            />
+          </Field>
+          <Field label="Empfänger / Auftraggeber">
+            <input
+              value={form.counterpartName}
+              onChange={(e) => setForm({ ...form, counterpartName: e.target.value })}
+              className="input"
+            />
+          </Field>
+          <Field label="Verwendungszweck">
+            <input
+              value={form.purpose}
+              onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+              className="input"
+            />
+          </Field>
+          <Field label="Kategorie">
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              className="select"
             >
-              Ausgabe
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, type: 'INCOME' })}
-              className={cn(
-                'flex-1 rounded-md border py-2.5 text-sm font-semibold transition',
-                form.type === 'INCOME'
-                  ? 'border-transparent text-white'
-                  : 'border-line bg-elev text-ink-2',
-              )}
-              style={form.type === 'INCOME' ? { background: 'var(--pos)' } : undefined}
-            >
-              Einnahme
-            </button>
-          </div>
-        </Field>
-        <Field label="Betrag (EUR)" required>
-          <input
-            type="number"
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            className="input tnum"
-            step="0.01"
-            min="0.01"
-          />
-        </Field>
-        <Field label="Datum" required>
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            className="input"
-          />
-        </Field>
-        <Field label="Empfänger / Auftraggeber">
-          <input
-            value={form.counterpartName}
-            onChange={(e) => setForm({ ...form, counterpartName: e.target.value })}
-            className="input"
-          />
-        </Field>
-        <Field label="Verwendungszweck">
-          <input
-            value={form.purpose}
-            onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-            className="input"
-          />
-        </Field>
-        <Field label="Kategorie">
-          <select
-            value={form.categoryId}
-            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-            className="select"
-          >
-            <option value="">Unkategorisiert</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.icon} {cat.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Notizen" className="sm:col-span-2">
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="input min-h-[80px]"
-          />
-        </Field>
+              <option value="">Unkategorisiert</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon} {cat.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Notizen" className="sm:col-span-2">
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="input min-h-[80px]"
+            />
+          </Field>
+        </fieldset>
       </div>
       {accounts.length > 0 && (
         <p className="mt-3 text-xs text-ink-3">
@@ -648,6 +701,3 @@ function EditTransactionModal({
     </Modal>
   );
 }
-
-// silence unused import warning when palette not in use
-void pickCategoryColor;

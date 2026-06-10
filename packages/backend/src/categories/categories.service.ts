@@ -62,8 +62,13 @@ export class CategoriesService implements OnModuleInit {
   async remove(userId: string, id: string) {
     const cat = await this.prisma.category.findFirst({ where: { id, userId, isSystem: false } });
     if (!cat) throw new NotFoundException('Kategorie nicht gefunden oder ist System-Kategorie');
-    await this.prisma.transaction.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
-    await this.prisma.category.delete({ where: { id } });
+    // Budgets hängen mit Restrict-FK an der Kategorie und müssen mit weg;
+    // alles atomar, damit kein halb bereinigter Zustand entsteht.
+    await this.prisma.$transaction([
+      this.prisma.transaction.updateMany({ where: { categoryId: id }, data: { categoryId: null } }),
+      this.prisma.budget.deleteMany({ where: { categoryId: id } }),
+      this.prisma.category.delete({ where: { id } }),
+    ]);
     return { message: 'Kategorie gelöscht' };
   }
 }

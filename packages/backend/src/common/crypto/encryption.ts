@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { Logger } from '@nestjs/common';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -28,9 +29,8 @@ function loadKey(): Buffer {
     // Fallback für nicht-konforme Längen: SHA-256-Hash des Inputs als 32-Byte-Key.
     // Sicherheit ist nur so gut wie die Entropie des Original-Strings — bitte
     // mit `openssl rand -hex 32` einen korrekten Key generieren.
-     
-    console.warn(
-      `[encryption] ENCRYPTION_KEY hat ungewöhnliche Länge (${raw.length}). ` +
+    new Logger('Encryption').warn(
+      `ENCRYPTION_KEY hat ungewöhnliche Länge (${raw.length}). ` +
         'Fallback: SHA-256-Hash des Inputs wird als Key verwendet. ' +
         'Empfohlen: `openssl rand -hex 32` in .env eintragen.',
     );

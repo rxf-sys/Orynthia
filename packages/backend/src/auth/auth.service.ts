@@ -89,7 +89,7 @@ export class AuthService {
       }
       const isValid = authenticator.verify({
         token: dto.twoFactorCode,
-        secret: this.readTwoFactorSecret(user.twoFactorSecret),
+        secret: this.readTwoFactorSecret(user.twoFactorSecret, user.id),
       });
       if (!isValid) {
         throw new UnauthorizedException('Ungültiger 2FA-Code');
@@ -162,7 +162,7 @@ export class AuthService {
 
     const isValid = authenticator.verify({
       token: code,
-      secret: this.readTwoFactorSecret(user.twoFactorSecret),
+      secret: this.readTwoFactorSecret(user.twoFactorSecret, user.id),
     });
 
     if (!isValid) {
@@ -221,7 +221,17 @@ export class AuthService {
       `,
     });
     if (!sent) {
-      this.logger.warn(`Passwort-Reset-Token für ${user.email}: ${resetLink}`);
+      // Self-Hosting-Fallback ohne SMTP: der vollständige Link (inkl. Token!)
+      // landet nur im Log, wenn das explizit erlaubt wurde — Logs werden oft
+      // aggregiert/gesichert und dürfen keine Secrets enthalten.
+      if (process.env.MAIL_FALLBACK_LOG === 'true') {
+        this.logger.warn(`Passwort-Reset-Token für ${user.email}: ${resetLink}`);
+      } else {
+        this.logger.warn(
+          `Passwort-Reset angefordert für ${user.email}, aber SMTP ist nicht konfiguriert. ` +
+            'Setze MAIL_FALLBACK_LOG=true, um den Reset-Link im Log auszugeben.',
+        );
+      }
     }
   }
 
@@ -272,10 +282,10 @@ export class AuthService {
 
   /**
    * Akzeptiert sowohl verschlüsselte (neue) als auch Klartext-Secrets (Bestand).
-   * Bei Klartext: einmaliges, transparentes Re-Encrypt in der DB wird beim
-   * nächsten generate2FASecret-Aufruf erledigt; hier nur Read-Path.
+   * Legacy-Klartext wird beim ersten Read transparent verschlüsselt
+   * zurückgeschrieben, damit kein Bestand dauerhaft unverschlüsselt bleibt.
    */
-  private readTwoFactorSecret(stored: string | null): string {
+  private readTwoFactorSecret(stored: string | null, userId?: string): string {
     if (!stored) throw new BadRequestException('2FA Secret fehlt');
     if (isEncrypted(stored)) {
       try {
@@ -285,7 +295,16 @@ export class AuthService {
         throw new UnauthorizedException('2FA-Daten beschädigt – bitte 2FA neu einrichten.');
       }
     }
-    // Legacy: Klartext-Secret aus pre-encryption Bestand
+    // Legacy: Klartext-Secret aus pre-encryption Bestand → im Hintergrund migrieren
+    if (userId) {
+      this.prisma.user
+        .update({ where: { id: userId }, data: { twoFactorSecret: encrypt(stored) } })
+        .then(() => this.logger.log(`Legacy-2FA-Secret für User ${userId} verschlüsselt.`))
+        .catch((err: unknown) => {
+          const reason = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Re-Encrypt des 2FA-Secrets fehlgeschlagen (User ${userId}): ${reason}`);
+        });
+    }
     return stored;
   }
 

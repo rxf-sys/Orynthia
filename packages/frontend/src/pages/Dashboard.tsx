@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -39,6 +40,12 @@ const CHART_COLORS = {
 
 const CATEGORY_PALETTE = ['#424769', '#ffb17a', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
 
+// Neutrale Farbe für den Sammelposten "Sonstige" im Kategorie-Chart
+const OTHER_CATEGORY_COLOR = 'var(--text-4, #aeb3c4)';
+
+const TOP_CATEGORIES_LIMIT = 5;
+const RECENT_TX_LIMIT = 6;
+
 const MONTH_NAMES: Record<string, string> = {
   '01': 'Jan',
   '02': 'Feb',
@@ -57,7 +64,7 @@ const MONTH_NAMES: Record<string, string> = {
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
 
-  const { data: dashboard, isLoading } = useQuery({
+  const { data: dashboard, isLoading, isError, refetch } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.getData().then((r) => r.data),
   });
@@ -67,11 +74,50 @@ export function DashboardPage() {
     queryFn: () => transactionsApi.getMonthlyOverview(6).then((r) => r.data),
   });
 
+  const expensesByCategory = dashboard?.expensesByCategory;
+
+  // Einheitliche Datenbasis für Pie-Chart UND Legende:
+  // Top 5 Kategorien + Sammelposten "Sonstige" für den Rest.
+  const categoryChartData = useMemo(() => {
+    const items = expensesByCategory ?? [];
+    const top = items.slice(0, TOP_CATEGORIES_LIMIT).map((item, i) => ({
+      key: item.categoryId || String(i),
+      name: item.category?.name || 'Unkategorisiert',
+      icon: item.category?.icon,
+      color: item.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
+      amount: item.amount,
+    }));
+    const rest = items.slice(TOP_CATEGORIES_LIMIT);
+    if (rest.length > 0) {
+      top.push({
+        key: 'sonstige',
+        name: 'Sonstige',
+        icon: undefined,
+        color: OTHER_CATEGORY_COLOR,
+        amount: rest.reduce((sum, item) => sum + item.amount, 0),
+      });
+    }
+    return top;
+  }, [expensesByCategory]);
+
+  // Loader strikt VOR dem Rendern der Kennzahlen halten,
+  // damit während des Ladens keine 0-Werte aufblitzen.
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-indigo" />
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="flex flex-col items-center gap-3 py-12 text-center">
+        <p className="text-sm font-semibold text-ink">Dashboard konnte nicht geladen werden</p>
+        <Btn variant="ghost" icon={RefreshCw} onClick={() => refetch()}>
+          Erneut versuchen
+        </Btn>
+      </Card>
     );
   }
 
@@ -235,14 +281,14 @@ export function DashboardPage() {
         <Card>
           <div className="text-[1.05rem] font-bold text-ink">Ausgaben nach Kategorie</div>
           <div className="mb-3.5 text-[0.85rem] text-ink-3">{monthLabel} {today.getFullYear()}</div>
-          {(dashboard?.expensesByCategory?.length ?? 0) > 0 ? (
+          {categoryChartData.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie
-                    data={dashboard!.expensesByCategory}
+                    data={categoryChartData}
                     dataKey="amount"
-                    nameKey="category.name"
+                    nameKey="name"
                     cx="50%"
                     cy="50%"
                     innerRadius={48}
@@ -251,11 +297,8 @@ export function DashboardPage() {
                     stroke="var(--bg-elev)"
                     strokeWidth={2}
                   >
-                    {dashboard!.expensesByCategory.map((entry, i: number) => (
-                      <Cell
-                        key={entry.categoryId || i}
-                        fill={entry.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]}
-                      />
+                    {categoryChartData.map((entry) => (
+                      <Cell key={entry.key} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -270,21 +313,18 @@ export function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 space-y-1.5">
-                {dashboard!.expensesByCategory.slice(0, 5).map((item, i) => {
-                  const color = item.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length];
-                  return (
-                    <div
-                      key={item.categoryId || i}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <CategoryDot cat={{ color, name: item.category?.name }} />
-                      <span className="flex-1 truncate text-ink-2">
-                        {item.category?.icon} {item.category?.name}
-                      </span>
-                      <span className="tnum font-semibold text-ink">{formatCurrency(item.amount)}</span>
-                    </div>
-                  );
-                })}
+                {categoryChartData.map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <CategoryDot cat={{ color: item.color, name: item.name }} />
+                    <span className="flex-1 truncate text-ink-2">
+                      {item.icon} {item.name}
+                    </span>
+                    <span className="tnum font-semibold text-ink">{formatCurrency(item.amount)}</span>
+                  </div>
+                ))}
               </div>
             </>
           ) : (
@@ -325,7 +365,7 @@ export function DashboardPage() {
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[0.75rem] font-bold text-white"
                       style={{ background: color }}
                     >
-                      {acc.bankName[0]?.toUpperCase()}
+                      {acc.bankName[0]?.toUpperCase() || '?'}
                     </div>
                     <div className="min-w-0">
                       <div className="truncate text-[0.85rem] font-semibold">{acc.bankName}</div>
@@ -370,7 +410,7 @@ export function DashboardPage() {
           </div>
           {(dashboard?.recentTransactions?.length ?? 0) > 0 ? (
             <div>
-              {dashboard!.recentTransactions.slice(0, 6).map((tx: Transaction) => {
+              {dashboard!.recentTransactions.slice(0, RECENT_TX_LIMIT).map((tx: Transaction) => {
                 const amount = Number(tx.amount);
                 return (
                   <div

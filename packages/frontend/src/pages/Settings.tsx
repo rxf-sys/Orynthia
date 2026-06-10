@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   User,
   Shield,
@@ -17,9 +17,9 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Tag, Avatar, useConfirm } from '@/components/ui';
+import { Card, Btn, Field, PageHead, Tag, Avatar, Modal } from '@/components/ui';
 
 type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
 
@@ -70,13 +70,14 @@ export function SettingsPage() {
 
 function ProfileTab() {
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
   const { user } = useAuthStore();
   const [form, setForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
   });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => api.patch('/users/profile', data),
@@ -84,15 +85,16 @@ function ProfileTab() {
       queryClient.invalidateQueries({ queryKey: ['auth-me'] });
       toast.success('Profil aktualisiert');
     },
-    onError: () => toast.error('Fehler beim Aktualisieren'),
+    onError: (err) => toast.error(parseApiError(err, 'Fehler beim Aktualisieren')),
   });
 
   const deleteAccountMutation = useMutation({
-    mutationFn: () => api.delete('/users/account'),
+    mutationFn: () => api.delete('/users/account', { data: { password: deletePassword } }),
     onSuccess: () => {
       useAuthStore.getState().logout();
       window.location.href = '/login';
     },
+    onError: (err) => toast.error(parseApiError(err, 'Fehler beim Löschen des Kontos')),
   });
 
   const fullName = `${form.firstName} ${form.lastName}`.trim() || form.email;
@@ -114,6 +116,7 @@ function ProfileTab() {
           }}
           className="grid max-w-2xl gap-4 sm:grid-cols-2"
         >
+          <fieldset disabled={updateMutation.isPending} className="contents">
           <Field label="Vorname">
             <input
               value={form.firstName}
@@ -149,6 +152,7 @@ function ProfileTab() {
               Speichern
             </Btn>
           </div>
+          </fieldset>
         </form>
       </Card>
 
@@ -157,23 +161,59 @@ function ProfileTab() {
         <p className="mb-4 text-sm text-ink-3">
           Dein Konto und alle zugehörigen Daten werden unwiderruflich gelöscht.
         </p>
-        <Btn
-          variant="danger"
-          icon={Trash2}
-          onClick={async () => {
-            const ok = await confirm({
-              title: 'Konto unwiderruflich löschen?',
-              description:
-                'Alle Konten, Transaktionen, Budgets und Verträge werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
-              confirmLabel: 'Endgültig löschen',
-              destructive: true,
-            });
-            if (ok) deleteAccountMutation.mutate();
-          }}
-        >
+        <Btn variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>
           Konto löschen
         </Btn>
       </Card>
+
+      <Modal
+        open={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeletePassword('');
+        }}
+        size="sm"
+        title="Konto unwiderruflich löschen?"
+        description="Alle Konten, Transaktionen, Budgets und Verträge werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden."
+        footer={
+          <>
+            <Btn
+              variant="ghost"
+              onClick={() => {
+                setDeleteOpen(false);
+                setDeletePassword('');
+              }}
+              disabled={deleteAccountMutation.isPending}
+            >
+              Abbrechen
+            </Btn>
+            <Btn
+              variant="danger"
+              onClick={() => deleteAccountMutation.mutate()}
+              disabled={deleteAccountMutation.isPending || deletePassword.length === 0}
+            >
+              {deleteAccountMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Endgültig löschen'
+              )}
+            </Btn>
+          </>
+        }
+      >
+        <Field label="Passwort zur Bestätigung" required>
+          <input
+            type="password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            className="input"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            disabled={deleteAccountMutation.isPending}
+            required
+          />
+        </Field>
+      </Modal>
     </div>
   );
 }
@@ -200,7 +240,7 @@ function SecurityTab() {
       setShowPasswordForm(false);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     },
-    onError: () => toast.error('Fehler beim Ändern des Passworts'),
+    onError: (err) => toast.error(parseApiError(err, 'Fehler beim Ändern des Passworts')),
   });
 
   const generate2faMutation = useMutation({
@@ -220,7 +260,7 @@ function SecurityTab() {
       setVerifyCode('');
       toast.success('2FA aktiviert');
     },
-    onError: () => toast.error('Ungültiger Code'),
+    onError: (err) => toast.error(parseApiError(err, 'Ungültiger Code')),
   });
 
   const disable2faMutation = useMutation({
@@ -229,7 +269,7 @@ function SecurityTab() {
       queryClient.invalidateQueries({ queryKey: ['auth-me'] });
       toast.success('2FA deaktiviert');
     },
-    onError: () => toast.error('Ungültiger Code'),
+    onError: (err) => toast.error(parseApiError(err, 'Ungültiger Code')),
   });
 
   return (
@@ -266,6 +306,7 @@ function SecurityTab() {
             }}
             className="max-w-md space-y-4 animate-fade-in"
           >
+            <fieldset disabled={passwordMutation.isPending} className="contents space-y-4">
             <Field label="Aktuelles Passwort">
               <div className="relative">
                 <input
@@ -281,7 +322,7 @@ function SecurityTab() {
                   type="button"
                   onClick={() => setShowPasswords(!showPasswords)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink"
-                  aria-label="Passwort anzeigen"
+                  aria-label={showPasswords ? 'Passwort verbergen' : 'Passwort anzeigen'}
                 >
                   {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -318,6 +359,7 @@ function SecurityTab() {
                 Abbrechen
               </Btn>
             </div>
+            </fieldset>
           </form>
         )}
       </Card>
@@ -356,7 +398,7 @@ function SecurityTab() {
               Scanne diesen QR-Code mit deiner Authenticator-App (z. B. Google Authenticator, Authy).
             </p>
             <div className="w-fit rounded-lg bg-white p-4">
-              <img src={qrCode} alt="2FA QR Code" className="h-48 w-48" />
+              <img src={qrCode} alt="2FA QR Code" className="h-40 w-40 max-w-full sm:h-48 sm:w-48" />
             </div>
             {totpSecret && (
               <div className="flex items-center gap-2">
@@ -450,19 +492,53 @@ function SecurityTab() {
   );
 }
 
+interface NotificationSettings {
+  budgetWarnings: boolean;
+  newTransactions: boolean;
+  weeklyReport: boolean;
+  monthlyReport: boolean;
+  unusualActivity: boolean;
+  savingsGoals: boolean;
+}
+
 function NotificationsTab() {
-  const [settings, setSettings] = useState({
-    budgetWarnings: true,
-    newTransactions: true,
-    weeklyReport: true,
-    monthlyReport: true,
-    unusualActivity: true,
-    savingsGoals: false,
+  const queryClient = useQueryClient();
+
+  const { data: settings, isLoading } = useQuery<NotificationSettings>({
+    queryKey: ['notification-settings'],
+    queryFn: () => api.get('/users/notification-settings').then((r) => r.data),
   });
 
-  const toggleSetting = (key: keyof typeof settings) => {
-    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
-    toast.success('Einstellung gespeichert');
+  const updateMutation = useMutation({
+    mutationFn: (patch: Partial<NotificationSettings>) =>
+      api.patch('/users/notification-settings', patch).then((r) => r.data as NotificationSettings),
+    onMutate: async (patch) => {
+      // Optimistic update: Cache sofort anpassen, bei Fehler zurücksetzen.
+      await queryClient.cancelQueries({ queryKey: ['notification-settings'] });
+      const previous = queryClient.getQueryData<NotificationSettings>(['notification-settings']);
+      if (previous) {
+        queryClient.setQueryData<NotificationSettings>(['notification-settings'], {
+          ...previous,
+          ...patch,
+        });
+      }
+      return { previous };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['notification-settings'], data);
+      toast.success('Einstellung gespeichert');
+    },
+    onError: (err, _patch, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['notification-settings'], context.previous);
+      }
+      toast.error(parseApiError(err, 'Fehler beim Speichern der Einstellung'));
+    },
+  });
+
+  const toggleSetting = (key: keyof NotificationSettings) => {
+    if (!settings || updateMutation.isPending) return;
+    updateMutation.mutate({ [key]: !settings[key] });
   };
 
   const notificationOptions = [
@@ -504,50 +580,58 @@ function NotificationsTab() {
         <h3 className="text-lg font-bold text-ink">Benachrichtigungen</h3>
         <p className="mt-0.5 text-sm text-ink-3">Wähle, worüber wir dich informieren sollen.</p>
       </div>
-      <div>
-        {notificationOptions.map((opt, i) => (
-          <div
-            key={opt.key}
-            className={cn(
-              'flex items-center justify-between gap-4 px-5 py-4',
-              i < notificationOptions.length - 1 && 'border-b',
-            )}
-            style={
-              i < notificationOptions.length - 1 ? { borderColor: 'var(--line-2)' } : undefined
-            }
-          >
-            <div>
-              <p className="text-sm font-semibold text-ink">{opt.label}</p>
-              <p className="mt-0.5 text-xs text-ink-3">{opt.description}</p>
-            </div>
-            <label
-              className="inline-flex shrink-0 cursor-pointer items-center"
-              title={settings[opt.key] ? 'Aus' : 'An'}
+      {isLoading || !settings ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo" />
+        </div>
+      ) : (
+        <div>
+          {notificationOptions.map((opt, i) => (
+            <div
+              key={opt.key}
+              className={cn(
+                'flex items-center justify-between gap-4 px-5 py-4',
+                i < notificationOptions.length - 1 && 'border-b',
+              )}
+              style={
+                i < notificationOptions.length - 1 ? { borderColor: 'var(--line-2)' } : undefined
+              }
             >
-              <input
-                type="checkbox"
-                checked={settings[opt.key]}
-                onChange={() => toggleSetting(opt.key)}
-                className="peer sr-only"
-                aria-label={opt.label}
-              />
-              <div
-                className={cn(
-                  'relative h-6 w-11 rounded-pill transition-colors',
-                  settings[opt.key] ? 'bg-indigo' : 'bg-sunken',
-                )}
+              <div>
+                <p className="text-sm font-semibold text-ink">{opt.label}</p>
+                <p className="mt-0.5 text-xs text-ink-3">{opt.description}</p>
+              </div>
+              <label
+                className="inline-flex shrink-0 cursor-pointer items-center"
+                title={settings[opt.key] ? 'Aus' : 'An'}
               >
+                <input
+                  type="checkbox"
+                  checked={settings[opt.key]}
+                  onChange={() => toggleSetting(opt.key)}
+                  disabled={updateMutation.isPending}
+                  className="peer sr-only"
+                  aria-label={opt.label}
+                />
                 <div
                   className={cn(
-                    'absolute top-1 h-4 w-4 rounded-full bg-white transition-transform',
-                    settings[opt.key] ? 'translate-x-6' : 'translate-x-1',
+                    'relative h-6 w-11 rounded-pill transition-colors',
+                    settings[opt.key] ? 'bg-indigo' : 'bg-sunken',
+                    updateMutation.isPending && 'opacity-60',
                   )}
-                />
-              </div>
-            </label>
-          </div>
-        ))}
-      </div>
+                >
+                  <div
+                    className={cn(
+                      'absolute top-1 h-4 w-4 rounded-full bg-white transition-transform',
+                      settings[opt.key] ? 'translate-x-6' : 'translate-x-1',
+                    )}
+                  />
+                </div>
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

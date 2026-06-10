@@ -1,8 +1,11 @@
 // Orynthia – minimaler Service Worker.
-// Stale-while-revalidate für statische Assets, network-first für /api.
-const VERSION = 'v1';
+// Navigationen (HTML) network-first, gehashte Assets cache-first,
+// /api immer network-only.
+const VERSION = 'v2';
 const STATIC_CACHE = `orynthia-static-${VERSION}`;
-const STATIC_ASSETS = ['/', '/index.html', '/icon.svg', '/manifest.webmanifest'];
+// Nur unveränderliche Dateien vorab cachen – index.html ändert sich bei jedem
+// Deploy und würde cache-first auf gelöschte Asset-Hashes zeigen (weiße Seite).
+const STATIC_ASSETS = ['/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(STATIC_CACHE).then((c) => c.addAll(STATIC_ASSETS)).catch(() => undefined));
@@ -23,10 +26,28 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // API & gleichgelagerte dynamische Pfade: network-first, kein Cache.
+  // API & gleichgelagerte dynamische Pfade: network-only, kein Cache.
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return;
 
-  // Statische Assets: cache-first mit Hintergrund-Refresh.
+  // Navigationen: network-first, Cache nur als Offline-Fallback. So bekommt
+  // jeder Reload nach einem Deploy sofort das neue index.html.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async (cache) => {
+        try {
+          const res = await fetch(req);
+          if (res && res.status === 200) cache.put('/index.html', res.clone());
+          return res;
+        } catch {
+          const cached = await cache.match('/index.html');
+          return cached || Response.error();
+        }
+      }),
+    );
+    return;
+  }
+
+  // Statische Assets (gehashte Dateinamen): cache-first mit Hintergrund-Refresh.
   event.respondWith(
     caches.open(STATIC_CACHE).then(async (cache) => {
       const cached = await cache.match(req);

@@ -1,6 +1,8 @@
-import { IsUUID, IsNumber, IsOptional, IsEnum, IsBoolean, Min } from 'class-validator';
+import { IsUUID, IsNumber, IsOptional, IsEnum, IsBoolean, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { BudgetPeriod } from '@prisma/client';
+
+const MAX_AMOUNT = 999_999_999.99;
 
 export class CreateBudgetDto {
   @ApiProperty({ example: 'uuid-of-category' })
@@ -10,6 +12,7 @@ export class CreateBudgetDto {
   @ApiProperty({ example: 500 })
   @IsNumber()
   @Min(0.01)
+  @Max(MAX_AMOUNT)
   amount: number;
 
   @ApiProperty({ enum: BudgetPeriod, required: false, default: 'MONTHLY' })
@@ -23,6 +26,7 @@ export class UpdateBudgetDto {
   @IsOptional()
   @IsNumber()
   @Min(0.01)
+  @Max(MAX_AMOUNT)
   amount?: number;
 
   @ApiProperty({ enum: BudgetPeriod, required: false })

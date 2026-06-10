@@ -19,7 +19,7 @@
   --line: #e3e5ed;
   --line-2: #eef0f6;
   --text: #1d2138;
-  --text-2: #4a4f70;
+  --text-2: #3f4463;
   --text-3: #878f9d;
   --text-4: #aeb3c4;
   --primary: var(--indigo);
@@ -71,9 +71,14 @@
   --text-3: #8a8f9d;
   --text-4: #5b6075;
 
+  /* Statusfarben heller als im Light-Theme, sonst saufen sie auf dunklem Grund ab */
+  --pos: #34b27d;
   --pos-bg: #143226;
+  --neg: #ef6a6f;
   --neg-bg: #321719;
+  --warn: #e0a13d;
   --warn-bg: #332617;
+  --info: #5d96ef;
   --info-bg: #152744;
 
   --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
@@ -320,5 +325,17 @@
     font-style: italic;
     font-weight: 400;
     letter-spacing: -0.02em;
+  }
+}
+
+/* Nutzerpräferenz "reduzierte Bewegung" respektieren */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

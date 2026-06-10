@@ -10,17 +10,20 @@ export class CreateCategoryDto {
   @ApiProperty({ required: false, example: '🎯' })
   @IsOptional()
   @IsString()
+  @MaxLength(16)
   icon?: string;
 
   @ApiProperty({ required: false, example: '#8b5cf6' })
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   color?: string;
 
   @ApiProperty({ required: false, type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(100, { each: true })
   keywords?: string[];
 }
 
@@ -34,16 +37,19 @@ export class UpdateCategoryDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(16)
   icon?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   color?: string;
 
   @ApiProperty({ required: false, type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(100, { each: true })
   keywords?: string[];
 }

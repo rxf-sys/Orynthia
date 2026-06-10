@@ -38,4 +38,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 RUN npx prisma@5 generate
 EXPOSE 3000
+# Non-Root: App braucht nur Lesezugriff + Port 3000
+USER node
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
+  CMD wget -qO /dev/null http://127.0.0.1:3000/api/health || exit 1
 CMD ["sh", "-c", "npx prisma@5 migrate deploy && node dist/main.js"]

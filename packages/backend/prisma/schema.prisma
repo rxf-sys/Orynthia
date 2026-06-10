@@ -30,6 +30,9 @@ model User {
   passwordResetToken   String?   @map("password_reset_token")
   passwordResetExpires DateTime? @map("password_reset_expires")
 
+  // Einstellungen
+  notificationSettings Json? @map("notification_settings")
+
   // Status
   isActive       Boolean   @default(true) @map("is_active")
   isEmailVerified Boolean  @default(false) @map("is_email_verified")
@@ -160,7 +163,7 @@ model Transaction {
   recurringPaymentId String? @map("recurring_payment_id")
   
   // Externe Referenz
-  externalId      String?   @map("external_id") @unique
+  externalId      String?   @map("external_id")
   
   // Notizen
   notes           String?
@@ -175,6 +178,7 @@ model Transaction {
   category        Category?   @relation(fields: [categoryId], references: [id])
   recurringPayment RecurringPayment? @relation(fields: [recurringPaymentId], references: [id])
 
+  @@unique([bankAccountId, externalId])
   @@index([bankAccountId, date])
   @@index([categoryId])
   @@index([date])

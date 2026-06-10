@@ -3,7 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 const DEMO_EMAIL = 'demo@orynthia.local';
-const DEMO_PASSWORD = 'demo1234';
+// Überschreibbar via DEMO_PASSWORD, damit das Repo-Default nicht auf
+// erreichbaren Instanzen mit aktiviertem Seed verwendet wird.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo1234';
 
 @Injectable()
 export class DemoSeedService implements OnModuleInit {

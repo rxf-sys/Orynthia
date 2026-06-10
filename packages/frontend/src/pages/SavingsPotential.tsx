@@ -70,7 +70,7 @@ export function SavingsPotentialPage() {
                 {formatCurrency(data.subscriptions.total)}
               </div>
               <div className="mt-1 text-xs text-ink-3">
-                {data.subscriptions.count} {data.subscriptions.count === 1 ? 'Posten' : 'Posten'} / Monat
+                {data.subscriptions.count} {data.subscriptions.count === 1 ? 'Abo' : 'Abos'} / Monat
               </div>
             </Card>
             <Card>
@@ -160,7 +160,7 @@ export function SavingsPotentialPage() {
                   to="/contracts"
                   className="text-[0.85rem] font-semibold text-indigo hover:underline"
                 >
-                  Alle Verträge →
+                  Alle Verträge anzeigen
                 </Link>
               </div>
               <div className="space-y-2">
