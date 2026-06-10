@@ -16,7 +16,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[ErrorBoundary]', error, info.componentStack);
+    if (import.meta.env.DEV) {
+      console.error('[ErrorBoundary]', error, info.componentStack);
+    } else {
+      // In Prod nur die Message, kein voller Stack in der Konsole
+      console.error('[ErrorBoundary]', error.message);
+    }
   }
 
   private reset = () => {

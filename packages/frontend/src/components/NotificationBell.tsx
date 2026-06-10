@@ -104,6 +104,8 @@ export function NotificationBell() {
         <Bell className="h-4 w-4" />
         {unread > 0 && (
           <span
+            aria-live="polite"
+            aria-atomic="true"
             className="absolute -right-0.5 -top-0.5 grid min-h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[0.65rem] font-bold text-white"
             style={{ background: 'var(--neg)', boxShadow: '0 0 0 2px var(--bg-elev)' }}
           >

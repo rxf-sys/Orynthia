@@ -30,6 +30,7 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // httpOnly Cookies automatisch mitsenden
+  timeout: 30_000, // hängende Requests nicht unbegrenzt offen halten
 });
 
 // Response Interceptor: Token Refresh bei 401
@@ -65,7 +66,11 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
-        window.location.href = '/login';
+        // Kein harter window.location-Redirect: Auth-State zurücksetzen,
+        // die Route-Guards navigieren dann ohne Full-Reload (und ohne
+        // Mehrfach-Redirects bei parallelen 401ern).
+        const { useAuthStore } = await import('@/stores/authStore');
+        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

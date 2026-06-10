@@ -20,6 +20,12 @@ const sizes = {
   lg: 'max-w-3xl',
 };
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Zähler statt Flag: bei verschachtelten Modals darf das erste Schließen den
+// Body-Scroll nicht freigeben, solange noch ein Modal offen ist.
+let openModalCount = 0;
+
 export function Modal({
   open,
   onClose,
@@ -34,16 +40,49 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return;
+    // Fokus-Rückgabe: das Element merken, das das Modal geöffnet hat.
+    const trigger = document.activeElement as HTMLElement | null;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Fokus-Trap: Tab zykliert innerhalb des Dialogs.
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !dialogRef.current.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
+
     document.addEventListener('keydown', onKey);
+    openModalCount += 1;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    dialogRef.current?.focus();
+
+    // Erstes fokussierbares Element fokussieren, sonst den Dialog selbst.
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+    if (focusable && focusable.length > 0) focusable[0].focus();
+    else dialogRef.current?.focus();
+
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      openModalCount -= 1;
+      if (openModalCount === 0) document.body.style.overflow = prevOverflow;
+      trigger?.focus();
     };
   }, [open, onClose]);
 

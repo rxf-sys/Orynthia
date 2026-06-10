@@ -1,18 +1,23 @@
+import { useEffect } from 'react';
 import { Menu, Search, HelpCircle, Plus, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useThemeStore } from '@/stores/themeStore';
 import { cn } from '@/lib/utils';
 import { Btn, IconBtn } from './ui/Btn';
 import { NotificationBell } from './NotificationBell';
+import { CommandPalette, useCommandPalette } from './CommandPalette';
 
 const TITLE_MAP: Record<string, string> = {
   '/': 'Dashboard',
   '/transactions': 'Transaktionen',
   '/accounts': 'Konten',
   '/budgets': 'Budgets',
-  '/savings': 'Sparzielen',
-  '/contracts': 'Verträgen',
-  '/recurring': 'wiederkehrenden Zahlungen',
+  '/savings': 'Sparziele',
+  '/investments': 'Depot',
+  '/recurring': 'Wiederkehrende Zahlungen',
+  '/contracts': 'Verträge',
+  '/savings-potential': 'Sparpotenzial',
+  '/assistant': 'KI-Assistent',
   '/settings': 'Einstellungen',
 };
 
@@ -25,8 +30,14 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { pathname } = useLocation();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.set);
+  const { open, openPalette, closePalette } = useCommandPalette();
 
-  const placeholder = `In ${TITLE_MAP[pathname] || 'Orynthia'} suchen…`;
+  const pageTitle = TITLE_MAP[pathname];
+
+  // Tab-Titel pro Route – hilft bei History, Bookmarks und mehreren Tabs.
+  useEffect(() => {
+    document.title = pageTitle ? `${pageTitle} – Orynthia` : 'Orynthia';
+  }, [pageTitle]);
 
   return (
     <header
@@ -41,12 +52,22 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Search */}
-      <div className="hidden flex-1 items-center gap-2.5 rounded-pill border border-line bg-soft px-3.5 py-2 text-ink-3 md:flex md:max-w-[420px]">
+      {/* Befehlspalette: Navigation + Transaktionssuche */}
+      <button
+        onClick={openPalette}
+        className="hidden flex-1 items-center gap-2.5 rounded-pill border border-line bg-soft px-3.5 py-2 text-left text-ink-3 transition-colors hover:border-ink-4 md:flex md:max-w-[420px]"
+      >
         <Search className="h-4 w-4" />
-        <input className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-4" placeholder={placeholder} />
+        <span className="flex-1 text-sm text-ink-4">Suchen oder Seite öffnen…</span>
         <span className="rounded border border-line px-1.5 py-0.5 text-[0.7rem] text-ink-3">⌘K</span>
-      </div>
+      </button>
+      <IconBtn
+        icon={Search}
+        aria-label="Suche öffnen"
+        variant="ghost"
+        className="md:hidden"
+        onClick={openPalette}
+      />
 
       <div className="flex-1 md:flex-none" />
 
@@ -70,7 +91,13 @@ export function Header({ onMenuClick }: HeaderProps) {
         </button>
       </div>
 
-      <IconBtn icon={HelpCircle} aria-label="Hilfe" variant="ghost" className="hidden sm:grid" />
+      <IconBtn
+        icon={HelpCircle}
+        aria-label="Hilfe – KI-Assistent öffnen"
+        variant="ghost"
+        className="hidden sm:grid"
+        onClick={() => navigate('/assistant')}
+      />
       <NotificationBell />
 
       <Btn
@@ -82,6 +109,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       >
         Neu
       </Btn>
+
+      <CommandPalette open={open} onClose={closePalette} />
     </header>
   );
 }

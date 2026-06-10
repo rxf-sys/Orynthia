@@ -9,6 +9,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Große, selten geänderte Vendor-Pakete als eigene Chunks: bessere
+        // Cache-Trefferquote und kleineres Initial-Bundle (Recharts lädt nur
+        // auf Seiten mit Charts).
+        manualChunks: {
+          recharts: ['recharts'],
+          react: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     host: true,
