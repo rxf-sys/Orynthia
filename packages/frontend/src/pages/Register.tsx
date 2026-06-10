@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ShieldCheck, Lock, ServerCog } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Btn, Field } from '@/components/ui';
 
@@ -32,15 +33,16 @@ export function RegisterPage() {
       await register(form.email, form.password, form.firstName, form.lastName);
       toast.success('Konto erfolgreich erstellt!');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registrierung fehlgeschlagen';
-      const axiosMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(axiosMessage || message);
+      toast.error(parseApiError(err, 'Registrierung fehlgeschlagen'));
     } finally {
       setLoading(false);
     }
   };
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
+
+  const passwordMismatch =
+    form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
@@ -107,6 +109,7 @@ export function RegisterPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset disabled={loading} className="contents space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Vorname">
                 <input
@@ -115,6 +118,7 @@ export function RegisterPage() {
                   onChange={(e) => update('firstName', e.target.value)}
                   className="input"
                   placeholder="Max"
+                  autoComplete="given-name"
                 />
               </Field>
               <Field label="Nachname">
@@ -124,6 +128,7 @@ export function RegisterPage() {
                   onChange={(e) => update('lastName', e.target.value)}
                   className="input"
                   placeholder="Mustermann"
+                  autoComplete="family-name"
                 />
               </Field>
             </div>
@@ -135,29 +140,36 @@ export function RegisterPage() {
                 onChange={(e) => update('email', e.target.value)}
                 className="input"
                 placeholder="deine@email.de"
+                autoComplete="email"
                 required
               />
             </Field>
 
-            <Field label="Passwort" required hint="Mindestens 8 Zeichen, mit Zahlen und Sonderzeichen.">
+            <Field label="Passwort" required hint="Mindestens 8 Zeichen.">
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => update('password', e.target.value)}
                 className="input"
                 placeholder="••••••••"
+                autoComplete="new-password"
                 required
                 minLength={8}
               />
             </Field>
 
-            <Field label="Passwort bestätigen" required>
+            <Field
+              label="Passwort bestätigen"
+              required
+              error={passwordMismatch ? 'Passwörter stimmen nicht überein' : undefined}
+            >
               <input
                 type="password"
                 value={form.confirmPassword}
                 onChange={(e) => update('confirmPassword', e.target.value)}
                 className="input"
                 placeholder="Passwort wiederholen"
+                autoComplete="new-password"
                 required
               />
             </Field>
@@ -174,9 +186,15 @@ export function RegisterPage() {
               </span>
             </label>
 
-            <Btn type="submit" variant="grad" disabled={loading} className="w-full justify-center">
+            <Btn
+              type="submit"
+              variant="grad"
+              disabled={loading || passwordMismatch}
+              className="w-full justify-center"
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Konto erstellen'}
             </Btn>
+            </fieldset>
           </form>
 
           <p className="mt-5 text-center text-sm text-ink-3">

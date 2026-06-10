@@ -10,10 +10,11 @@ import {
   YAxis,
   ReferenceLine,
 } from 'recharts';
-import { TrendingDown, TrendingUp, Loader2, CalendarClock } from 'lucide-react';
+import { TrendingDown, TrendingUp, Loader2, CalendarClock, RefreshCw } from 'lucide-react';
 import { dashboardApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { Card } from './ui/Card';
+import { Btn } from './ui/Btn';
 
 const RANGES: { id: number; label: string }[] = [
   { id: 30, label: '30 Tage' },
@@ -24,7 +25,7 @@ const RANGES: { id: number; label: string }[] = [
 export function ForecastCard() {
   const [days, setDays] = useState(30);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['forecast', days],
     queryFn: () => dashboardApi.getForecast(days).then((r) => r.data),
     staleTime: 5 * 60_000,
@@ -59,7 +60,14 @@ export function ForecastCard() {
         </div>
       </div>
 
-      {isLoading || !data ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+          <p className="text-sm text-ink-3">Prognose konnte nicht geladen werden</p>
+          <Btn variant="ghost" size="sm" icon={RefreshCw} onClick={() => refetch()}>
+            Erneut versuchen
+          </Btn>
+        </div>
+      ) : isLoading || !data ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-indigo" />
         </div>

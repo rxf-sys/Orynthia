@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { investmentsApi } from '@/lib/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, parseDecimal } from '@/lib/utils';
 import type { CreateInvestmentData, InvestmentPosition, InvestmentType } from '@/lib/types';
 import { Card, Btn, Field, PageHead, EmptyState, Modal, useConfirm } from '@/components/ui';
 
@@ -28,11 +28,19 @@ const TYPE_LABELS: Record<InvestmentType, string> = {
 
 const TYPE_ORDER: InvestmentType[] = ['STOCK', 'ETF', 'FUND', 'CRYPTO', 'BOND', 'OTHER'];
 
+// Lokales Datum (YYYY-MM-DD) statt toISOString(), das je nach Zeitzone ±1 Tag abweicht.
+const todayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export function InvestmentsPage() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<InvestmentPosition | null>(null);
+  const [priceEdit, setPriceEdit] = useState<{ id: string; symbol: string; value: string } | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['investments'],
@@ -62,7 +70,12 @@ export function InvestmentsPage() {
 
   const priceMutation = useMutation({
     mutationFn: ({ id, price }: { id: string; price: number }) => investmentsApi.updatePrice(id, price),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['investments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      setPriceEdit(null);
+      setPriceError(null);
+    },
+    onError: () => toast.error('Fehler beim Aktualisieren'),
   });
 
   const deleteMutation = useMutation({
@@ -191,13 +204,13 @@ export function InvestmentsPage() {
                       key={p.id}
                       pos={p}
                       onEdit={() => setEditing(p)}
-                      onUpdatePrice={async () => {
-                        const current = p.currentPrice ?? p.averagePrice;
-                        const next = window.prompt(`Aktueller Kurs für ${p.symbol} (${p.currency}):`, String(current));
-                        if (!next) return;
-                        const num = Number(next.replace(',', '.'));
-                        if (!isFinite(num) || num < 0) return toast.error('Ungültiger Betrag');
-                        priceMutation.mutate({ id: p.id, price: num });
+                      onUpdatePrice={() => {
+                        setPriceError(null);
+                        setPriceEdit({
+                          id: p.id,
+                          symbol: p.symbol,
+                          value: String(p.currentPrice ?? p.averagePrice),
+                        });
                       }}
                       onDelete={async () => {
                         const ok = await confirm({
@@ -224,6 +237,51 @@ export function InvestmentsPage() {
           onSubmit={(d) => updateMutation.mutate({ id: editing.id, data: d })}
           isPending={updateMutation.isPending}
         />
+      )}
+
+      {priceEdit && (
+        <Modal
+          open
+          onClose={() => setPriceEdit(null)}
+          title="Kurs aktualisieren"
+          description={priceEdit.symbol}
+          size="sm"
+          footer={
+            <>
+              <Btn variant="ghost" onClick={() => setPriceEdit(null)} disabled={priceMutation.isPending}>
+                Abbrechen
+              </Btn>
+              <Btn
+                variant="grad"
+                disabled={priceMutation.isPending}
+                onClick={() => {
+                  const num = parseDecimal(priceEdit.value);
+                  if (num === null || num <= 0) {
+                    setPriceError('Ungültiger Betrag');
+                    return;
+                  }
+                  priceMutation.mutate({ id: priceEdit.id, price: num });
+                }}
+              >
+                {priceMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
+              </Btn>
+            </>
+          }
+        >
+          <Field label="Aktueller Kurs" required error={priceError}>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={priceEdit.value}
+              onChange={(e) => {
+                setPriceEdit({ ...priceEdit, value: e.target.value });
+                setPriceError(null);
+              }}
+              className="input tnum"
+              autoFocus
+            />
+          </Field>
+        </Modal>
       )}
     </div>
   );
@@ -315,7 +373,7 @@ function PositionForm({
     averagePrice: '',
     currentPrice: '',
     currency: 'EUR',
-    purchaseDate: new Date().toISOString().slice(0, 10),
+    purchaseDate: todayLocal(),
     notes: '',
   });
 
@@ -328,13 +386,17 @@ function PositionForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const q = Number(form.quantity);
+          const symbol = form.symbol.trim();
+          const name = form.name.trim();
+          if (!symbol) return toast.error('Bitte Symbol angeben');
+          if (!name) return toast.error('Bitte Bezeichnung angeben');
+          const q = parseDecimal(form.quantity);
           const avg = Number(form.averagePrice);
-          if (!isFinite(q) || q <= 0) return toast.error('Stückzahl > 0 nötig');
+          if (q === null || q <= 0) return toast.error('Stückzahl > 0 nötig');
           if (!isFinite(avg) || avg < 0) return toast.error('Kaufpreis muss ≥ 0 sein');
           onSubmit({
-            symbol: form.symbol.trim(),
-            name: form.name.trim(),
+            symbol,
+            name,
             type: form.type,
             quantity: q,
             averagePrice: avg,
@@ -346,6 +408,7 @@ function PositionForm({
         }}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
+        <fieldset disabled={isPending} className="contents">
         <Field label="Symbol / Ticker" required>
           <input
             value={form.symbol}
@@ -379,12 +442,11 @@ function PositionForm({
         </Field>
         <Field label="Stückzahl" required>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={form.quantity}
             onChange={(e) => setForm({ ...form, quantity: e.target.value })}
             className="input tnum"
-            step="0.00000001"
-            min="0.00000001"
             required
           />
         </Field>
@@ -436,6 +498,7 @@ function PositionForm({
             Schließen
           </Btn>
         </div>
+        </fieldset>
       </form>
     </Card>
   );
@@ -477,9 +540,9 @@ function EditPositionModal({
             variant="grad"
             disabled={isPending}
             onClick={() => {
-              const q = Number(form.quantity);
+              const q = parseDecimal(form.quantity);
               const avg = Number(form.averagePrice);
-              if (!isFinite(q) || q <= 0) return toast.error('Stückzahl > 0 nötig');
+              if (q === null || q <= 0) return toast.error('Stückzahl > 0 nötig');
               onSubmit({
                 name: form.name,
                 type: form.type,
@@ -519,12 +582,11 @@ function EditPositionModal({
         </Field>
         <Field label="Stückzahl">
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={form.quantity}
             onChange={(e) => setForm({ ...form, quantity: e.target.value })}
             className="input tnum"
-            step="0.00000001"
-            min="0.00000001"
           />
         </Field>
         <Field label="Ø Kaufpreis">
@@ -558,6 +620,3 @@ function EditPositionModal({
     </Modal>
   );
 }
-
-// silence unused import
-void cn;

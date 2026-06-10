@@ -62,6 +62,7 @@ export function ContractsPage() {
     contractType: 'SUBSCRIPTION',
     billingCycle: 'MONTHLY',
   });
+  const [costErrors, setCostErrors] = useState<{ monthlyCost?: string; yearlyCost?: string }>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ['contracts'],
@@ -86,6 +87,7 @@ export function ContractsPage() {
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
       setShowForm(false);
       setForm({ name: '', provider: '', contractType: 'SUBSCRIPTION', billingCycle: 'MONTHLY' });
+      setCostErrors({});
       toast.success('Vertrag erstellt');
     },
     onError: () => toast.error('Fehler beim Erstellen'),
@@ -118,6 +120,9 @@ export function ContractsPage() {
   });
 
   const contracts = data?.contracts || [];
+  const marketDataAsOf = comparison
+    ? (comparison as typeof comparison & { marketDataAsOf?: string }).marketDataAsOf
+    : undefined;
 
   const grouped = new Map<string, Contract[]>();
   for (const c of contracts) {
@@ -204,10 +209,36 @@ export function ContractsPage() {
                 toast.error('Bitte Name, Anbieter und Typ ausfüllen');
                 return;
               }
-              createMutation.mutate(form as CreateContractData);
+              const errors: { monthlyCost?: string; yearlyCost?: string } = {};
+              if (form.monthlyCost !== undefined && form.monthlyCost < 0) {
+                errors.monthlyCost = 'Kosten dürfen nicht negativ sein';
+              }
+              if (form.yearlyCost !== undefined && form.yearlyCost < 0) {
+                errors.yearlyCost = 'Kosten dürfen nicht negativ sein';
+              }
+              setCostErrors(errors);
+              if (errors.monthlyCost || errors.yearlyCost) return;
+              // Leere Strings nie ans Backend senden (@IsDateString/@IsUUID lehnen sie ab).
+              const payload: CreateContractData = {
+                name: form.name,
+                provider: form.provider,
+                contractType: form.contractType,
+                monthlyCost: form.monthlyCost,
+                yearlyCost: form.yearlyCost,
+                billingCycle: form.billingCycle || undefined,
+                contractNumber: form.contractNumber || undefined,
+                noticePeriod: form.noticePeriod || undefined,
+                startDate: form.startDate || undefined,
+                endDate: form.endDate || undefined,
+                cancellationDate: form.cancellationDate || undefined,
+                counterpartName: form.counterpartName || undefined,
+                counterpartIban: form.counterpartIban || undefined,
+              };
+              createMutation.mutate(payload);
             }}
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
+            <fieldset disabled={createMutation.isPending} className="contents">
             <Field label="Vertragsname" required>
               <input
                 value={form.name || ''}
@@ -240,21 +271,27 @@ export function ContractsPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Monatliche Kosten">
+            <Field label="Monatliche Kosten" error={costErrors.monthlyCost}>
               <input
                 type="number"
                 value={form.monthlyCost ?? ''}
-                onChange={(e) => setForm({ ...form, monthlyCost: Number(e.target.value) || undefined })}
+                onChange={(e) => {
+                  setForm({ ...form, monthlyCost: Number(e.target.value) || undefined });
+                  setCostErrors((prev) => ({ ...prev, monthlyCost: undefined }));
+                }}
                 className="input tnum"
                 placeholder="0,00"
                 step="0.01"
               />
             </Field>
-            <Field label="Jährliche Kosten">
+            <Field label="Jährliche Kosten" error={costErrors.yearlyCost}>
               <input
                 type="number"
                 value={form.yearlyCost ?? ''}
-                onChange={(e) => setForm({ ...form, yearlyCost: Number(e.target.value) || undefined })}
+                onChange={(e) => {
+                  setForm({ ...form, yearlyCost: Number(e.target.value) || undefined });
+                  setCostErrors((prev) => ({ ...prev, yearlyCost: undefined }));
+                }}
                 className="input tnum"
                 placeholder="0,00"
                 step="0.01"
@@ -302,6 +339,7 @@ export function ContractsPage() {
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Vertrag speichern'}
               </Btn>
             </div>
+            </fieldset>
           </form>
         </Card>
       )}
@@ -314,7 +352,7 @@ export function ContractsPage() {
           <EmptyState
             icon={<FileText className="h-10 w-10 text-ink-4" />}
             title="Noch keine Verträge erfasst"
-            sub="Nutze die Auto-Erkennung oder erfasse Verträge manuell."
+            sub="Klicke oben auf „Neuer Vertrag“, um einen Vertrag manuell anzulegen – oder lass die Auto-Erkennung wiederkehrende Zahlungen aus deinen Buchungen finden."
           />
         ) : (
           <div className="space-y-5">
@@ -599,6 +637,12 @@ export function ContractsPage() {
                   </Card>
                 );
               })}
+
+              {marketDataAsOf && (
+                <p className="text-right text-xs text-ink-4">
+                  Marktdaten: Stand {marketDataAsOf}
+                </p>
+              )}
             </>
           )}
         </div>

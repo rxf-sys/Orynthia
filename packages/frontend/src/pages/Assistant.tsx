@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Send, Sparkles, Loader2, User, Bot, AlertTriangle } from 'lucide-react';
 import { chatApi } from '@/lib/api';
 import { Card, Btn, PageHead, EmptyState } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { cn, parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 interface ChatMessage {
@@ -31,7 +31,7 @@ export function AssistantPage() {
   });
 
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'smooth' });
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: 'auto' });
   }, [messages, pending]);
 
   const send = async (raw?: string) => {
@@ -45,10 +45,7 @@ export function AssistantPage() {
       const res = await chatApi.send(next);
       setMessages([...next, { role: 'assistant', content: res.data.content }]);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Antwort konnte nicht geladen werden';
-      toast.error(msg);
+      toast.error(parseApiError(err, 'Antwort konnte nicht geladen werden'));
       setMessages(next.slice(0, -1));
       setInput(text);
     } finally {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2, ArrowLeft, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { parseApiError } from '@/lib/utils';
 import { Btn, Field } from '@/components/ui';
 
 export function ForgotPasswordPage() {
@@ -17,10 +18,7 @@ export function ForgotPasswordPage() {
       await api.post('/auth/forgot-password', { email });
       setDone(true);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Anfrage fehlgeschlagen';
-      toast.error(msg);
+      toast.error(parseApiError(err, 'Anfrage fehlgeschlagen'));
     } finally {
       setLoading(false);
     }
@@ -51,6 +49,7 @@ export function ForgotPasswordPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset disabled={loading} className="contents space-y-4">
             <Field label="E-Mail" required>
               <input
                 type="email"
@@ -58,6 +57,7 @@ export function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="input"
                 placeholder="deine@email.de"
+                autoComplete="email"
                 required
                 autoFocus
               />
@@ -65,6 +65,7 @@ export function ForgotPasswordPage() {
             <Btn type="submit" variant="grad" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset-Link senden'}
             </Btn>
+            </fieldset>
           </form>
         )}
       </div>

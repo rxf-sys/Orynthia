@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Calendar, Repeat } from 'lucide-react';
 import { recurringPaymentsApi, categoriesApi } from '@/lib/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, parseDecimal } from '@/lib/utils';
 import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, CategoryIcon, Tag, useConfirm } from '@/components/ui';
@@ -28,6 +28,7 @@ export function RecurringPaymentsPage() {
     categoryId: '',
     nextDueDate: '',
   });
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['recurring-payments'],
@@ -45,6 +46,7 @@ export function RecurringPaymentsPage() {
       queryClient.invalidateQueries({ queryKey: ['recurring-payments'] });
       setShowForm(false);
       setForm({ name: '', amount: '', frequency: 'MONTHLY', counterpartName: '', categoryId: '', nextDueDate: '' });
+      setAmountError(null);
       toast.success('Wiederkehrende Zahlung erstellt');
     },
     onError: () => toast.error('Fehler beim Erstellen'),
@@ -69,9 +71,13 @@ export function RecurringPaymentsPage() {
   const payments = data?.payments || [];
   const activePayments = payments.filter((p) => p.isActive);
   const inactivePayments = payments.filter((p) => !p.isActive);
-  const sorted = [...activePayments].sort((a, b) =>
-    (a.nextDueDate || '').localeCompare(b.nextDueDate || ''),
-  );
+  // Einträge ohne Fälligkeitsdatum ans Ende sortieren.
+  const sorted = [...activePayments].sort((a, b) => {
+    if (!a.nextDueDate && !b.nextDueDate) return 0;
+    if (!a.nextDueDate) return 1;
+    if (!b.nextDueDate) return -1;
+    return a.nextDueDate.localeCompare(b.nextDueDate);
+  });
   const biggest = activePayments.reduce<RecurringPayment | null>((max, p) => {
     if (!max) return p;
     return Math.abs(Number(p.amount)) > Math.abs(Number(max.amount)) ? p : max;
@@ -102,7 +108,7 @@ export function RecurringPaymentsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label="Pro Monat" value={formatCurrency(data?.monthlyTotal || 0)} />
         <KpiTile label="Pro Jahr" value={formatCurrency(data?.yearlyTotal || 0)} />
-        <KpiTile label="Diese Woche fällig" value={`${dueThisWeek.length}`} />
+        <KpiTile label="Nächste 7 Tage fällig" value={`${dueThisWeek.length}`} />
         <KpiTile label="Größte Position" value={biggest ? formatCurrency(Number(biggest.amount)) : '—'} />
       </div>
 
@@ -119,9 +125,9 @@ export function RecurringPaymentsPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const amount = Number(form.amount);
-              if (!amount) {
-                toast.error('Bitte Betrag eingeben');
+              const amount = parseDecimal(form.amount);
+              if (amount === null || !amount) {
+                setAmountError('Bitte gültigen Betrag eingeben');
                 return;
               }
               createMutation.mutate({
@@ -129,12 +135,14 @@ export function RecurringPaymentsPage() {
                 amount,
                 frequency: form.frequency as CreateRecurringPaymentData['frequency'],
                 counterpartName: form.counterpartName || undefined,
+                // Leere Strings nie ans Backend senden (@IsUUID/@IsDateString lehnen sie ab).
                 categoryId: form.categoryId || undefined,
                 nextDueDate: form.nextDueDate || undefined,
               });
             }}
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
+            <fieldset disabled={createMutation.isPending} className="contents">
             <Field label="Name" required>
               <input
                 value={form.name}
@@ -144,14 +152,17 @@ export function RecurringPaymentsPage() {
                 required
               />
             </Field>
-            <Field label="Betrag (negativ = Ausgabe)" required>
+            <Field label="Betrag (negativ = Ausgabe)" required error={amountError}>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, amount: e.target.value });
+                  setAmountError(null);
+                }}
                 className="input tnum"
                 placeholder="-12,99"
-                step="0.01"
                 required
               />
             </Field>
@@ -203,6 +214,7 @@ export function RecurringPaymentsPage() {
                 {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Erstellen'}
               </Btn>
             </div>
+            </fieldset>
           </form>
         </Card>
       )}
@@ -240,6 +252,7 @@ export function RecurringPaymentsPage() {
                 if (ok) deleteMutation.mutate(payment.id);
               }}
               onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: false })}
+              togglePending={toggleMutation.isPending}
             />
           ))}
           {inactivePayments.length > 0 && (
@@ -265,6 +278,7 @@ export function RecurringPaymentsPage() {
                       if (ok) deleteMutation.mutate(payment.id);
                     }}
                     onToggle={() => toggleMutation.mutate({ id: payment.id, isActive: true })}
+                    togglePending={toggleMutation.isPending}
                   />
                 </div>
               ))}
@@ -292,11 +306,13 @@ function PaymentRow({
   isLast,
   onDelete,
   onToggle,
+  togglePending,
 }: {
   payment: RecurringPayment;
   isLast?: boolean;
   onDelete: () => void;
   onToggle: () => void;
+  togglePending?: boolean;
 }) {
   const amount = Number(payment.amount);
   const isExpense = amount < 0;
@@ -346,6 +362,7 @@ function PaymentRow({
           type="checkbox"
           checked={payment.isActive}
           onChange={onToggle}
+          disabled={togglePending}
           className="peer sr-only"
           aria-label={payment.isActive ? 'Pausieren' : 'Aktivieren'}
         />
