@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
-import { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
+import { UpdateProfileDto, ChangePasswordDto, DeleteAccountDto } from './dto/user.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -30,7 +30,8 @@ export class UsersController {
   }
 
   @Delete('account')
-  async deleteAccount(@Req() req: Request) {
-    return this.usersService.deleteAccount(req.user!.id);
+  @ApiOperation({ summary: 'Konto endgültig löschen (erfordert Passwort-Bestätigung)' })
+  async deleteAccount(@Req() req: Request, @Body() dto: DeleteAccountDto) {
+    return this.usersService.deleteAccount(req.user!.id, dto.password);
   }
 }

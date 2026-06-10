@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BudgetPeriod } from '@prisma/client';
 
@@ -48,6 +48,11 @@ export class BudgetsService {
   }
 
   async create(userId: string, data: { categoryId: string; amount: number; period?: BudgetPeriod }) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: data.categoryId, OR: [{ userId }, { isSystem: true }] },
+    });
+    if (!category) throw new ForbiddenException('Kategorie nicht zugänglich');
+
     return this.prisma.budget.create({
       data: {
         userId,

@@ -38,8 +38,8 @@ async function bootstrap() {
 
   const port = process.env.APP_PORT || 3000;
 
-  // Swagger API Documentation (nur wenn SWAGGER_ENABLED=true)
-  if (process.env.SWAGGER_ENABLED === 'true') {
+  // Swagger API Documentation (nur wenn SWAGGER_ENABLED=true, nie in Production)
+  if (process.env.SWAGGER_ENABLED === 'true' && process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Orynthia API')
       .setDescription('Persönliche Finanzmanagement API')

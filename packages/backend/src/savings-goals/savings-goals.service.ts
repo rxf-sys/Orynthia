@@ -79,19 +79,37 @@ export class SavingsGoalsService {
     });
     if (!goal) throw new NotFoundException('Sparziel nicht gefunden');
 
-    const newAmount = Number(goal.currentAmount) + amount;
-    if (newAmount < 0) throw new BadRequestException('Betrag kann nicht negativ werden');
+    if (Number(goal.currentAmount) + amount < 0) {
+      throw new BadRequestException('Betrag kann nicht negativ werden');
+    }
 
-    const isCompleted = newAmount >= Number(goal.targetAmount);
-
-    return this.prisma.savingsGoal.update({
+    // Atomares Inkrement statt Read-Modify-Write: parallele Einzahlungen
+    // (Doppel-Klick, Auto-Sparplan) dürfen sich nicht gegenseitig überschreiben.
+    const updated = await this.prisma.savingsGoal.update({
       where: { id },
-      data: {
-        currentAmount: newAmount,
-        isCompleted,
-        completedAt: isCompleted && !goal.isCompleted ? new Date() : goal.completedAt,
-      },
+      data: { currentAmount: { increment: amount } },
     });
+
+    if (Number(updated.currentAmount) < 0) {
+      // Negativ-Guard gegen Race zwischen Vorab-Check und Inkrement: zurückrollen.
+      await this.prisma.savingsGoal.update({
+        where: { id },
+        data: { currentAmount: { decrement: amount } },
+      });
+      throw new BadRequestException('Betrag kann nicht negativ werden');
+    }
+
+    const isCompleted = Number(updated.currentAmount) >= Number(updated.targetAmount);
+    if (isCompleted !== updated.isCompleted) {
+      return this.prisma.savingsGoal.update({
+        where: { id },
+        data: {
+          isCompleted,
+          completedAt: isCompleted ? new Date() : null,
+        },
+      });
+    }
+    return updated;
   }
 
   async remove(userId: string, id: string) {

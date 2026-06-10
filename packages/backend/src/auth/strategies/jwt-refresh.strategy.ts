@@ -8,11 +8,10 @@ import { Request } from 'express';
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(config: ConfigService) {
     super({
+      // Ausschließlich aus dem httpOnly-Cookie: ein Body-Fallback würde das
+      // Cookie-only-Design unterlaufen (exfiltrierte Tokens wären replaybar).
       jwtFromRequest: ExtractJwt.fromExtractors([
-        // 1. Aus httpOnly Cookie lesen
         (req: Request) => req?.cookies?.refreshToken || null,
-        // 2. Fallback: aus Body lesen
-        ExtractJwt.fromBodyField('refreshToken'),
       ]),
       ignoreExpiration: false,
       secretOrKey: config.get('JWT_REFRESH_SECRET'),
@@ -21,7 +20,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
   }
 
   async validate(req: Request, payload: { sub: string; email: string }) {
-    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     return { ...payload, refreshToken };
   }
 }

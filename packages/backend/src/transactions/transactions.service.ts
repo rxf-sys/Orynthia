@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
 import { Prisma } from '@prisma/client';
@@ -6,6 +6,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -14,6 +16,7 @@ export class TransactionsService {
   async create(userId: string, dto: CreateTransactionDto) {
     // Prüfe ob Konto dem User gehört
     await this.verifyAccountOwnership(userId, dto.bankAccountId);
+    if (dto.categoryId) await this.verifyCategoryAccess(userId, dto.categoryId);
 
     // Auto-Kategorisierung wenn keine Kategorie angegeben
     let categoryId = dto.categoryId;
@@ -46,7 +49,10 @@ export class TransactionsService {
         counterpartName: tx.counterpartName,
         purpose: tx.purpose,
       })
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Benachrichtigung für große Buchung fehlgeschlagen: ${reason}`);
+      });
 
     return tx;
   }
@@ -119,6 +125,7 @@ export class TransactionsService {
 
   async update(userId: string, id: string, dto: UpdateTransactionDto) {
     await this.findById(userId, id); // Ownership check
+    if (dto.categoryId) await this.verifyCategoryAccess(userId, dto.categoryId);
 
     const { date, ...rest } = dto;
     const data: Prisma.TransactionUpdateInput = {
@@ -248,6 +255,13 @@ export class TransactionsService {
       where: { id: accountId, userId },
     });
     if (!account) throw new ForbiddenException('Konto gehört nicht diesem Benutzer');
+  }
+
+  private async verifyCategoryAccess(userId: string, categoryId: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: categoryId, OR: [{ userId }, { isSystem: true }] },
+    });
+    if (!category) throw new ForbiddenException('Kategorie nicht zugänglich');
   }
 
   private async autoCategorize(userId: string, counterpartName: string, purpose?: string): Promise<string | undefined> {

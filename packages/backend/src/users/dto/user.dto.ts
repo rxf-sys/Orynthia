@@ -23,5 +23,13 @@ export class ChangePasswordDto {
   @ApiProperty({ example: 'neuesPW456' })
   @IsString()
   @MinLength(8)
+  @MaxLength(128)
   newPassword: string;
+}
+
+export class DeleteAccountDto {
+  @ApiProperty({ description: 'Aktuelles Passwort zur Bestätigung der Kontolöschung' })
+  @IsString()
+  @MaxLength(128)
+  password: string;
 }
