@@ -17,34 +17,43 @@ export class BudgetsService {
 
     const now = new Date();
 
-    // Pro Budget die Ausgaben für die jeweilige Periode berechnen
-    const results = await Promise.all(
-      budgets.map(async (budget) => {
-        const { start, end } = this.getPeriodRange(budget.period, now);
-        const spent = await this.prisma.transaction.aggregate({
+    // Eine Aggregation pro Periodentyp statt pro Budget (vermeidet N+1-Queries)
+    const periods = [...new Set(budgets.map((b) => b.period))];
+    const spentByPeriodCategory = new Map<string, number>();
+
+    await Promise.all(
+      periods.map(async (period) => {
+        const { start, end } = this.getPeriodRange(period, now);
+        const grouped = await this.prisma.transaction.groupBy({
+          by: ['categoryId'],
           where: {
             bankAccount: { userId },
-            categoryId: budget.categoryId,
+            categoryId: { in: budgets.filter((b) => b.period === period).map((b) => b.categoryId) },
             amount: { lt: 0 },
             date: { gte: start, lte: end },
           },
           _sum: { amount: true },
         });
-
-        const spentAmount = Math.abs(Number(spent._sum.amount || 0));
-        const budgetAmount = Number(budget.amount);
-
-        return {
-          ...budget,
-          amount: budgetAmount,
-          spent: spentAmount,
-          remaining: budgetAmount - spentAmount,
-          percentage: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0,
-        };
+        for (const g of grouped) {
+          if (g.categoryId) {
+            spentByPeriodCategory.set(`${period}:${g.categoryId}`, Math.abs(Number(g._sum.amount || 0)));
+          }
+        }
       }),
     );
 
-    return results;
+    return budgets.map((budget) => {
+      const spentAmount = spentByPeriodCategory.get(`${budget.period}:${budget.categoryId}`) ?? 0;
+      const budgetAmount = Number(budget.amount);
+
+      return {
+        ...budget,
+        amount: budgetAmount,
+        spent: spentAmount,
+        remaining: budgetAmount - spentAmount,
+        percentage: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0,
+      };
+    });
   }
 
   async create(userId: string, data: { categoryId: string; amount: number; period?: BudgetPeriod }) {

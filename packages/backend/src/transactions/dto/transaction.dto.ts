@@ -1,7 +1,10 @@
-import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, IsArray, IsUUID } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, IsArray, IsUUID, Min, Max, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { TransactionType } from '@prisma/client';
 import { Type } from 'class-transformer';
+
+// Obergrenze der DB-Spalte Decimal(12,2)
+const MAX_AMOUNT = 999_999_999.99;
 
 export class CreateTransactionDto {
   @ApiProperty()
@@ -10,6 +13,8 @@ export class CreateTransactionDto {
 
   @ApiProperty()
   @IsNumber()
+  @Min(-MAX_AMOUNT)
+  @Max(MAX_AMOUNT)
   amount: number;
 
   @ApiProperty()
@@ -19,16 +24,19 @@ export class CreateTransactionDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   purpose?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   counterpartName?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(34)
   counterpartIban?: string;
 
   @ApiProperty({ required: false })
@@ -44,18 +52,22 @@ export class CreateTransactionDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @ApiProperty({ required: false, type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   tags?: string[];
 }
 
 export class UpdateTransactionDto {
   @IsOptional()
   @IsNumber()
+  @Min(-MAX_AMOUNT)
+  @Max(MAX_AMOUNT)
   amount?: number;
 
   @IsOptional()
@@ -64,14 +76,17 @@ export class UpdateTransactionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   purpose?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   counterpartName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(34)
   counterpartIban?: string;
 
   @IsOptional()
@@ -80,11 +95,13 @@ export class UpdateTransactionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   tags?: string[];
 
   @IsOptional()
@@ -115,15 +132,19 @@ export class TransactionFilterDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   search?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(1)
   page?: number = 1;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(1)
+  @Max(100)
   limit?: number = 50;
 }

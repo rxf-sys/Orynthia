@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PaymentFrequency } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRecurringPaymentDto, UpdateRecurringPaymentDto } from './dto/recurring-payment.dto';
@@ -8,6 +8,7 @@ export class RecurringPaymentsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, dto: CreateRecurringPaymentDto) {
+    if (dto.categoryId) await this.verifyCategoryAccess(userId, dto.categoryId);
     return this.prisma.recurringPayment.create({
       data: {
         userId,
@@ -55,6 +56,7 @@ export class RecurringPaymentsService {
       where: { id, userId },
     });
     if (!payment) throw new NotFoundException('Wiederkehrende Zahlung nicht gefunden');
+    if (dto.categoryId) await this.verifyCategoryAccess(userId, dto.categoryId);
 
     return this.prisma.recurringPayment.update({
       where: { id },
@@ -79,5 +81,12 @@ export class RecurringPaymentsService {
 
     await this.prisma.recurringPayment.delete({ where: { id } });
     return { message: 'Wiederkehrende Zahlung gelöscht' };
+  }
+
+  private async verifyCategoryAccess(userId: string, categoryId: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: categoryId, OR: [{ userId }, { isSystem: true }] },
+    });
+    if (!category) throw new ForbiddenException('Kategorie nicht zugänglich');
   }
 }

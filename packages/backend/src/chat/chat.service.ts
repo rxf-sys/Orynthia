@@ -26,12 +26,13 @@ Antworte nicht auf Themen außerhalb persönlicher Finanzen – lenke dann freun
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private client: Anthropic | null = null;
-  private readonly model = 'claude-opus-4-7';
+  private readonly model: string;
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
+    this.model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-opus-4-8';
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (apiKey && apiKey.trim().length > 0) {
       this.client = new Anthropic({ apiKey });
@@ -93,6 +94,11 @@ export class ChatService {
       );
     }
 
+    this.logger.log(
+      `Chat-Usage user=${userId}: in=${response.usage.input_tokens} out=${response.usage.output_tokens} ` +
+        `cacheRead=${response.usage.cache_read_input_tokens ?? 0} cacheWrite=${response.usage.cache_creation_input_tokens ?? 0}`,
+    );
+
     const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
     return {
       role: 'assistant' as const,
@@ -116,10 +122,12 @@ export class ChatService {
         this.prisma.bankAccount.findMany({
           where: { userId, isActive: true },
           select: { bankName: true, accountName: true, accountType: true, balance: true },
+          take: 20,
         }),
         this.prisma.budget.findMany({
           where: { userId, isActive: true },
           include: { category: { select: { name: true } } },
+          take: 25,
         }),
         this.prisma.transaction.findMany({
           where: { bankAccount: { userId } },
@@ -145,14 +153,17 @@ export class ChatService {
         this.prisma.recurringPayment.findMany({
           where: { userId, isActive: true },
           select: { name: true, amount: true, frequency: true, nextDueDate: true },
+          take: 30,
         }),
         this.prisma.contract.findMany({
           where: { userId, isActive: true },
           select: { name: true, provider: true, monthlyCost: true, billingCycle: true },
+          take: 30,
         }),
         this.prisma.savingsGoal.findMany({
           where: { userId, isCompleted: false },
           select: { name: true, targetAmount: true, currentAmount: true, deadline: true },
+          take: 20,
         }),
       ]);
 

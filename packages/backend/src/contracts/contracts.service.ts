@@ -6,6 +6,10 @@ import { CreateContractDto, UpdateContractDto } from './dto/contract.dto';
 
 // Durchschnittliche Marktpreise Deutschland (Stand 2025/2026)
 // Quelle: Check24, Verivox, Stiftung Warentest Durchschnittswerte
+// Stichtag der hinterlegten Durchschnittswerte – beim Aktualisieren mitziehen,
+// damit das Frontend veraltete Vergleiche kennzeichnen kann.
+const MARKET_DATA_AS_OF = '2025-12';
+
 const MARKET_AVERAGES: Record<string, { avgMonthly: number; avgYearly: number; unit?: string; tips: string[]; compareUrls: string[] }> = {
   INSURANCE_LIABILITY: {
     avgMonthly: 5,
@@ -402,6 +406,7 @@ export class ContractsService {
       comparisons,
       totalSavingsMonthly: Math.round(totalSavingsMonthly * 100) / 100,
       totalSavingsYearly: Math.round(totalSavingsYearly * 100) / 100,
+      marketDataAsOf: MARKET_DATA_AS_OF,
     };
   }
 

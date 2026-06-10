@@ -119,7 +119,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-orynthia}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt – bitte .env aus .env.example anlegen}@postgres:5432/${POSTGRES_DB:-orynthia}?schema=public
     ports:
-      - "5555:5555"
+      # Studio hat keine Auth – nur lokal binden
+      - "127.0.0.1:5555:5555"
     command:
       - sh
       - -c

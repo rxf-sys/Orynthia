@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -32,4 +32,36 @@ export class DeleteAccountDto {
   @IsString()
   @MaxLength(128)
   password: string;
+}
+
+export class NotificationSettingsDto {
+  @ApiProperty({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  budgetWarnings?: boolean;
+
+  @ApiProperty({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  newTransactions?: boolean;
+
+  @ApiProperty({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  weeklyReport?: boolean;
+
+  @ApiProperty({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  monthlyReport?: boolean;
+
+  @ApiProperty({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  unusualActivity?: boolean;
+
+  @ApiProperty({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  savingsGoals?: boolean;
 }
