@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Delete, Param, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
@@ -28,8 +28,8 @@ export class AuthController {
   @Post('register')
   @Throttle({ short: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Neuen Benutzer registrieren' })
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    const tokens = await this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const tokens = await this.authService.register(dto, req.headers['user-agent']);
     this.setTokenCookies(res, tokens);
     return { message: 'Registrierung erfolgreich', expiresIn: tokens.expiresIn };
   }
@@ -38,8 +38,8 @@ export class AuthController {
   @Throttle({ short: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Anmelden' })
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const tokens = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const tokens = await this.authService.login(dto, req.headers['user-agent']);
     this.setTokenCookies(res, tokens);
     return { message: 'Anmeldung erfolgreich', expiresIn: tokens.expiresIn };
   }
@@ -71,9 +71,39 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Abmelden' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    await this.authService.logout(req.user!.id);
+    // Nur die eigene Session (dieses Gerät) beenden — andere Geräte bleiben angemeldet
+    await this.authService.logout(req.user!.id, req.user!.sessionId);
     this.clearTokenCookies(res);
     return { message: 'Erfolgreich abgemeldet' };
+  }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Alle Sessions (Geräte) abmelden' })
+  async logoutAll(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logoutAll(req.user!.id);
+    this.clearTokenCookies(res);
+    return { message: 'Alle Sitzungen abgemeldet' };
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Aktive Sessions (Geräte) auflisten' })
+  async listSessions(@Req() req: Request) {
+    return this.authService.listSessions(req.user!.id, req.user!.sessionId);
+  }
+
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Eine bestimmte Session gezielt beenden' })
+  async revokeSession(@Req() req: Request, @Param('id') id: string) {
+    await this.authService.revokeSession(req.user!.id, id);
+    return { message: 'Session beendet' };
   }
 
   @Get('2fa/generate')

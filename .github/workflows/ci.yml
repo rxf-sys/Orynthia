@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Überholte Läufe desselben Branches abbrechen (spart Runner-Minuten)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
@@ -26,7 +31,8 @@ jobs:
         run: cd packages/backend && npx prisma generate
 
       - name: Lint Backend
-        run: cd packages/backend && pnpm lint
+        # bewusst ohne das --fix aus dem lint-Script — CI prüft nur, ändert nichts
+        run: cd packages/backend && pnpm exec eslint "{src,test}/**/*.ts"
 
       - name: Lint Frontend
         run: cd packages/frontend && pnpm lint

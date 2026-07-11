@@ -61,8 +61,10 @@ export class UsersService {
       where: { id: userId },
       // Refresh-Token mit invalidieren: ein kompromittierter Token darf den
       // Passwortwechsel nicht überleben (konsistent mit resetPassword).
-      data: { passwordHash, refreshToken: null },
+      data: { passwordHash },
     });
+    // Passwortwechsel beendet alle Sessions (Multi-Device-Logout)
+    await this.prisma.userSession.deleteMany({ where: { userId } });
 
     return { message: 'Passwort erfolgreich geändert' };
   }

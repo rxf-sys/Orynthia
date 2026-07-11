@@ -13,6 +13,9 @@ describe('UsersService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    userSession: {
+      deleteMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -25,18 +28,17 @@ describe('UsersService', () => {
   });
 
   describe('changePassword', () => {
-    it('invalidates the stored refresh token together with the password change', async () => {
+    it('beendet alle Sessions zusammen mit der Passwort-Änderung', async () => {
       const passwordHash = await bcrypt.hash('altesPasswort1', 4);
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', passwordHash });
       mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.userSession.deleteMany.mockResolvedValue({ count: 2 });
 
       await service.changePassword('u1', 'altesPasswort1', 'neuesPasswort1');
 
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ refreshToken: null }),
-        }),
-      );
+      expect(mockPrisma.userSession.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+      });
     });
 
     it('rejects a wrong current password', async () => {

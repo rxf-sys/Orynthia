@@ -1,6 +1,6 @@
 export const CATEGORY_PALETTE = [
-  '#424769',
-  '#ffb17a',
+  '#37415c',
+  '#fda481',
   '#5b8def',
   '#1f8a5b',
   '#b97aff',

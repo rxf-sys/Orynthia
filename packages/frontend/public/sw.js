@@ -1,7 +1,8 @@
 // Orynthia – minimaler Service Worker.
 // Navigationen (HTML) network-first, gehashte Assets cache-first,
 // /api immer network-only.
-const VERSION = 'v2';
+// v3: Rebrand auf die „Uxintace sunset"-Palette — precached icon.svg/manifest geändert
+const VERSION = 'v3';
 const STATIC_CACHE = `orynthia-static-${VERSION}`;
 // Nur unveränderliche Dateien vorab cachen – index.html ändert sich bei jedem
 // Deploy und würde cache-first auf gelöschte Asset-Hashes zeigen (weiße Seite).

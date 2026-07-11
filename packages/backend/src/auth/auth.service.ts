@@ -12,6 +12,8 @@ import { RegisterDto, LoginDto, TokenResponseDto } from './dto/auth.dto';
 import { encrypt, decrypt, isEncrypted } from '../common/crypto/encryption';
 
 const PASSWORD_RESET_TTL_MIN = 60;
+const REFRESH_TTL_DAYS = 7;
+const MAX_SESSIONS_PER_USER = 10;
 
 @Injectable()
 export class AuthService {
@@ -24,7 +26,7 @@ export class AuthService {
     private mail: MailService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<TokenResponseDto> {
+  async register(dto: RegisterDto, userAgent?: string): Promise<TokenResponseDto> {
     // Prüfe ob E-Mail schon existiert
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
@@ -37,15 +39,25 @@ export class AuthService {
     // Passwort hashen
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    // User erstellen
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email.toLowerCase(),
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-      },
-    });
+    // User erstellen. Der Unique-Constraint fängt die Race zwischen dem
+    // findUnique-Check oben und diesem Insert ab (parallele Doppel-Registrierung)
+    // — P2002 wird als sauberer 409 statt als 500 gemeldet.
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email.toLowerCase(),
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+        },
+      });
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+        throw new ConflictException('E-Mail-Adresse bereits registriert');
+      }
+      throw err;
+    }
 
     // System-Kategorien für User kopieren (Batch-Insert)
     const systemCategories = await this.prisma.category.findMany({
@@ -65,10 +77,10 @@ export class AuthService {
       });
     }
 
-    return this.generateTokens(user.id, user.email);
+    return this.issueTokens(user.id, user.email, undefined, userAgent);
   }
 
-  async login(dto: LoginDto): Promise<TokenResponseDto> {
+  async login(dto: LoginDto, userAgent?: string): Promise<TokenResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -102,40 +114,72 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return this.generateTokens(user.id, user.email);
+    return this.issueTokens(user.id, user.email, undefined, userAgent);
   }
 
-  async refreshTokens(userId: string, refreshToken: string): Promise<TokenResponseDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !user.refreshToken) {
+  async refreshTokens(userId: string, sessionId: string, refreshToken: string): Promise<TokenResponseDto> {
+    const session = await this.prisma.userSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.userId !== userId || session.expiresAt <= new Date()) {
       throw new UnauthorizedException('Zugang verweigert');
     }
 
-    const tokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
+    const tokenValid = await bcrypt.compare(refreshToken, session.tokenHash);
     if (!tokenValid) {
+      // Hash passt nicht zur Session: entweder Replay eines alten (rotierten)
+      // Tokens oder Diebstahl — die Session wird vorsorglich beendet.
+      await this.prisma.userSession.delete({ where: { id: sessionId } }).catch(() => undefined);
       throw new UnauthorizedException('Ungültiger Refresh Token');
     }
 
-    return this.generateTokens(user.id, user.email);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Zugang verweigert');
+    }
+
+    // Rotation innerhalb derselben Session: neuer Token, gleiche Session-ID
+    return this.issueTokens(user.id, user.email, sessionId);
   }
 
   async refreshFromCookie(refreshToken: string): Promise<TokenResponseDto> {
-    // Refresh Token verifizieren und User-ID extrahieren
-    const payload = await this.jwtService.verifyAsync(refreshToken, {
+    // Refresh Token verifizieren und User-/Session-ID extrahieren
+    const payload = await this.jwtService.verifyAsync<{ sub: string; sid?: string }>(refreshToken, {
       secret: this.config.get('JWT_REFRESH_SECRET'),
     });
+    if (!payload.sid) {
+      // Alt-Token aus der Zeit vor den Multi-Device-Sessions
+      throw new UnauthorizedException('Sitzung abgelaufen — bitte neu anmelden.');
+    }
 
-    return this.refreshTokens(payload.sub, refreshToken);
+    return this.refreshTokens(payload.sub, payload.sid, refreshToken);
   }
 
-  async logout(userId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: null },
+  /** Meldet genau eine Session (Gerät) ab; ohne sessionId alle Sessions. */
+  async logout(userId: string, sessionId?: string | null): Promise<void> {
+    await this.prisma.userSession.deleteMany({
+      where: sessionId ? { id: sessionId, userId } : { userId },
     });
+  }
+
+  async logoutAll(userId: string): Promise<void> {
+    await this.prisma.userSession.deleteMany({ where: { userId } });
+  }
+
+  /** Aktive Sessions des Users (für die Geräteliste in den Einstellungen). */
+  async listSessions(userId: string, currentSessionId?: string | null) {
+    const sessions = await this.prisma.userSession.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      orderBy: { lastUsedAt: 'desc' },
+      select: { id: true, userAgent: true, createdAt: true, lastUsedAt: true },
+    });
+    return sessions.map((s) => ({ ...s, current: s.id === currentSessionId }));
+  }
+
+  /** Beendet gezielt eine fremde Session des Users (z. B. verlorenes Gerät). */
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    const result = await this.prisma.userSession.deleteMany({
+      where: { id: sessionId, userId },
+    });
+    if (result.count === 0) throw new BadRequestException('Session nicht gefunden');
   }
 
   async generate2FASecret(userId: string) {
@@ -252,9 +296,11 @@ export class AuthService {
         passwordHash,
         passwordResetToken: null,
         passwordResetExpires: null,
-        refreshToken: null,
       },
     });
+    // Alle Geräte abmelden — ein Angreifer mit gestohlenem Refresh-Token
+    // darf die Passwort-Änderung nicht überleben.
+    await this.prisma.userSession.deleteMany({ where: { userId: user.id } });
   }
 
   /**
@@ -271,6 +317,12 @@ export class AuthService {
       });
       if (result.count > 0) {
         this.logger.log(`Abgelaufene Passwort-Reset-Tokens bereinigt: ${result.count}`);
+      }
+      const sessions = await this.prisma.userSession.deleteMany({
+        where: { expiresAt: { lt: new Date() } },
+      });
+      if (sessions.count > 0) {
+        this.logger.log(`Abgelaufene Sessions bereinigt: ${sessions.count}`);
       }
     } catch (err: unknown) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -308,8 +360,19 @@ export class AuthService {
     return stored;
   }
 
-  private async generateTokens(userId: string, email: string): Promise<TokenResponseDto> {
-    const payload = { sub: userId, email };
+  /**
+   * Erzeugt ein Token-Paar. Ohne `existingSessionId` wird eine neue Session
+   * angelegt (Login/Registrierung auf einem weiteren Gerät), mit
+   * `existingSessionId` rotiert der Refresh-Token innerhalb der Session.
+   */
+  private async issueTokens(
+    userId: string,
+    email: string,
+    existingSessionId?: string,
+    userAgent?: string,
+  ): Promise<TokenResponseDto> {
+    const sessionId = existingSessionId ?? crypto.randomUUID();
+    const payload = { sub: userId, email, sid: sessionId };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -322,17 +385,47 @@ export class AuthService {
       }),
     ]);
 
-    // Refresh Token gehasht speichern
-    const hashedRefresh = await bcrypt.hash(refreshToken, 10);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: hashedRefresh },
-    });
+    // Refresh Token nur als bcrypt-Hash persistieren
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 86_400_000);
+
+    if (existingSessionId) {
+      await this.prisma.userSession.update({
+        where: { id: sessionId },
+        data: { tokenHash, lastUsedAt: new Date(), expiresAt },
+      });
+    } else {
+      await this.prisma.userSession.create({
+        data: {
+          id: sessionId,
+          userId,
+          tokenHash,
+          userAgent: userAgent ? userAgent.slice(0, 255) : null,
+          expiresAt,
+        },
+      });
+      await this.enforceSessionLimit(userId);
+    }
 
     return {
       accessToken,
       refreshToken,
       expiresIn: 900, // 15 Minuten in Sekunden
     };
+  }
+
+  /** Älteste Sessions kappen, damit die Tabelle pro User nicht wuchert. */
+  private async enforceSessionLimit(userId: string): Promise<void> {
+    const surplus = await this.prisma.userSession.findMany({
+      where: { userId },
+      orderBy: { lastUsedAt: 'desc' },
+      skip: MAX_SESSIONS_PER_USER,
+      select: { id: true },
+    });
+    if (surplus.length > 0) {
+      await this.prisma.userSession.deleteMany({
+        where: { id: { in: surplus.map((s) => s.id) } },
+      });
+    }
   }
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
 import { Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { fromCents, toCents } from '../common/money';
 
 @Injectable()
 export class TransactionsService {
@@ -131,6 +132,11 @@ export class TransactionsService {
     const data: Prisma.TransactionUpdateInput = {
       ...rest,
       ...(date !== undefined && { date: new Date(date) }),
+      // Typ dem Vorzeichen nachziehen, wenn der Betrag ohne expliziten Typ
+      // geändert wird — sonst bleibt z. B. eine auf positiv korrigierte
+      // Buchung als EXPENSE gefiltert.
+      ...(dto.amount !== undefined &&
+        dto.type === undefined && { type: dto.amount >= 0 ? 'INCOME' : 'EXPENSE' }),
     };
 
     return this.prisma.transaction.update({
@@ -168,7 +174,7 @@ export class TransactionsService {
 
     return result.map(r => ({
       category: r.categoryId ? catMap.get(r.categoryId) : { name: 'Unkategorisiert', icon: '❓', color: '#94a3b8' },
-      totalAmount: Math.abs(Number(r._sum.amount)),
+      totalAmount: Math.abs(fromCents(toCents(Number(r._sum.amount || 0)))),
       count: r._count.id,
     })).sort((a, b) => b.totalAmount - a.totalAmount);
   }
@@ -195,18 +201,19 @@ export class TransactionsService {
       monthlyData.set(key, { income: 0, expenses: 0 });
     }
 
+    // Summierung in Integer-Cents (Float-Addition driftet bei vielen Buchungen)
     for (const tx of transactions) {
       const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
       const entry = monthlyData.get(key);
       if (entry) {
-        const amount = Number(tx.amount);
-        if (amount >= 0) entry.income += amount;
-        else entry.expenses += Math.abs(amount);
+        const cents = toCents(tx.amount);
+        if (cents >= 0) entry.income += cents;
+        else entry.expenses += Math.abs(cents);
       }
     }
 
     return Array.from(monthlyData.entries())
-      .map(([month, data]) => ({ month, ...data }))
+      .map(([month, data]) => ({ month, income: fromCents(data.income), expenses: fromCents(data.expenses) }))
       .reverse();
   }
 
@@ -235,14 +242,23 @@ export class TransactionsService {
       orderBy: { date: 'desc' },
     });
 
+    // Freitextfelder gegen CSV-/Formel-Injection härten: Zellen, die mit
+    // = + - @ beginnen, würden Excel/LibreOffice sonst als Formel ausführen.
+    const sanitizeCell = (value: string): string => {
+      const cleaned = value.replace(/;/g, ',').replace(/[\r\n]+/g, ' ');
+      return /^[=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
+    };
+
     const header = 'Datum;Betrag;Währung;Typ;Kategorie;Verwendungszweck;Gegenpartei;IBAN Gegenpartei;Konto;Bank;IBAN';
     const rows = transactions.map((tx) => {
       const date = tx.date.toISOString().split('T')[0];
       const amount = Number(tx.amount).toFixed(2).replace('.', ',');
-      const category = tx.category?.name || '';
-      const purpose = (tx.purpose || '').replace(/;/g, ',').replace(/\n/g, ' ');
-      const counterpart = (tx.counterpartName || '').replace(/;/g, ',');
-      return `${date};${amount};${tx.currency};${tx.type};${category};${purpose};${counterpart};${tx.counterpartIban || ''};${tx.bankAccount.accountName};${tx.bankAccount.bankName};${tx.bankAccount.iban || ''}`;
+      const category = sanitizeCell(tx.category?.name || '');
+      const purpose = sanitizeCell(tx.purpose || '');
+      const counterpart = sanitizeCell(tx.counterpartName || '');
+      const accountName = sanitizeCell(tx.bankAccount.accountName);
+      const bankName = sanitizeCell(tx.bankAccount.bankName);
+      return `${date};${amount};${tx.currency};${tx.type};${category};${purpose};${counterpart};${tx.counterpartIban || ''};${accountName};${bankName};${tx.bankAccount.iban || ''}`;
     });
 
     return [header, ...rows].join('\n');

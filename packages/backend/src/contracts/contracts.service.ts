@@ -3,6 +3,7 @@ import { ContractType, BillingCycle, Prisma } from '@prisma/client';
 import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContractDto, UpdateContractDto } from './dto/contract.dto';
+import { roundMoney, sumMoney } from '../common/money';
 
 // Durchschnittliche Marktpreise Deutschland (Stand 2025/2026)
 // Quelle: Check24, Verivox, Stiftung Warentest Durchschnittswerte
@@ -112,9 +113,9 @@ export class ContractsService {
     const cycle = dto.billingCycle || 'MONTHLY';
 
     if (monthlyCost && !yearlyCost) {
-      yearlyCost = monthlyCost * 12;
+      yearlyCost = roundMoney(monthlyCost * 12);
     } else if (yearlyCost && !monthlyCost) {
-      monthlyCost = yearlyCost / 12;
+      monthlyCost = roundMoney(yearlyCost / 12);
     }
 
     return this.prisma.contract.create({
@@ -147,8 +148,8 @@ export class ContractsService {
 
     // Kosten zusammenrechnen
     const activeContracts = contracts.filter((c) => c.isActive);
-    const totalMonthly = activeContracts.reduce((sum, c) => sum + Number(c.monthlyCost || 0), 0);
-    const totalYearly = activeContracts.reduce((sum, c) => sum + Number(c.yearlyCost || 0), 0);
+    const totalMonthly = sumMoney(activeContracts, (c) => c.monthlyCost || 0);
+    const totalYearly = sumMoney(activeContracts, (c) => c.yearlyCost || 0);
 
     // Gruppierung nach Typ
     const byType: Record<string, { contracts: typeof contracts; totalMonthly: number; totalYearly: number }> = {};
@@ -171,8 +172,8 @@ export class ContractsService {
         yearlyCost: Number(c.yearlyCost || 0),
         avgMonthlyAmount: Number(c.avgMonthlyAmount || 0),
       })),
-      totalMonthly: Math.round(totalMonthly * 100) / 100,
-      totalYearly: Math.round(totalYearly * 100) / 100,
+      totalMonthly,
+      totalYearly,
       byType,
     };
   }
@@ -202,11 +203,11 @@ export class ContractsService {
     // Kosten synchron halten
     if (dto.monthlyCost !== undefined) {
       data.monthlyCost = dto.monthlyCost;
-      if (dto.yearlyCost === undefined) data.yearlyCost = dto.monthlyCost * 12;
+      if (dto.yearlyCost === undefined) data.yearlyCost = roundMoney(dto.monthlyCost * 12);
     }
     if (dto.yearlyCost !== undefined) {
       data.yearlyCost = dto.yearlyCost;
-      if (dto.monthlyCost === undefined) data.monthlyCost = dto.yearlyCost / 12;
+      if (dto.monthlyCost === undefined) data.monthlyCost = roundMoney(dto.yearlyCost / 12);
     }
 
     return this.prisma.contract.update({ where: { id }, data });

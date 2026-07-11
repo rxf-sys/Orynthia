@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, Progress, Tag, useConfirm } from '@/components/ui';
 
 const defaultIcons = ['🏖️', '🏠', '🚗', '💻', '📱', '🎓', '💍', '🎁', '🏥', '📈'];
-const defaultColors = ['#424769', '#ffb17a', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
+const defaultColors = ['#37415c', '#fda481', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
 
 export function SavingsGoalsPage() {
   const queryClient = useQueryClient();
@@ -21,7 +21,7 @@ export function SavingsGoalsPage() {
     currentAmount: '',
     deadline: '',
     icon: '🏖️',
-    color: '#424769',
+    color: '#37415c',
   });
   const [targetAmountError, setTargetAmountError] = useState<string | null>(null);
   const [addAmountId, setAddAmountId] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function SavingsGoalsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['savings-goals'] });
       setShowForm(false);
-      setForm({ name: '', targetAmount: '', currentAmount: '', deadline: '', icon: '🏖️', color: '#424769' });
+      setForm({ name: '', targetAmount: '', currentAmount: '', deadline: '', icon: '🏖️', color: '#37415c' });
       setTargetAmountError(null);
       toast.success('Sparziel erstellt');
     },
@@ -126,7 +126,7 @@ export function SavingsGoalsPage() {
           style={{
             borderStyle: 'dashed',
             borderColor: 'var(--peach)',
-            background: 'rgba(255,177,122,.05)',
+            background: 'rgba(253,164,129,.05)',
           }}
         >
           <h3 className="mb-4 text-lg font-bold text-ink">Neues Sparziel</h3>
@@ -351,7 +351,7 @@ function GoalCard({
   isPending: boolean;
 }) {
   const percentage = Math.min(goal.percentage, 100);
-  const color = goal.color || '#424769';
+  const color = goal.color || '#37415c';
 
   const monthsRemaining = goal.deadline
     ? Math.max(1, differenceInCalendarMonths(new Date(goal.deadline), new Date()))

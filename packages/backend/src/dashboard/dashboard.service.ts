@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { addFrequency, addMonthsClamped, frequencyToMonthly } from '../common/dates';
+import { fromCents, roundMoney, sumMoney, toCents } from '../common/money';
 
 const SUBSCRIPTION_TYPES = new Set(['STREAMING', 'GYM', 'SUBSCRIPTION']);
 
@@ -14,9 +16,11 @@ export class DashboardService {
   async getDashboardData(userId: string) {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // Obergrenzen exklusiv (lt) statt inklusiv (lte): `new Date(y, m+1, 0)` wäre
+    // Mitternacht des letzten Tages — Buchungen mit Uhrzeit am Monatsletzten
+    // fielen sonst aus allen Monats-Aggregationen heraus.
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
     // Parallelisierte Abfragen
     const [
@@ -35,17 +39,17 @@ export class DashboardService {
       }),
       // Monatliche Einnahmen
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: monthStart, lte: monthEnd }, amount: { gt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: monthStart, lt: nextMonthStart }, amount: { gt: 0 } },
         _sum: { amount: true },
       }),
       // Monatliche Ausgaben
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: monthStart, lte: monthEnd }, amount: { lt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: monthStart, lt: nextMonthStart }, amount: { lt: 0 } },
         _sum: { amount: true },
       }),
       // Letzter Monat zum Vergleich
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: lastMonthStart, lte: lastMonthEnd }, amount: { lt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: lastMonthStart, lt: monthStart }, amount: { lt: 0 } },
         _sum: { amount: true },
       }),
       // Letzte 10 Transaktionen
@@ -58,16 +62,16 @@ export class DashboardService {
       // Ausgaben nach Kategorie (aktueller Monat)
       this.prisma.transaction.groupBy({
         by: ['categoryId'],
-        where: { bankAccount: { userId }, amount: { lt: 0 }, date: { gte: monthStart, lte: monthEnd } },
+        where: { bankAccount: { userId }, amount: { lt: 0 }, date: { gte: monthStart, lt: nextMonthStart } },
         _sum: { amount: true },
       }),
       // Ungelesene Benachrichtigungen
       this.prisma.notification.count({ where: { userId, isRead: false } }),
     ]);
 
-    const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
-    const incomeAmount = Number(monthlyIncome._sum.amount || 0);
-    const expenseAmount = Math.abs(Number(monthlyExpenses._sum.amount || 0));
+    const totalBalance = sumMoney(accounts, (acc) => acc.balance);
+    const incomeAmount = roundMoney(Number(monthlyIncome._sum.amount || 0));
+    const expenseAmount = Math.abs(roundMoney(Number(monthlyExpenses._sum.amount || 0)));
 
     // Kategorien für Ausgaben laden
     const categoryIds = expensesByCategory.map(e => e.categoryId).filter(Boolean) as string[];
@@ -81,7 +85,7 @@ export class DashboardService {
         totalBalance,
         monthlyIncome: incomeAmount,
         monthlyExpenses: expenseAmount,
-        lastMonthExpenses: Math.abs(Number(lastMonthExpenses._sum.amount || 0)),
+        lastMonthExpenses: Math.abs(roundMoney(Number(lastMonthExpenses._sum.amount || 0))),
         savingsRate: incomeAmount > 0
           ? Math.round(((incomeAmount - expenseAmount) / incomeAmount) * 100)
           : 0,
@@ -131,7 +135,7 @@ export class DashboardService {
       }),
     ]);
 
-    const startBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
+    const startBalance = sumMoney(accounts, (a) => a.balance);
 
     // 1) Geplante Buchungen pro Tag sammeln
     type ScheduledItem = { name: string; amount: number; source: 'recurring' | 'contract' };
@@ -147,12 +151,15 @@ export class DashboardService {
       if (!r.nextDueDate) continue;
       let next = new Date(r.nextDueDate);
       next.setHours(0, 0, 0, 0);
+      // Ziel-Tag der ersten Fälligkeit merken: eine Zahlung am 31. bleibt
+      // am Monatsletzten, statt nach dem Februar dauerhaft auf den 28. zu
+      // rutschen oder per setMonth-Überlauf in den Folgemonat zu driften.
+      const anchorDay = next.getDate();
       while (next <= endDate) {
         if (next >= today) {
-          addItem(next, { name: r.name, amount: Number(r.amount), source: 'recurring' });
+          addItem(next, { name: r.name, amount: roundMoney(r.amount), source: 'recurring' });
         }
-        next = addFrequency(next, r.frequency);
-        if (!next) break;
+        next = addFrequency(next, r.frequency, anchorDay);
       }
     }
 
@@ -170,15 +177,13 @@ export class DashboardService {
 
       let anchor = c.startDate ? new Date(c.startDate) : new Date(today);
       anchor.setHours(0, 0, 0, 0);
+      const anchorDay = anchor.getDate();
       while (anchor < today) {
-        anchor = new Date(anchor);
-        anchor.setMonth(anchor.getMonth() + billingMonths);
+        anchor = addMonthsClamped(anchor, billingMonths, anchorDay);
       }
       while (anchor <= endDate) {
-        addItem(anchor, { name: c.name, amount: -cycleAmount, source: 'contract' });
-        const next = new Date(anchor);
-        next.setMonth(next.getMonth() + billingMonths);
-        anchor = next;
+        addItem(anchor, { name: c.name, amount: -roundMoney(cycleAmount), source: 'contract' });
+        anchor = addMonthsClamped(anchor, billingMonths, anchorDay);
       }
     }
 
@@ -198,10 +203,10 @@ export class DashboardService {
       const isFixed = cp && [...fixedKeywords].some((k) => cp.includes(k) || k.includes(cp));
       if (isFixed) continue;
       const key = tx.date.toISOString().slice(0, 10);
-      variableDaily.set(key, (variableDaily.get(key) ?? 0) + Math.abs(Number(tx.amount)));
+      variableDaily.set(key, (variableDaily.get(key) ?? 0) + Math.abs(toCents(tx.amount)));
     }
     const dailyTotals = [...variableDaily.values()].sort((a, b) => a - b);
-    const medianDailySpend = dailyTotals.length > 0 ? dailyTotals[Math.floor(dailyTotals.length / 2)] : 0;
+    const medianDailySpendCents = dailyTotals.length > 0 ? dailyTotals[Math.floor(dailyTotals.length / 2)] : 0;
 
     // 3) Projektion Tag für Tag
     const points: Array<{
@@ -212,50 +217,50 @@ export class DashboardService {
       estimatedVariableSpend: number;
       items: ScheduledItem[];
     }> = [];
-    let running = startBalance;
-    let lowestBalance = startBalance;
+    let runningCents = toCents(startBalance);
+    let lowestCents = runningCents;
     let lowestDate = today.toISOString().slice(0, 10);
-    let totalIn = 0;
-    let totalOut = 0;
+    let totalInCents = 0;
+    let totalOutCents = 0;
 
     for (let i = 0; i <= horizon; i++) {
       const day = new Date(today);
       day.setDate(day.getDate() + i);
       const key = day.toISOString().slice(0, 10);
       const items = schedule.get(key) ?? [];
-      let scheduledIn = 0;
-      let scheduledOut = 0;
+      let scheduledInCents = 0;
+      let scheduledOutCents = 0;
       for (const it of items) {
-        if (it.amount >= 0) scheduledIn += it.amount;
-        else scheduledOut += Math.abs(it.amount);
+        if (it.amount >= 0) scheduledInCents += toCents(it.amount);
+        else scheduledOutCents += Math.abs(toCents(it.amount));
       }
-      const variable = i === 0 ? 0 : medianDailySpend;
-      running += scheduledIn - scheduledOut - variable;
-      totalIn += scheduledIn;
-      totalOut += scheduledOut + variable;
-      if (running < lowestBalance) {
-        lowestBalance = running;
+      const variableCents = i === 0 ? 0 : medianDailySpendCents;
+      runningCents += scheduledInCents - scheduledOutCents - variableCents;
+      totalInCents += scheduledInCents;
+      totalOutCents += scheduledOutCents + variableCents;
+      if (runningCents < lowestCents) {
+        lowestCents = runningCents;
         lowestDate = key;
       }
       points.push({
         date: key,
-        projectedBalance: Math.round(running * 100) / 100,
-        scheduledIn: Math.round(scheduledIn * 100) / 100,
-        scheduledOut: Math.round(scheduledOut * 100) / 100,
-        estimatedVariableSpend: Math.round(variable * 100) / 100,
+        projectedBalance: fromCents(runningCents),
+        scheduledIn: fromCents(scheduledInCents),
+        scheduledOut: fromCents(scheduledOutCents),
+        estimatedVariableSpend: fromCents(variableCents),
         items,
       });
     }
 
     return {
       horizonDays: horizon,
-      startBalance: Math.round(startBalance * 100) / 100,
-      endBalance: Math.round(running * 100) / 100,
-      lowestBalance: Math.round(lowestBalance * 100) / 100,
+      startBalance: roundMoney(startBalance),
+      endBalance: fromCents(runningCents),
+      lowestBalance: fromCents(lowestCents),
       lowestDate,
-      totalIn: Math.round(totalIn * 100) / 100,
-      totalOut: Math.round(totalOut * 100) / 100,
-      medianDailySpend: Math.round(medianDailySpend * 100) / 100,
+      totalIn: fromCents(totalInCents),
+      totalOut: fromCents(totalOutCents),
+      medianDailySpend: fromCents(medianDailySpendCents),
       points,
     };
   }
@@ -282,14 +287,11 @@ export class DashboardService {
       }),
     ]);
 
-    const recurringMonthly = activeRecurring.reduce((sum, r) => {
-      return sum + frequencyToMonthly(Math.abs(Number(r.amount)), r.frequency);
-    }, 0);
-    const contractMonthly = activeContracts.reduce(
-      (sum, c) => sum + Number(c.monthlyCost ?? 0),
-      0,
+    const recurringMonthly = sumMoney(activeRecurring, (r) =>
+      frequencyToMonthly(Math.abs(Number(r.amount)), r.frequency),
     );
-    const totalFixedMonthly = recurringMonthly + contractMonthly;
+    const contractMonthly = sumMoney(activeContracts, (c) => c.monthlyCost ?? 0);
+    const totalFixedMonthly = fromCents(toCents(recurringMonthly) + toCents(contractMonthly));
 
     // Abo-Übersicht (Streaming / Gym / Subscription + Verträge mit niedrigem monatlichen Cost)
     const subscriptionContracts = activeContracts
@@ -319,12 +321,12 @@ export class DashboardService {
     const subscriptions = [...subscriptionContracts, ...subscriptionRecurring].sort(
       (a, b) => b.monthlyCost - a.monthlyCost,
     );
-    const subscriptionTotal = subscriptions.reduce((s, x) => s + x.monthlyCost, 0);
+    const subscriptionTotal = sumMoney(subscriptions, (x) => x.monthlyCost);
 
     // Kategorien-Median (letzte 5 abgeschlossene Monate) vs. aktueller Monat
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthlySumByCat = new Map<string, Map<string, number>>(); // monthKey -> categoryId -> sum
+    const monthlySumByCat = new Map<string, Map<string, number>>(); // monthKey -> categoryId -> Cents
     for (const tx of txLastSixMonths) {
       if (!tx.categoryId) continue;
       const d = tx.date;
@@ -357,15 +359,15 @@ export class DashboardService {
     const catMap = new Map(categoryDetails.map((c) => [c.id, c]));
 
     const overspendingCategories = [...categoryMedians.entries()]
-      .map(([cid, median]) => ({
+      .map(([cid, medianCents]) => ({
         category: catMap.get(cid),
-        median: Math.round(median * 100) / 100,
-        currentMonth: Math.round((currentMonthSums.get(cid) ?? 0) * 100) / 100,
+        median: fromCents(medianCents),
+        currentMonth: fromCents(currentMonthSums.get(cid) ?? 0),
       }))
       .filter((row) => row.category && row.median > 0 && row.currentMonth > row.median * 1.2)
       .map((row) => ({
         ...row,
-        overBy: Math.round((row.currentMonth - row.median) * 100) / 100,
+        overBy: fromCents(toCents(row.currentMonth) - toCents(row.median)),
         overByPercent: Math.round(((row.currentMonth - row.median) / row.median) * 100),
       }))
       .sort((a, b) => b.overBy - a.overBy)
@@ -376,18 +378,18 @@ export class DashboardService {
 
     void currentMonthStart; // keep tree-shake happy
     return {
-      totalFixedMonthly: Math.round(totalFixedMonthly * 100) / 100,
-      totalFixedYearly: Math.round(totalFixedMonthly * 12 * 100) / 100,
+      totalFixedMonthly: roundMoney(totalFixedMonthly),
+      totalFixedYearly: roundMoney(totalFixedMonthly * 12),
       breakdown: {
-        recurringMonthly: Math.round(recurringMonthly * 100) / 100,
-        contractMonthly: Math.round(contractMonthly * 100) / 100,
+        recurringMonthly: roundMoney(recurringMonthly),
+        contractMonthly: roundMoney(contractMonthly),
       },
       subscriptions: {
-        total: Math.round(subscriptionTotal * 100) / 100,
+        total: roundMoney(subscriptionTotal),
         count: subscriptions.length,
         items: subscriptions.map((s) => ({
           ...s,
-          monthlyCost: Math.round(s.monthlyCost * 100) / 100,
+          monthlyCost: roundMoney(s.monthlyCost),
         })),
       },
       providerSavings: {
@@ -403,33 +405,5 @@ export class DashboardService {
 }
 
 function monthsAgo(months: number): Date {
-  const d = new Date();
-  d.setMonth(d.getMonth() - months);
-  return d;
-}
-
-function frequencyToMonthly(amount: number, freq: string): number {
-  switch (freq) {
-    case 'WEEKLY': return amount * (52 / 12);
-    case 'BIWEEKLY': return amount * (26 / 12);
-    case 'MONTHLY': return amount;
-    case 'QUARTERLY': return amount / 3;
-    case 'BIANNUALLY': return amount / 6;
-    case 'YEARLY': return amount / 12;
-    default: return amount;
-  }
-}
-
-function addFrequency(d: Date, freq: string): Date {
-  const next = new Date(d);
-  switch (freq) {
-    case 'WEEKLY': next.setDate(next.getDate() + 7); break;
-    case 'BIWEEKLY': next.setDate(next.getDate() + 14); break;
-    case 'MONTHLY': next.setMonth(next.getMonth() + 1); break;
-    case 'QUARTERLY': next.setMonth(next.getMonth() + 3); break;
-    case 'BIANNUALLY': next.setMonth(next.getMonth() + 6); break;
-    case 'YEARLY': next.setFullYear(next.getFullYear() + 1); break;
-    default: next.setMonth(next.getMonth() + 1);
-  }
-  return next;
+  return addMonthsClamped(new Date(), -months);
 }

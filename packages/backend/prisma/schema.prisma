@@ -23,8 +23,6 @@ model User {
   twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
   twoFactorSecret  String?  @map("two_factor_secret")
   
-  // Refresh Token
-  refreshToken   String?   @map("refresh_token")
 
   // Passwort-Reset
   passwordResetToken   String?   @map("password_reset_token")
@@ -52,8 +50,27 @@ model User {
   bankConnections BankConnection[]
   contracts      Contract[]
   investments    InvestmentPosition[]
+  sessions       UserSession[]
 
   @@map("users")
+}
+
+// ---------- Refresh-Sessions (Multi-Device) ----------
+// Ein Eintrag pro angemeldetem Gerät/Browser. Der Refresh-Token liegt nur
+// als bcrypt-Hash vor und rotiert bei jedem Refresh innerhalb der Session.
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @map("token_hash")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+  expiresAt  DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
 }
 
 // ---------- Wertanlagen / Depot ----------

@@ -177,7 +177,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       <div
         className="grid h-8 w-8 shrink-0 place-items-center rounded-md"
         style={{
-          background: isUser ? 'var(--grad-soft)' : 'rgba(66, 71, 105, 0.12)',
+          background: isUser ? 'var(--grad-soft)' : 'rgba(55, 65, 92, 0.12)',
           color: isUser ? 'var(--peach-2)' : 'var(--indigo)',
         }}
       >

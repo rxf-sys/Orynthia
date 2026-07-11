@@ -52,12 +52,15 @@ export class SavingsGoalsService {
     const data: Prisma.SavingsGoalUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.targetAmount !== undefined) data.targetAmount = dto.targetAmount;
-    if (dto.currentAmount !== undefined) {
-      data.currentAmount = dto.currentAmount;
-      // Auto-Complete wenn Ziel erreicht
-      if (dto.currentAmount >= Number(goal.targetAmount)) {
+    // Auto-Complete gegen die effektiven Werte prüfen: auch eine reine
+    // Änderung des Zielbetrags kann ein Ziel (un)erreicht machen.
+    if (dto.currentAmount !== undefined || dto.targetAmount !== undefined) {
+      if (dto.currentAmount !== undefined) data.currentAmount = dto.currentAmount;
+      const effectiveCurrent = dto.currentAmount ?? Number(goal.currentAmount);
+      const effectiveTarget = dto.targetAmount ?? Number(goal.targetAmount);
+      if (effectiveCurrent >= effectiveTarget) {
         data.isCompleted = true;
-        data.completedAt = new Date();
+        data.completedAt = goal.completedAt ?? new Date();
       } else {
         data.isCompleted = false;
         data.completedAt = null;

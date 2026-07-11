@@ -45,12 +45,21 @@ const processQueue = (error: unknown | null) => {
   failedQueue = [];
 };
 
+// Auth-Endpoints vom Auto-Refresh ausnehmen: Ein 401 von /auth/login ist
+// "falsches Passwort", ein 401 von /auth/refresh ist "Session abgelaufen" —
+// beides darf keinen weiteren Refresh anstoßen. Ohne diese Ausnahme landet
+// der Refresh-Request bei eigenem 401 in der failedQueue und wartet auf
+// sich selbst (Deadlock: isRefreshing bleibt true, alle Requests hängen).
+const AUTH_NO_RETRY = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl: string = originalRequest?.url ?? '';
+    const isAuthEndpoint = AUTH_NO_RETRY.some((p) => requestUrl.includes(p));
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -89,6 +98,12 @@ export const authApi = {
   register: (data: { email: string; password: string; firstName?: string; lastName?: string }) =>
     api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
+  logoutAll: () => api.post('/auth/logout-all'),
+  sessions: () =>
+    api.get<Array<{ id: string; userAgent: string | null; createdAt: string; lastUsedAt: string; current: boolean }>>(
+      '/auth/sessions',
+    ),
+  revokeSession: (id: string) => api.delete(`/auth/sessions/${id}`),
   me: () => api.get('/auth/me'),
   generate2FA: () => api.get('/auth/2fa/generate'),
   enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
