@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PaymentFrequency } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { frequencyToMonthly } from '../common/dates';
+import { roundMoney, sumMoney } from '../common/money';
 import { CreateRecurringPaymentDto, UpdateRecurringPaymentDto } from './dto/recurring-payment.dto';
 
 @Injectable()
@@ -30,26 +32,14 @@ export class RecurringPaymentsService {
       orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
     });
 
-    // Monatliche Gesamtkosten berechnen (52/12 bzw. 26/12 wie im
-    // Dashboard-Service, damit beide Ansichten dieselbe Summe zeigen)
-    const monthlyTotal = payments
-      .filter((p) => p.isActive)
-      .reduce((sum, p) => {
-        const amount = Math.abs(Number(p.amount));
-        switch (p.frequency) {
-          case 'WEEKLY': return sum + amount * (52 / 12);
-          case 'BIWEEKLY': return sum + amount * (26 / 12);
-          case 'MONTHLY': return sum + amount;
-          case 'QUARTERLY': return sum + amount / 3;
-          case 'BIANNUALLY': return sum + amount / 6;
-          case 'YEARLY': return sum + amount / 12;
-          default: return sum + amount;
-        }
-      }, 0);
+    // Monatliche Gesamtkosten: gemeinsame Frequenz-Faktoren aus common/dates
+    // (identisch mit dem Dashboard-Service) + verlustfreie Cent-Summe.
+    const monthlyTotal = sumMoney(
+      payments.filter((p) => p.isActive),
+      (p) => frequencyToMonthly(Math.abs(Number(p.amount)), p.frequency),
+    );
 
-    const yearlyTotal = monthlyTotal * 12;
-
-    return { payments, monthlyTotal: Math.round(monthlyTotal * 100) / 100, yearlyTotal: Math.round(yearlyTotal * 100) / 100 };
+    return { payments, monthlyTotal, yearlyTotal: roundMoney(monthlyTotal * 12) };
   }
 
   async update(userId: string, id: string, dto: UpdateRecurringPaymentDto) {

@@ -23,7 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: { sub: string; email: string }) {
+  async validate(payload: { sub: string; email: string; sid?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, firstName: true, lastName: true, twoFactorEnabled: true, isActive: true },
@@ -33,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException();
     }
 
-    return user;
+    // Session-ID aus dem Token für gezielten Logout durchreichen
+    return { ...user, sessionId: payload.sid ?? null };
   }
 }

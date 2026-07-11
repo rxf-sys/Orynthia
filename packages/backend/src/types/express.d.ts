@@ -7,6 +7,7 @@ declare global {
       lastName: string | null;
       twoFactorEnabled: boolean;
       isActive: boolean;
+      sessionId?: string | null;
     }
   }
 }

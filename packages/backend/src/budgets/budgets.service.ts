@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BudgetPeriod } from '@prisma/client';
+import { fromCents, roundMoney, toCents } from '../common/money';
 
 @Injectable()
 export class BudgetsService {
@@ -36,7 +37,7 @@ export class BudgetsService {
         });
         for (const g of grouped) {
           if (g.categoryId) {
-            spentByPeriodCategory.set(`${period}:${g.categoryId}`, Math.abs(Number(g._sum.amount || 0)));
+            spentByPeriodCategory.set(`${period}:${g.categoryId}`, Math.abs(roundMoney(Number(g._sum.amount || 0))));
           }
         }
       }),
@@ -50,7 +51,7 @@ export class BudgetsService {
         ...budget,
         amount: budgetAmount,
         spent: spentAmount,
-        remaining: budgetAmount - spentAmount,
+        remaining: fromCents(toCents(budgetAmount) - toCents(spentAmount)),
         percentage: budgetAmount > 0 ? Math.round((spentAmount / budgetAmount) * 100) : 0,
       };
     });
@@ -62,26 +63,42 @@ export class BudgetsService {
     });
     if (!category) throw new ForbiddenException('Kategorie nicht zugänglich');
 
-    return this.prisma.budget.create({
-      data: {
-        userId,
-        categoryId: data.categoryId,
-        amount: data.amount,
-        period: data.period || 'MONTHLY',
-        startDate: new Date(),
-      },
-      include: { category: { select: { name: true, icon: true, color: true } } },
-    });
+    try {
+      return await this.prisma.budget.create({
+        data: {
+          userId,
+          categoryId: data.categoryId,
+          amount: data.amount,
+          period: data.period || 'MONTHLY',
+          startDate: new Date(),
+        },
+        include: { category: { select: { name: true, icon: true, color: true } } },
+      });
+    } catch (err: unknown) {
+      // Unique-Constraint (userId, categoryId, period) → sauberer 409 statt 500
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+        throw new ConflictException('Für diese Kategorie existiert bereits ein Budget mit dieser Periode');
+      }
+      throw err;
+    }
   }
 
   async update(userId: string, id: string, data: { amount?: number; period?: BudgetPeriod; isActive?: boolean }) {
     const budget = await this.prisma.budget.findFirst({ where: { id, userId } });
     if (!budget) throw new NotFoundException('Budget nicht gefunden');
-    return this.prisma.budget.update({
-      where: { id },
-      data,
-      include: { category: { select: { name: true, icon: true, color: true } } },
-    });
+    try {
+      return await this.prisma.budget.update({
+        where: { id },
+        data,
+        include: { category: { select: { name: true, icon: true, color: true } } },
+      });
+    } catch (err: unknown) {
+      // Perioden-Wechsel kann mit einem bestehenden Budget kollidieren
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+        throw new ConflictException('Für diese Kategorie existiert bereits ein Budget mit dieser Periode');
+      }
+      throw err;
+    }
   }
 
   async remove(userId: string, id: string) {

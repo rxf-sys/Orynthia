@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto } from './dto/transaction.dto';
 import { Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { fromCents, toCents } from '../common/money';
 
 @Injectable()
 export class TransactionsService {
@@ -173,7 +174,7 @@ export class TransactionsService {
 
     return result.map(r => ({
       category: r.categoryId ? catMap.get(r.categoryId) : { name: 'Unkategorisiert', icon: '❓', color: '#94a3b8' },
-      totalAmount: Math.abs(Number(r._sum.amount)),
+      totalAmount: Math.abs(fromCents(toCents(Number(r._sum.amount || 0)))),
       count: r._count.id,
     })).sort((a, b) => b.totalAmount - a.totalAmount);
   }
@@ -200,18 +201,19 @@ export class TransactionsService {
       monthlyData.set(key, { income: 0, expenses: 0 });
     }
 
+    // Summierung in Integer-Cents (Float-Addition driftet bei vielen Buchungen)
     for (const tx of transactions) {
       const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}`;
       const entry = monthlyData.get(key);
       if (entry) {
-        const amount = Number(tx.amount);
-        if (amount >= 0) entry.income += amount;
-        else entry.expenses += Math.abs(amount);
+        const cents = toCents(tx.amount);
+        if (cents >= 0) entry.income += cents;
+        else entry.expenses += Math.abs(cents);
       }
     }
 
     return Array.from(monthlyData.entries())
-      .map(([month, data]) => ({ month, ...data }))
+      .map(([month, data]) => ({ month, income: fromCents(data.income), expenses: fromCents(data.expenses) }))
       .reverse();
   }
 

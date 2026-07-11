@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BudgetsService } from './budgets.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 
 describe('BudgetsService', () => {
   let service: BudgetsService;
@@ -72,6 +72,37 @@ describe('BudgetsService', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('fragt die Monats-Periode als halboffenes Intervall ab (31.12. 14:00 zählt mit)', async () => {
+      // 15. Dez 2026 — Monat mit 31 Tagen
+      jest.useFakeTimers().setSystemTime(new Date(2026, 11, 15, 9, 0, 0));
+
+      mockPrisma.budget.findMany.mockResolvedValue([
+        {
+          id: '1',
+          userId: 'user1',
+          categoryId: 'cat1',
+          amount: 500,
+          period: 'MONTHLY',
+          isActive: true,
+          category: { name: 'Lebensmittel', icon: '🛒', color: '#f59e0b' },
+        },
+      ]);
+      mockPrisma.transaction.groupBy.mockResolvedValue([]);
+
+      await service.findAll('user1');
+
+      const where = mockPrisma.transaction.groupBy.mock.calls[0][0].where;
+      // gte 1. Dez 00:00, lt 1. Jan 00:00 — eine Buchung am 31.12. 14:00 liegt
+      // im Intervall. Mit dem alten `lte` auf 31.12. 00:00 fiel sie heraus.
+      expect(where.date.gte).toEqual(new Date(2026, 11, 1));
+      expect(where.date.lt).toEqual(new Date(2027, 0, 1));
+      expect(where.date.lte).toBeUndefined();
+      const lastDayAfternoon = new Date(2026, 11, 31, 14, 0, 0);
+      expect(lastDayAfternoon >= where.date.gte && lastDayAfternoon < where.date.lt).toBe(true);
+
+      jest.useRealTimers();
+    });
   });
 
   describe('create', () => {
@@ -111,6 +142,17 @@ describe('BudgetsService', () => {
         service.create('user1', { categoryId: 'foreign-cat', amount: 500 }),
       ).rejects.toThrow(ForbiddenException);
       expect(mockPrisma.budget.create).not.toHaveBeenCalled();
+    });
+
+    it('meldet ein Duplikat (Kategorie + Periode) als 409 Conflict statt 500', async () => {
+      mockPrisma.category.findFirst.mockResolvedValue({ id: 'cat1', userId: 'user1' });
+      mockPrisma.budget.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      await expect(
+        service.create('user1', { categoryId: 'cat1', amount: 500 }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
