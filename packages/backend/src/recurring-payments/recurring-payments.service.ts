@@ -30,14 +30,15 @@ export class RecurringPaymentsService {
       orderBy: [{ isActive: 'desc' }, { nextDueDate: 'asc' }],
     });
 
-    // Monatliche Gesamtkosten berechnen
+    // Monatliche Gesamtkosten berechnen (52/12 bzw. 26/12 wie im
+    // Dashboard-Service, damit beide Ansichten dieselbe Summe zeigen)
     const monthlyTotal = payments
       .filter((p) => p.isActive)
       .reduce((sum, p) => {
         const amount = Math.abs(Number(p.amount));
         switch (p.frequency) {
-          case 'WEEKLY': return sum + amount * 4.33;
-          case 'BIWEEKLY': return sum + amount * 2.17;
+          case 'WEEKLY': return sum + amount * (52 / 12);
+          case 'BIWEEKLY': return sum + amount * (26 / 12);
           case 'MONTHLY': return sum + amount;
           case 'QUARTERLY': return sum + amount / 3;
           case 'BIANNUALLY': return sum + amount / 6;

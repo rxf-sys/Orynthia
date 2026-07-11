@@ -36,7 +36,7 @@ const contractTypeLabels: Record<string, { label: string; icon: string; group: s
   STREAMING: { label: 'Streaming', icon: '🎬', group: 'Abos', color: '#e76b8d' },
   GYM: { label: 'Fitness', icon: '💪', group: 'Abos', color: '#1f8a5b' },
   SUBSCRIPTION: { label: 'Sonstiges Abo', icon: '📦', group: 'Abos', color: '#e76b8d' },
-  RENT: { label: 'Miete', icon: '🏘️', group: 'Wohnen', color: '#424769' },
+  RENT: { label: 'Miete', icon: '🏘️', group: 'Wohnen', color: '#37415c' },
   LEASE: { label: 'Leasing', icon: '🚙', group: 'Sonstige', color: '#3aa3a5' },
   LOAN: { label: 'Kredit', icon: '🏦', group: 'Sonstige', color: '#3aa3a5' },
   OTHER: { label: 'Sonstige', icon: '📄', group: 'Sonstige', color: '#878f9d' },
@@ -198,7 +198,7 @@ export function ContractsPage() {
           style={{
             borderStyle: 'dashed',
             borderColor: 'var(--peach)',
-            background: 'rgba(255,177,122,.05)',
+            background: 'rgba(253,164,129,.05)',
           }}
         >
           <h3 className="mb-4 text-lg font-bold text-ink">Neuen Vertrag erfassen</h3>

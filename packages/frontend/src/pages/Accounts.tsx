@@ -290,7 +290,7 @@ export function AccountsPage() {
           style={{
             borderStyle: 'dashed',
             borderColor: 'var(--peach)',
-            background: 'rgba(255,177,122,.05)',
+            background: 'rgba(253,164,129,.05)',
           }}
         >
           <div className="mb-5 flex gap-1 rounded-pill border border-line bg-soft p-1">

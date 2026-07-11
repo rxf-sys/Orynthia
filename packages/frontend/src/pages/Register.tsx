@@ -54,7 +54,7 @@ export function RegisterPage() {
         <div
           className="pointer-events-none absolute -bottom-1/2 -right-1/3 h-[600px] w-[600px] rounded-full"
           style={{
-            background: 'radial-gradient(circle at center, rgba(255,177,122,.55), transparent 60%)',
+            background: 'radial-gradient(circle at center, rgba(253,164,129,.55), transparent 60%)',
           }}
         />
         <div className="relative flex items-center gap-3">
@@ -96,7 +96,7 @@ export function RegisterPage() {
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <div
               className="grid h-10 w-10 place-items-center rounded-md bg-grad-brand font-extrabold text-white"
-              style={{ boxShadow: '0 4px 12px rgba(66,71,105,.18)' }}
+              style={{ boxShadow: '0 4px 12px rgba(55,65,92,.18)' }}
             >
               O
             </div>

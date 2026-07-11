@@ -23,8 +23,8 @@ export function Avatar({ name, size = 36, className, color }: AvatarProps) {
         width: size,
         height: size,
         fontSize: Math.max(11, Math.floor(size * 0.4)),
-        background: color || 'linear-gradient(135deg, #424769, #ffb17a)',
-        boxShadow: '0 0 0 2px var(--bg-elev), 0 4px 10px rgba(45,50,80,.18)',
+        background: color || 'linear-gradient(135deg, #37415c, #fda481)',
+        boxShadow: '0 0 0 2px var(--bg-elev), 0 4px 10px rgba(24,26,47,.18)',
         flex: '0 0 auto',
       }}
     >

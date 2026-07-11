@@ -30,7 +30,7 @@ export class BudgetsService {
             bankAccount: { userId },
             categoryId: { in: budgets.filter((b) => b.period === period).map((b) => b.categoryId) },
             amount: { lt: 0 },
-            date: { gte: start, lte: end },
+            date: { gte: start, lt: end },
           },
           _sum: { amount: true },
         });
@@ -91,24 +91,32 @@ export class BudgetsService {
     return { message: 'Budget gelöscht' };
   }
 
+  /**
+   * Liefert die aktuelle Budget-Periode als halboffenes Intervall [start, end):
+   * `end` ist der Beginn der Folgeperiode und wird mit `lt` abgefragt. Ein
+   * inklusives `lte` auf Mitternacht des letzten Tages würde Buchungen mit
+   * Uhrzeit am letzten Periodentag verlieren.
+   */
   private getPeriodRange(period: BudgetPeriod, now: Date): { start: Date; end: Date } {
     const year = now.getFullYear();
     const month = now.getMonth();
 
     switch (period) {
-      case 'WEEKLY':
+      case 'WEEKLY': {
         const dayOfWeek = now.getDay();
         const monday = new Date(year, month, now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return { start: monday, end: sunday };
+        const nextMonday = new Date(monday);
+        nextMonday.setDate(monday.getDate() + 7);
+        return { start: monday, end: nextMonday };
+      }
       case 'MONTHLY':
-        return { start: new Date(year, month, 1), end: new Date(year, month + 1, 0) };
-      case 'QUARTERLY':
+        return { start: new Date(year, month, 1), end: new Date(year, month + 1, 1) };
+      case 'QUARTERLY': {
         const quarterStart = Math.floor(month / 3) * 3;
-        return { start: new Date(year, quarterStart, 1), end: new Date(year, quarterStart + 3, 0) };
+        return { start: new Date(year, quarterStart, 1), end: new Date(year, quarterStart + 3, 1) };
+      }
       case 'YEARLY':
-        return { start: new Date(year, 0, 1), end: new Date(year, 11, 31) };
+        return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
     }
   }
 }

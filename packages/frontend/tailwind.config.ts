@@ -6,9 +6,9 @@ export default {
     extend: {
       colors: {
         // Brand
-        indigo: { DEFAULT: '#424769', soft: '#6a6f95' },
-        navy: '#2d3250',
-        peach: { DEFAULT: '#ffb17a', light: '#ffd6b1', press: '#ff9d55' },
+        indigo: { DEFAULT: '#37415c', soft: '#5e6a8c' },
+        navy: '#181a2f',
+        peach: { DEFAULT: '#fda481', light: '#fec9b2', press: '#fc8b60' },
 
         // Semantic surfaces (CSS-var-driven for dark mode)
         bg: 'var(--bg)',
@@ -35,8 +35,8 @@ export default {
         'info-bg': 'var(--info-bg)',
 
         // Category swatches
-        'cat-1': '#424769',
-        'cat-2': '#ffb17a',
+        'cat-1': '#37415c',
+        'cat-2': '#fda481',
         'cat-3': '#5b8def',
         'cat-4': '#1f8a5b',
         'cat-5': '#b97aff',
@@ -45,9 +45,9 @@ export default {
         'cat-8': '#d99a2b',
       },
       backgroundImage: {
-        'grad-brand': 'linear-gradient(135deg, #424769, #ffb17a)',
-        'grad-brand-90': 'linear-gradient(90deg,  #424769, #ffb17a)',
-        'grad-hero': 'linear-gradient(135deg, #2d3250 0%, #424769 65%, #ffb17a 110%)',
+        'grad-brand': 'linear-gradient(135deg, #37415c, #fda481)',
+        'grad-brand-90': 'linear-gradient(90deg,  #37415c, #fda481)',
+        'grad-hero': 'linear-gradient(135deg, #181a2f 0%, #37415c 65%, #fda481 110%)',
         'grad-soft': 'linear-gradient(135deg, #f3f0fb 0%, #fff1e3 100%)',
       },
       fontFamily: {
@@ -62,9 +62,9 @@ export default {
         pill: '999px',
       },
       boxShadow: {
-        sm: '0 1px 0 rgba(45,50,80,.04), 0 6px 18px rgba(45,50,80,.06)',
-        md: '0 1px 0 rgba(45,50,80,.04), 0 14px 32px rgba(45,50,80,.10)',
-        btn: '0 4px 12px rgba(66,71,105,.18)',
+        sm: '0 1px 0 rgba(24,26,47,.04), 0 6px 18px rgba(24,26,47,.06)',
+        md: '0 1px 0 rgba(24,26,47,.04), 0 14px 32px rgba(24,26,47,.10)',
+        btn: '0 4px 12px rgba(55,65,92,.18)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

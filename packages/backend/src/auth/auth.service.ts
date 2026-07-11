@@ -37,15 +37,25 @@ export class AuthService {
     // Passwort hashen
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    // User erstellen
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email.toLowerCase(),
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-      },
-    });
+    // User erstellen. Der Unique-Constraint fängt die Race zwischen dem
+    // findUnique-Check oben und diesem Insert ab (parallele Doppel-Registrierung)
+    // — P2002 wird als sauberer 409 statt als 500 gemeldet.
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email.toLowerCase(),
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+        },
+      });
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+        throw new ConflictException('E-Mail-Adresse bereits registriert');
+      }
+      throw err;
+    }
 
     // System-Kategorien für User kopieren (Batch-Insert)
     const systemCategories = await this.prisma.category.findMany({

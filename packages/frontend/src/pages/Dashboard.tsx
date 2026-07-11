@@ -38,7 +38,7 @@ const CHART_COLORS = {
   tooltipBorder: 'var(--line)',
 };
 
-const CATEGORY_PALETTE = ['#424769', '#ffb17a', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
+const CATEGORY_PALETTE = ['#37415c', '#fda481', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
 
 // Neutrale Farbe für den Sammelposten "Sonstige" im Kategorie-Chart
 const OTHER_CATEGORY_COLOR = 'var(--text-4, #aeb3c4)';
@@ -219,7 +219,7 @@ export function DashboardPage() {
           <Card className="flex gap-3.5">
             <div
               className="grid h-11 w-11 shrink-0 place-items-center rounded-md"
-              style={{ background: 'rgba(255,177,122,.2)', color: 'var(--peach-press)' }}
+              style={{ background: 'rgba(253,164,129,.2)', color: 'var(--peach-press)' }}
             >
               <SearchIcon className="h-5 w-5" />
             </div>

@@ -14,9 +14,11 @@ export class DashboardService {
   async getDashboardData(userId: string) {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // Obergrenzen exklusiv (lt) statt inklusiv (lte): `new Date(y, m+1, 0)` wäre
+    // Mitternacht des letzten Tages — Buchungen mit Uhrzeit am Monatsletzten
+    // fielen sonst aus allen Monats-Aggregationen heraus.
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
     // Parallelisierte Abfragen
     const [
@@ -35,17 +37,17 @@ export class DashboardService {
       }),
       // Monatliche Einnahmen
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: monthStart, lte: monthEnd }, amount: { gt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: monthStart, lt: nextMonthStart }, amount: { gt: 0 } },
         _sum: { amount: true },
       }),
       // Monatliche Ausgaben
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: monthStart, lte: monthEnd }, amount: { lt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: monthStart, lt: nextMonthStart }, amount: { lt: 0 } },
         _sum: { amount: true },
       }),
       // Letzter Monat zum Vergleich
       this.prisma.transaction.aggregate({
-        where: { bankAccount: { userId }, date: { gte: lastMonthStart, lte: lastMonthEnd }, amount: { lt: 0 } },
+        where: { bankAccount: { userId }, date: { gte: lastMonthStart, lt: monthStart }, amount: { lt: 0 } },
         _sum: { amount: true },
       }),
       // Letzte 10 Transaktionen
@@ -58,7 +60,7 @@ export class DashboardService {
       // Ausgaben nach Kategorie (aktueller Monat)
       this.prisma.transaction.groupBy({
         by: ['categoryId'],
-        where: { bankAccount: { userId }, amount: { lt: 0 }, date: { gte: monthStart, lte: monthEnd } },
+        where: { bankAccount: { userId }, amount: { lt: 0 }, date: { gte: monthStart, lt: nextMonthStart } },
         _sum: { amount: true },
       }),
       // Ungelesene Benachrichtigungen

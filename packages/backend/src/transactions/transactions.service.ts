@@ -131,6 +131,11 @@ export class TransactionsService {
     const data: Prisma.TransactionUpdateInput = {
       ...rest,
       ...(date !== undefined && { date: new Date(date) }),
+      // Typ dem Vorzeichen nachziehen, wenn der Betrag ohne expliziten Typ
+      // geändert wird — sonst bleibt z. B. eine auf positiv korrigierte
+      // Buchung als EXPENSE gefiltert.
+      ...(dto.amount !== undefined &&
+        dto.type === undefined && { type: dto.amount >= 0 ? 'INCOME' : 'EXPENSE' }),
     };
 
     return this.prisma.transaction.update({
@@ -235,14 +240,23 @@ export class TransactionsService {
       orderBy: { date: 'desc' },
     });
 
+    // Freitextfelder gegen CSV-/Formel-Injection härten: Zellen, die mit
+    // = + - @ beginnen, würden Excel/LibreOffice sonst als Formel ausführen.
+    const sanitizeCell = (value: string): string => {
+      const cleaned = value.replace(/;/g, ',').replace(/[\r\n]+/g, ' ');
+      return /^[=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
+    };
+
     const header = 'Datum;Betrag;Währung;Typ;Kategorie;Verwendungszweck;Gegenpartei;IBAN Gegenpartei;Konto;Bank;IBAN';
     const rows = transactions.map((tx) => {
       const date = tx.date.toISOString().split('T')[0];
       const amount = Number(tx.amount).toFixed(2).replace('.', ',');
-      const category = tx.category?.name || '';
-      const purpose = (tx.purpose || '').replace(/;/g, ',').replace(/\n/g, ' ');
-      const counterpart = (tx.counterpartName || '').replace(/;/g, ',');
-      return `${date};${amount};${tx.currency};${tx.type};${category};${purpose};${counterpart};${tx.counterpartIban || ''};${tx.bankAccount.accountName};${tx.bankAccount.bankName};${tx.bankAccount.iban || ''}`;
+      const category = sanitizeCell(tx.category?.name || '');
+      const purpose = sanitizeCell(tx.purpose || '');
+      const counterpart = sanitizeCell(tx.counterpartName || '');
+      const accountName = sanitizeCell(tx.bankAccount.accountName);
+      const bankName = sanitizeCell(tx.bankAccount.bankName);
+      return `${date};${amount};${tx.currency};${tx.type};${category};${purpose};${counterpart};${tx.counterpartIban || ''};${accountName};${bankName};${tx.bankAccount.iban || ''}`;
     });
 
     return [header, ...rows].join('\n');

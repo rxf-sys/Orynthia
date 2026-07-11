@@ -45,12 +45,21 @@ const processQueue = (error: unknown | null) => {
   failedQueue = [];
 };
 
+// Auth-Endpoints vom Auto-Refresh ausnehmen: Ein 401 von /auth/login ist
+// "falsches Passwort", ein 401 von /auth/refresh ist "Session abgelaufen" —
+// beides darf keinen weiteren Refresh anstoßen. Ohne diese Ausnahme landet
+// der Refresh-Request bei eigenem 401 in der failedQueue und wartet auf
+// sich selbst (Deadlock: isRefreshing bleibt true, alle Requests hängen).
+const AUTH_NO_RETRY = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl: string = originalRequest?.url ?? '';
+    const isAuthEndpoint = AUTH_NO_RETRY.some((p) => requestUrl.includes(p));
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

@@ -118,7 +118,7 @@ export function RecurringPaymentsPage() {
           style={{
             borderStyle: 'dashed',
             borderColor: 'var(--peach)',
-            background: 'rgba(255,177,122,.05)',
+            background: 'rgba(253,164,129,.05)',
           }}
         >
           <h3 className="mb-4 text-lg font-bold text-ink">Neue wiederkehrende Zahlung</h3>
