@@ -12,9 +12,9 @@ import {
   FileText,
   Lightbulb,
 } from 'lucide-react';
-import { contractsApi } from '@/lib/api';
+import { contractsApi } from '@/features/finance/api';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { Contract, CreateContractData, DetectedContract } from '@/lib/types';
+import type { Contract, CreateContractData, DetectedContract } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, Tag, useConfirm } from '@/components/ui';
 

@@ -12,9 +12,9 @@ import {
   Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { investmentsApi } from '@/lib/api';
+import { investmentsApi } from '@/features/finance/api';
 import { formatCurrency, parseDecimal } from '@/lib/utils';
-import type { CreateInvestmentData, InvestmentPosition, InvestmentType } from '@/lib/types';
+import type { CreateInvestmentData, InvestmentPosition, InvestmentType } from '@/features/finance/types';
 import { Card, Btn, Field, PageHead, EmptyState, Modal, useConfirm } from '@/components/ui';
 
 const TYPE_LABELS: Record<InvestmentType, string> = {

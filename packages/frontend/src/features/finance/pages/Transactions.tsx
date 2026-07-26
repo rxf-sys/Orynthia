@@ -12,9 +12,9 @@ import {
   Download,
   Loader2,
 } from 'lucide-react';
-import { transactionsApi, categoriesApi, accountsApi } from '@/lib/api';
+import { transactionsApi, categoriesApi, accountsApi } from '@/features/finance/api';
 import { formatCurrency, formatDate, formatDateRelative, parseDecimal, cn } from '@/lib/utils';
-import type { Transaction, Category, CreateTransactionData, BankAccount } from '@/lib/types';
+import type { Transaction, Category, CreateTransactionData, BankAccount } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import {
   Card,

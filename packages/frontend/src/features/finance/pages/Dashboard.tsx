@@ -22,12 +22,12 @@ import {
   TrendingUp,
   Loader2,
 } from 'lucide-react';
-import { dashboardApi, transactionsApi } from '@/lib/api';
+import { dashboardApi, transactionsApi } from '@/features/finance/api';
 import { formatCurrency, formatDateRelative } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
-import type { MonthlyOverview, BankAccount, Transaction } from '@/lib/types';
+import type { MonthlyOverview, BankAccount, Transaction } from '@/features/finance/types';
 import { Card, Btn, PageHead, Tag, CategoryIcon, CategoryDot, pickCategoryColor } from '@/components/ui';
-import { ForecastCard } from '@/components/ForecastCard';
+import { ForecastCard } from '@/features/finance/components/ForecastCard';
 
 const CHART_COLORS = {
   income: 'var(--pos)',

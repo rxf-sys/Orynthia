@@ -18,9 +18,9 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
-import { accountsApi, bankingApi } from '@/lib/api';
+import { accountsApi, bankingApi } from '@/features/finance/api';
 import { formatCurrency, cn, parseDecimal, parseApiError } from '@/lib/utils';
-import type { BankAccount, CreateAccountData } from '@/lib/types';
+import type { BankAccount, CreateAccountData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 import {

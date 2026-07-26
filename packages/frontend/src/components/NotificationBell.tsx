@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   TrendingDown,
   Repeat,
+  CalendarClock,
+  ListChecks,
   Target,
   Sparkles,
   CloudOff,
@@ -13,8 +15,8 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { notificationsApi } from '@/lib/api';
-import type { Notification, NotificationType } from '@/lib/types';
+
+import { notificationsApi, type Notification, type NotificationType } from '@/platform/api/notifications';
 import { cn } from '@/lib/utils';
 import { Btn } from './ui/Btn';
 
@@ -25,6 +27,8 @@ const ICON_MAP: Record<NotificationType, LucideIcon> = {
   RECURRING_DETECTED: Repeat,
   SAVINGS_MILESTONE: Sparkles,
   SYNC_ERROR: CloudOff,
+  TASK_DUE: ListChecks,
+  EVENT_REMINDER: CalendarClock,
   SYSTEM: Info,
 };
 
@@ -35,6 +39,8 @@ const ACCENT_MAP: Record<NotificationType, string> = {
   RECURRING_DETECTED: 'var(--indigo)',
   SAVINGS_MILESTONE: 'var(--pos)',
   SYNC_ERROR: 'var(--neg)',
+  TASK_DUE: 'var(--info)',
+  EVENT_REMINDER: 'var(--info)',
   SYSTEM: 'var(--ink-3)',
 };
 

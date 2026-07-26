@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Calendar, Repeat } from 'lucide-react';
-import { recurringPaymentsApi, categoriesApi } from '@/lib/api';
+import { recurringPaymentsApi, categoriesApi } from '@/features/finance/api';
 import { formatCurrency, cn, parseDecimal } from '@/lib/utils';
-import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/lib/types';
+import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, CategoryIcon, Tag, useConfirm } from '@/components/ui';
 

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Target } from 'lucide-react';
-import { budgetsApi, categoriesApi } from '@/lib/api';
+import { budgetsApi, categoriesApi } from '@/features/finance/api';
 import { formatCurrency, cn } from '@/lib/utils';
-import type { Budget, Category, CreateBudgetData } from '@/lib/types';
+import type { Budget, Category, CreateBudgetData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import {
   Card,

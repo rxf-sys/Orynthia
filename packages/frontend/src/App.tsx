@@ -9,21 +9,21 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Route-basiertes Code-Splitting: jede Seite ist ein eigener Chunk, damit der
 // initiale Download klein bleibt (insb. Recharts lädt nur, wo Charts sind).
-const LoginPage = lazy(() => import('@/pages/Login').then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import('@/pages/Register').then((m) => ({ default: m.RegisterPage })));
-const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })));
-const ResetPasswordPage = lazy(() => import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })));
-const DashboardPage = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
-const TransactionsPage = lazy(() => import('@/pages/Transactions').then((m) => ({ default: m.TransactionsPage })));
-const BudgetsPage = lazy(() => import('@/pages/Budgets').then((m) => ({ default: m.BudgetsPage })));
-const AccountsPage = lazy(() => import('@/pages/Accounts').then((m) => ({ default: m.AccountsPage })));
-const RecurringPaymentsPage = lazy(() => import('@/pages/RecurringPayments').then((m) => ({ default: m.RecurringPaymentsPage })));
-const SavingsGoalsPage = lazy(() => import('@/pages/SavingsGoals').then((m) => ({ default: m.SavingsGoalsPage })));
-const ContractsPage = lazy(() => import('@/pages/Contracts').then((m) => ({ default: m.ContractsPage })));
-const SavingsPotentialPage = lazy(() => import('@/pages/SavingsPotential').then((m) => ({ default: m.SavingsPotentialPage })));
-const AssistantPage = lazy(() => import('@/pages/Assistant').then((m) => ({ default: m.AssistantPage })));
-const InvestmentsPage = lazy(() => import('@/pages/Investments').then((m) => ({ default: m.InvestmentsPage })));
-const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const LoginPage = lazy(() => import('@/features/auth/pages/Login').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('@/features/auth/pages/Register').then((m) => ({ default: m.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('@/features/auth/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })));
+const DashboardPage = lazy(() => import('@/features/finance/pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
+const TransactionsPage = lazy(() => import('@/features/finance/pages/Transactions').then((m) => ({ default: m.TransactionsPage })));
+const BudgetsPage = lazy(() => import('@/features/finance/pages/Budgets').then((m) => ({ default: m.BudgetsPage })));
+const AccountsPage = lazy(() => import('@/features/finance/pages/Accounts').then((m) => ({ default: m.AccountsPage })));
+const RecurringPaymentsPage = lazy(() => import('@/features/finance/pages/RecurringPayments').then((m) => ({ default: m.RecurringPaymentsPage })));
+const SavingsGoalsPage = lazy(() => import('@/features/finance/pages/SavingsGoals').then((m) => ({ default: m.SavingsGoalsPage })));
+const ContractsPage = lazy(() => import('@/features/finance/pages/Contracts').then((m) => ({ default: m.ContractsPage })));
+const SavingsPotentialPage = lazy(() => import('@/features/finance/pages/SavingsPotential').then((m) => ({ default: m.SavingsPotentialPage })));
+const AssistantPage = lazy(() => import('@/features/assistant/pages/Assistant').then((m) => ({ default: m.AssistantPage })));
+const InvestmentsPage = lazy(() => import('@/features/finance/pages/Investments').then((m) => ({ default: m.InvestmentsPage })));
+const SettingsPage = lazy(() => import('@/features/settings/pages/Settings').then((m) => ({ default: m.SettingsPage })));
 
 function FullscreenLoader() {
   return (

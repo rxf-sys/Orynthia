@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ArrowLeft, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { api } from '@/lib/api';
+import { api } from '@/platform/api/client';
 import { parseApiError } from '@/lib/utils';
 import { Btn, Field } from '@/components/ui';
 

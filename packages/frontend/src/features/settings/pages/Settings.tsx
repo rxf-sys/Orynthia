@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { api } from '@/lib/api';
+import { api } from '@/platform/api/client';
 import { cn, parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, Tag, Avatar, Modal } from '@/components/ui';

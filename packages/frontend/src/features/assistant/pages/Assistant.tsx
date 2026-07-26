@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Send, Sparkles, Loader2, User, Bot, AlertTriangle } from 'lucide-react';
-import { chatApi } from '@/lib/api';
+import { chatApi } from '@/features/assistant/api';
 import { Card, Btn, PageHead, EmptyState } from '@/components/ui';
 import { cn, parseApiError } from '@/lib/utils';
 import toast from 'react-hot-toast';

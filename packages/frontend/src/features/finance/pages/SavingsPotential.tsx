@@ -9,7 +9,7 @@ import {
   ExternalLink,
   AlertTriangle,
 } from 'lucide-react';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi } from '@/features/finance/api';
 import { formatCurrency } from '@/lib/utils';
 import { Card, PageHead, Tag, EmptyState } from '@/components/ui';
 

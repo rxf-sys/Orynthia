@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInCalendarMonths } from 'date-fns';
 import { Plus, Trash2, X, Loader2, Check, Minus, Lightbulb, PiggyBank } from 'lucide-react';
-import { savingsGoalsApi } from '@/lib/api';
+import { savingsGoalsApi } from '@/features/finance/api';
 import { formatCurrency, cn, parseDecimal } from '@/lib/utils';
-import type { SavingsGoal, CreateSavingsGoalData } from '@/lib/types';
+import type { SavingsGoal, CreateSavingsGoalData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import { Card, Btn, Field, PageHead, Progress, Tag, useConfirm } from '@/components/ui';
 

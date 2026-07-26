@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { api } from '@/platform/api/client';
 import type {
   BankAccount,
   Budget,
@@ -15,7 +15,6 @@ import type {
   DetectedContract,
   InvestmentsResponse,
   MonthlyOverview,
-  Notification,
   PaginatedResult,
   ProviderComparison,
   RecurringPayment,
@@ -23,91 +22,6 @@ import type {
   Transaction,
   TransactionFilters,
 } from './types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // httpOnly Cookies automatisch mitsenden
-  timeout: 30_000, // hängende Requests nicht unbegrenzt offen halten
-});
-
-// Response Interceptor: Token Refresh bei 401
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: unknown) => void }> = [];
-
-const processQueue = (error: unknown | null) => {
-  failedQueue.forEach((prom) => {
-    if (error) prom.reject(error);
-    else prom.resolve();
-  });
-  failedQueue = [];
-};
-
-// Auth-Endpoints vom Auto-Refresh ausnehmen: Ein 401 von /auth/login ist
-// "falsches Passwort", ein 401 von /auth/refresh ist "Session abgelaufen" —
-// beides darf keinen weiteren Refresh anstoßen. Ohne diese Ausnahme landet
-// der Refresh-Request bei eigenem 401 in der failedQueue und wartet auf
-// sich selbst (Deadlock: isRefreshing bleibt true, alle Requests hängen).
-const AUTH_NO_RETRY = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'];
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    const requestUrl: string = originalRequest?.url ?? '';
-    const isAuthEndpoint = AUTH_NO_RETRY.some((p) => requestUrl.includes(p));
-
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(() => api(originalRequest));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        await api.post('/auth/refresh');
-        processQueue(null);
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError);
-        // Kein harter window.location-Redirect: Auth-State zurücksetzen,
-        // die Route-Guards navigieren dann ohne Full-Reload (und ohne
-        // Mehrfach-Redirects bei parallelen 401ern).
-        const { useAuthStore } = await import('@/stores/authStore');
-        useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  },
-);
-
-// --- API Functions ---
-
-export const authApi = {
-  login: (data: { email: string; password: string; twoFactorCode?: string }) =>
-    api.post('/auth/login', data),
-  register: (data: { email: string; password: string; firstName?: string; lastName?: string }) =>
-    api.post('/auth/register', data),
-  logout: () => api.post('/auth/logout'),
-  logoutAll: () => api.post('/auth/logout-all'),
-  sessions: () =>
-    api.get<Array<{ id: string; userAgent: string | null; createdAt: string; lastUsedAt: string; current: boolean }>>(
-      '/auth/sessions',
-    ),
-  revokeSession: (id: string) => api.delete(`/auth/sessions/${id}`),
-  me: () => api.get('/auth/me'),
-  generate2FA: () => api.get('/auth/2fa/generate'),
-  enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
-};
 
 export interface ForecastResponse {
   horizonDays: number;
@@ -127,12 +41,6 @@ export interface ForecastResponse {
     items: Array<{ name: string; amount: number; source: 'recurring' | 'contract' }>;
   }>;
 }
-
-export const dashboardApi = {
-  getData: () => api.get<DashboardData>('/dashboard'),
-  getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
-  getSavingsPotential: () => api.get<SavingsPotentialResponse>('/dashboard/savings-potential'),
-};
 
 export interface SavingsPotentialResponse {
   totalFixedMonthly: number;
@@ -164,6 +72,12 @@ export interface SavingsPotentialResponse {
     overByPercent: number;
   }>;
 }
+
+export const dashboardApi = {
+  getData: () => api.get<DashboardData>('/dashboard'),
+  getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
+  getSavingsPotential: () => api.get<SavingsPotentialResponse>('/dashboard/savings-potential'),
+};
 
 export const accountsApi = {
   getAll: () => api.get<BankAccount[]>('/accounts'),
@@ -251,25 +165,4 @@ export const investmentsApi = {
   updatePrice: (id: string, currentPrice: number) =>
     api.post<InvestmentsResponse['positions'][number]>(`/investments/${id}/price`, { currentPrice }),
   remove: (id: string) => api.delete(`/investments/${id}`),
-};
-
-export const chatApi = {
-  status: () => api.get<{ enabled: boolean }>('/chat/status'),
-  send: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
-    api.post<{
-      role: 'assistant';
-      content: string;
-      usage: { input: number; output: number; cacheRead: number; cacheWrite: number };
-    }>('/chat/message', { messages }),
-};
-
-export const notificationsApi = {
-  list: (opts: { unread?: boolean; limit?: number } = {}) =>
-    api.get<Notification[]>('/notifications', {
-      params: { ...(opts.unread ? { unread: 'true' } : {}), ...(opts.limit ? { limit: opts.limit } : {}) },
-    }),
-  count: () => api.get<{ count: number }>('/notifications/count'),
-  markAsRead: (id: string) => api.post<Notification>(`/notifications/${id}/read`),
-  markAllAsRead: () => api.post<{ updated: number }>('/notifications/read-all'),
-  remove: (id: string) => api.delete(`/notifications/${id}`),
 };

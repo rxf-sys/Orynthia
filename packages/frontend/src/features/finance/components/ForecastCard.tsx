@@ -11,10 +11,10 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { TrendingDown, TrendingUp, Loader2, CalendarClock, RefreshCw } from 'lucide-react';
-import { dashboardApi } from '@/lib/api';
+import { dashboardApi } from '../api';
 import { formatCurrency } from '@/lib/utils';
-import { Card } from './ui/Card';
-import { Btn } from './ui/Btn';
+import { Card } from '@/components/ui/Card';
+import { Btn } from '@/components/ui/Btn';
 
 const RANGES: { id: number; label: string }[] = [
   { id: 30, label: '30 Tage' },
