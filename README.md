@@ -2,7 +2,7 @@
 
 Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
 
-**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🤖 KI-Assistent — weitere Module (Rezepte, Listen, Notizen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
+**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 🛒 Listen · 🤖 KI-Assistent — weitere Module (Notizen, Reisen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
 
 ## Tech-Stack
 
@@ -275,6 +275,21 @@ Orynthia/
 - Gruppierung nach Überfällig / Heute / Später, Quick-Add per Enter
 - Fälligkeits-Erinnerungen (täglich 08:00, idempotent) im Notification-Center
 
+### Rezepte
+- Eigene Rezepte mit Zutaten, Zubereitungsschritten, Portionen, Zeiten und Schwierigkeit
+- Portionsrechner in der Detailansicht: Mengen werden live auf die gewünschte
+  Portionszahl umgerechnet
+- Filter nach Mahlzeit, Ernährungsform, Zubereitungszeit und Favoriten, Volltextsuche
+- Bilder werden per URL verlinkt (kein Upload – bewusst schlank und ohne Storage)
+
+### Listen
+- Einkaufs-, Pack-, Check- und Wunschlisten mit Quick-Add, Abhaken und „Aufräumen"
+- **Rezept → Einkaufsliste:** Zutaten eines Rezepts mit einem Klick übernehmen –
+  skaliert auf die gewünschte Portionszahl; gleichnamige Einträge mit gleicher
+  Einheit werden zusammengeführt statt doppelt angelegt (inkl. Synonymen wie
+  „g"/„Gramm"), abgehakte Treffer werden dabei reaktiviert
+- Einträge zeigen ihre Herkunft („aus Rezept")
+
 ### Finanzen
 - Open Banking (PSD2) via Enable Banking - automatischer Kontoabgleich
 - Automatische Transaktionskategorisierung (Keyword-basiert, inkl. System-Kategorien)
@@ -348,7 +363,9 @@ Orynthia/
 ### Technik
 - Responsive Light/Dark-Theme UI mit Mobile-Tabbar inkl. „Mehr“-Sheet
   (alle Bereiche mobil erreichbar)
-- **⌘K-Befehlspalette**: Seiten öffnen + Transaktionen durchsuchen von überall
+- **⌘K-Befehlspalette (Command Center)**: Seiten öffnen, modulübergreifend suchen
+  (Aufgaben, Termine, Rezepte, Listen – serverseitig aggregiert, debounced) und
+  Transaktionen durchsuchen – von überall
 - **Performance**: Route-basiertes Code-Splitting (Initial-JS ~330 kB statt
   892 kB; Charts laden nur auf Chart-Seiten), Fonts self-hosted
 - **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop); Service
@@ -497,6 +514,24 @@ Orynthia/
 - `POST /api/calendar/integrations/google/callback` - OAuth-Code einlösen (`{code, state}`)
 - `POST /api/calendar/integrations/:id/sync` - Sofort synchronisieren
 - `DELETE /api/calendar/integrations/:id` - Verbindung trennen (inkl. Token-Revoke)
+
+### Rezepte
+- `GET /api/recipes` - Liste (`?search=&mealType=&dietary=&difficulty=&favorite=&maxTotalMinutes=`)
+- `GET /api/recipes/:id` - Rezept mit Zutaten
+- `POST /api/recipes` / `PATCH /api/recipes/:id` / `DELETE /api/recipes/:id`
+- `POST /api/recipes/:id/favorite` - Favorit umschalten
+
+### Listen
+- `GET /api/lists` / `GET /api/lists/:id`
+- `POST /api/lists` / `PATCH /api/lists/:id` / `DELETE /api/lists/:id`
+- `POST /api/lists/:id/items` - Eintrag hinzufügen
+- `POST /api/lists/:id/items/bulk` - Mehrere Einträge (mit Zusammenführung)
+- `POST /api/lists/:id/from-recipe` - Zutaten aus Rezept übernehmen (`{recipeId, servings?, ingredientIds?}`)
+- `DELETE /api/lists/:id/checked` - Abgehakte Einträge entfernen
+- `PATCH|DELETE /api/lists/items/:itemId`
+
+### Suche
+- `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte, Listen)
 
 ### Home-Layout
 - `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge

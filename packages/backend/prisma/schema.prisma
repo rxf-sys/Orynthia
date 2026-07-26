@@ -56,6 +56,8 @@ model User {
   tasks          Task[]
   calendars      Calendar[]
   integrations   ExternalIntegration[]
+  recipes        Recipe[]
+  lists          List[]
 
   @@map("users")
 }
@@ -574,6 +576,106 @@ model Calendar {
   @@index([userId])
   @@index([integrationId])
   @@map("calendars")
+}
+
+// ---------- Rezepte ----------
+enum RecipeDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Recipe {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  title       String
+  description String?
+  imageUrl    String? @map("image_url")
+
+  prepMinutes Int @default(0) @map("prep_minutes")
+  cookMinutes Int @default(0) @map("cook_minutes")
+  servings    Int @default(2)
+
+  difficulty  RecipeDifficulty @default(EASY)
+  // Freie String-Arrays statt Enums: Mahlzeiten-/Ernährungs-Kategorien
+  // sollen ohne Migration erweiterbar bleiben (Muster: Transaction.tags)
+  mealTypes   String[] @default([]) @map("meal_types")
+  dietary     String[] @default([])
+  tags        String[] @default([])
+
+  instructions String[] @default([])
+  nutrition    Json?
+  isFavorite   Boolean  @default(false) @map("is_favorite")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingredients RecipeIngredient[]
+  listItems   ListItem[]
+
+  @@index([userId])
+  @@index([userId, isFavorite])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id        String   @id @default(uuid())
+  recipeId  String   @map("recipe_id")
+  name      String
+  amount    Decimal? @db.Decimal(10, 2)
+  unit      String?
+  sortOrder Int      @default(0) @map("sort_order")
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@map("recipe_ingredients")
+}
+
+// ---------- Listen ----------
+enum ListType {
+  SHOPPING  // Einkaufsliste
+  PACKING   // Packliste
+  CHECKLIST // Checkliste
+  WISHLIST  // Wunschliste
+  GENERIC   // Allgemeine Liste
+}
+
+model List {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  type      ListType @default(SHOPPING)
+  icon      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ListItem[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("lists")
+}
+
+model ListItem {
+  id        String   @id @default(uuid())
+  listId    String   @map("list_id")
+  name      String
+  amount    Decimal? @db.Decimal(10, 2)
+  unit      String?
+  checked   Boolean  @default(false)
+  sortOrder Int      @default(0) @map("sort_order")
+  recipeId  String?  @map("recipe_id") // Herkunft „aus Rezept übernommen"
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  list   List    @relation(fields: [listId], references: [id], onDelete: Cascade)
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([listId])
+  @@map("list_items")
 }
 
 // ---------- Externe Integrationen (Token-Vault) ----------

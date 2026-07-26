@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Calendar as CalendarIcon,
   CheckSquare,
+  ClipboardList,
   Clock,
   Eye,
   EyeOff,
@@ -21,6 +22,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { dashboardApi, contractsApi } from '@/features/finance/api';
 import { calendarApi } from '@/features/calendar/api';
 import { tasksApi } from '@/features/tasks/api';
+import { listsApi } from '@/features/lists/api';
+import { LIST_TYPE_ICON } from '@/features/lists/types';
 import { homeApi } from '@/features/home/api';
 import { cn, formatCurrency } from '@/lib/utils';
 import { Btn, Card } from '@/components/ui';
@@ -35,6 +38,7 @@ const WIDGETS = [
   { id: 'finance', title: 'Finanzen' },
   { id: 'today', title: 'Heute & demnächst' },
   { id: 'tasks', title: 'Aufgaben' },
+  { id: 'lists', title: 'Listen' },
   { id: 'contracts', title: 'Verträge & Abos' },
 ] as const;
 
@@ -132,6 +136,8 @@ export function HomePage() {
               return <TodayWidget key={w.id} />;
             case 'tasks':
               return <TasksWidget key={w.id} />;
+            case 'lists':
+              return <ListsWidget key={w.id} />;
             case 'contracts':
               return <ContractsWidget key={w.id} />;
           }
@@ -280,6 +286,55 @@ function TaskStat({ label, value, accent }: { label: string; value: number; acce
       </div>
       <div className="text-[0.7rem] font-semibold uppercase text-ink-3">{label}</div>
     </div>
+  );
+}
+
+function ListsWidget() {
+  const { data: lists, isLoading } = useQuery({
+    queryKey: ['lists'],
+    queryFn: () => listsApi.getAll().then((r) => r.data),
+  });
+
+  const withOpen = useMemo(
+    () => (lists ?? []).filter((l) => (l._count?.items ?? 0) > 0).slice(0, 4),
+    [lists],
+  );
+
+  return (
+    <Card>
+      <WidgetHead title="Listen" to="/lists" icon={ClipboardList} />
+      {isLoading ? (
+        <WidgetSkeleton />
+      ) : withOpen.length === 0 ? (
+        <WidgetEmpty
+          text={
+            (lists?.length ?? 0) === 0
+              ? 'Noch keine Listen angelegt.'
+              : 'Alles abgehakt – keine offenen Einträge.'
+          }
+          action={{ label: 'Liste öffnen', to: '/lists' }}
+        />
+      ) : (
+        <ul className="space-y-2">
+          {withOpen.map((list) => (
+            <li key={list.id}>
+              <Link
+                to={`/lists/${list.id}`}
+                className="flex items-center gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-soft"
+              >
+                <span aria-hidden>{list.icon ?? LIST_TYPE_ICON[list.type]}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                  {list.name}
+                </span>
+                <span className="tnum shrink-0 text-xs text-ink-3">
+                  {list._count!.items} offen
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

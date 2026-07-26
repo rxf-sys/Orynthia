@@ -5,6 +5,8 @@ import {
   Wallet,
   Calendar,
   CheckSquare,
+  ChefHat,
+  ClipboardList,
   ArrowLeftRight,
   Building2,
   Target,
@@ -39,8 +41,10 @@ interface NavItem {
 // Finanz-Modul trägt seine Unterseiten als aufklappbare Gruppe.
 const MODULES: NavItem[] = [
   { to: '/', end: true, icon: Home, label: 'Home' },
-  { to: '/calendar', icon: Calendar, label: 'Kalender', badge: 'Neu' },
-  { to: '/tasks', icon: CheckSquare, label: 'Aufgaben', badge: 'Neu' },
+  { to: '/calendar', icon: Calendar, label: 'Kalender' },
+  { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
+  { to: '/recipes', icon: ChefHat, label: 'Rezepte', badge: 'Neu' },
+  { to: '/lists', icon: ClipboardList, label: 'Listen', badge: 'Neu' },
   { to: '/assistant', icon: Bot, label: 'KI-Assistent', badge: 'Beta' },
 ];
 

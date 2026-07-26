@@ -218,6 +218,41 @@ export class CalendarService {
     return occurrences.slice(0, Math.min(limit, 50));
   }
 
+  /**
+   * Schmale Public API für die globale Suche. Sucht in Titel/Ort und liefert
+   * pro Treffer die nächste relevante Instanz (Serien werden expandiert).
+   */
+  async search(userId: string, q: string, limit = 5) {
+    const events = await this.prisma.calendarEvent.findMany({
+      where: {
+        calendar: { userId },
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { location: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      include: { calendar: { select: { name: true, color: true, readOnly: true } } },
+      orderBy: { startsAt: 'desc' },
+      take: limit * 4,
+    });
+
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 400 * 86_400_000);
+    return events
+      .map((event) => {
+        const next = this.nextOccurrenceStart(event, now, horizon) ?? event.startsAt;
+        return {
+          id: event.id,
+          title: event.title,
+          startsAt: next.toISOString(),
+          calendarName: event.calendar.name,
+          isAllDay: event.isAllDay,
+        };
+      })
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .slice(0, limit);
+  }
+
   // ---------- Termin-Erinnerungen ----------
 
   // Alle 5 Minuten: Termine melden, deren Erinnerungsfenster erreicht ist.

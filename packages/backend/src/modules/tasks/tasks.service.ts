@@ -146,6 +146,16 @@ export class TasksService {
     return { open, dueToday, overdue };
   }
 
+  /** Schmale Public API für die globale Suche. */
+  async search(userId: string, q: string, limit = 5) {
+    return this.prisma.task.findMany({
+      where: { userId, completedAt: null, title: { contains: q, mode: 'insensitive' } },
+      select: { id: true, title: true, dueAt: true, priority: true },
+      orderBy: { dueAt: { sort: 'asc', nulls: 'last' } },
+      take: limit,
+    });
+  }
+
   // ---------- Fälligkeits-Erinnerungen ----------
 
   // Täglich 08:00 wie die Budget-Warnungen; dedupeKey macht den Lauf idempotent.

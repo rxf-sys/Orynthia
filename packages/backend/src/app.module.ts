@@ -21,6 +21,9 @@ import { ChatModule } from './assistant/chat/chat.module';
 import { InvestmentsModule } from './modules/finance/investments/investments.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { RecipesModule } from './modules/recipes/recipes.module';
+import { ListsModule } from './modules/lists/lists.module';
+import { SearchModule } from './search/search.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 import { HealthModule } from './platform/health/health.module';
 
@@ -69,6 +72,9 @@ import { HealthModule } from './platform/health/health.module';
     InvestmentsModule,
     TasksModule,
     CalendarModule,
+    RecipesModule,
+    ListsModule,
+    SearchModule,
     DemoSeedModule,
     HealthModule,
   ],

@@ -329,10 +329,100 @@ export class DemoSeedService implements OnModuleInit {
       ],
     });
 
+    // ---------- Rezepte ----------
+    const bolognese = await this.prisma.recipe.create({
+      data: {
+        userId: user.id,
+        title: 'Spaghetti Bolognese',
+        description: 'Klassiker für die ganze Familie – schmeckt aufgewärmt fast noch besser.',
+        prepMinutes: 15,
+        cookMinutes: 45,
+        servings: 4,
+        difficulty: 'EASY',
+        mealTypes: ['dinner'],
+        tags: ['klassiker', 'familienessen'],
+        instructions: [
+          'Zwiebeln und Knoblauch fein würfeln und in Olivenöl glasig dünsten.',
+          'Hackfleisch zugeben und krümelig anbraten.',
+          'Tomaten zugeben, salzen, pfeffern und 30 Minuten köcheln lassen.',
+          'Spaghetti nach Packungsangabe kochen und mit der Sauce servieren.',
+        ],
+        isFavorite: true,
+        ingredients: {
+          create: [
+            { name: 'Hackfleisch', amount: 500, unit: 'g', sortOrder: 0 },
+            { name: 'Passierte Tomaten', amount: 800, unit: 'g', sortOrder: 1 },
+            { name: 'Zwiebeln', amount: 2, unit: 'Stück', sortOrder: 2 },
+            { name: 'Knoblauchzehen', amount: 2, unit: 'Stück', sortOrder: 3 },
+            { name: 'Spaghetti', amount: 500, unit: 'g', sortOrder: 4 },
+            { name: 'Olivenöl', sortOrder: 5 },
+          ],
+        },
+      },
+    });
+    await this.prisma.recipe.create({
+      data: {
+        userId: user.id,
+        title: 'Porridge mit Beeren',
+        description: 'Schnelles Frühstück, das lange satt hält.',
+        prepMinutes: 5,
+        cookMinutes: 10,
+        servings: 2,
+        difficulty: 'EASY',
+        mealTypes: ['breakfast'],
+        dietary: ['vegetarian'],
+        tags: ['schnell'],
+        instructions: [
+          'Haferflocken mit Milch aufkochen und 5 Minuten quellen lassen.',
+          'Mit Beeren und Honig anrichten.',
+        ],
+        ingredients: {
+          create: [
+            { name: 'Haferflocken', amount: 100, unit: 'g', sortOrder: 0 },
+            { name: 'Milch', amount: 400, unit: 'ml', sortOrder: 1 },
+            { name: 'Beerenmischung', amount: 150, unit: 'g', sortOrder: 2 },
+            { name: 'Honig', amount: 2, unit: 'EL', sortOrder: 3 },
+          ],
+        },
+      },
+    });
+
+    // ---------- Listen (inkl. Herkunft aus Rezept) ----------
+    await this.prisma.list.create({
+      data: {
+        userId: user.id,
+        name: 'Wocheneinkauf',
+        type: 'SHOPPING',
+        items: {
+          create: [
+            { name: 'Hackfleisch', amount: 500, unit: 'g', sortOrder: 0, recipeId: bolognese.id },
+            { name: 'Passierte Tomaten', amount: 800, unit: 'g', sortOrder: 1, recipeId: bolognese.id },
+            { name: 'Spaghetti', amount: 500, unit: 'g', sortOrder: 2, recipeId: bolognese.id },
+            { name: 'Kaffeebohnen', amount: 1, unit: 'kg', sortOrder: 3 },
+            { name: 'Spülmittel', sortOrder: 4, checked: true },
+          ],
+        },
+      },
+    });
+    await this.prisma.list.create({
+      data: {
+        userId: user.id,
+        name: 'Packliste Urlaub',
+        type: 'PACKING',
+        items: {
+          create: [
+            { name: 'Reisepass', sortOrder: 0 },
+            { name: 'Ladekabel', sortOrder: 1 },
+            { name: 'Sonnencreme', sortOrder: 2 },
+          ],
+        },
+      },
+    });
+
     this.logger.log(
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
         `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
-        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen.`,
+        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen, 2 Rezepte, 2 Listen.`,
     );
   }
 
