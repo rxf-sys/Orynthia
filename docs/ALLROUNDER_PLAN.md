@@ -1,6 +1,10 @@
 # Orynthia – Strategische Neuausrichtung zur Allrounder-App
 
-**Status:** Analyse- und Planungsdokument – wartet auf Freigabe. Es wurden keine Code-Änderungen vorgenommen.
+**Status:** Freigegeben und in Umsetzung. Phase 0 sowie der Phase-1-MVP (Tasks 1–10) sind auf `claude/loving-wright-82coi7` umgesetzt:
+Frontend-/Backend-Modularisierung, modulare Navigation (Sidebar/Tabbar/⌘K), Home-Widget-Dashboard mit Personalisierung,
+Aufgaben-Domain und lokale Kalender-Domain inkl. Migration `6_add_tasks_and_calendar`, Demo-Seed und README.
+Verifiziert per Build, Lint, 88 Tests sowie End-to-End-Smoke-Test gegen echte PostgreSQL-Instanz
+(Migrationen, Boot, Login, Aufgaben-Recurrence, Serien-Expansion, Dashboard-Layout). Offen: Phase 2+ (Tasks 11–17).
 **Stand:** 2026-07-26
 **Analysierte Repositories:** `rxf-sys/Orynthia` (Commit `a9a92df`), `rxf-sys/standby-web`
 
