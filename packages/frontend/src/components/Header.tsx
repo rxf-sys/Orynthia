@@ -9,15 +9,18 @@ import { CommandPalette } from './CommandPalette';
 import { useCommandPalette } from './useCommandPalette';
 
 const TITLE_MAP: Record<string, string> = {
-  '/': 'Dashboard',
-  '/transactions': 'Transaktionen',
-  '/accounts': 'Konten',
-  '/budgets': 'Budgets',
-  '/savings': 'Sparziele',
-  '/investments': 'Depot',
-  '/recurring': 'Wiederkehrende Zahlungen',
-  '/contracts': 'Verträge',
-  '/savings-potential': 'Sparpotenzial',
+  '/': 'Home',
+  '/finance': 'Finanzen',
+  '/finance/transactions': 'Transaktionen',
+  '/finance/accounts': 'Konten',
+  '/finance/budgets': 'Budgets',
+  '/finance/savings': 'Sparziele',
+  '/finance/investments': 'Depot',
+  '/finance/recurring': 'Wiederkehrende Zahlungen',
+  '/finance/contracts': 'Verträge',
+  '/finance/savings-potential': 'Sparpotenzial',
+  '/calendar': 'Kalender',
+  '/tasks': 'Aufgaben',
   '/assistant': 'KI-Assistent',
   '/settings': 'Einstellungen',
 };

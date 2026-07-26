@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray, IsString, IsOptional, IsBoolean, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -64,4 +65,20 @@ export class NotificationSettingsDto {
   @IsOptional()
   @IsBoolean()
   savingsGoals?: boolean;
+}
+
+export class DashboardLayoutDto {
+  @ApiProperty({ required: false, type: [String], description: 'IDs ausgeblendeter Widgets' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  hidden?: string[];
+
+  @ApiProperty({ required: false, type: [String], description: 'Widget-Reihenfolge' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  order?: string[];
 }

@@ -1,6 +1,8 @@
-# Orynthia - Persönliche Finanzverwaltung
+# Orynthia – Dein Alltag. Eine App.
 
-Eine Self-Hosted Web-App zur persönlichen Finanzverwaltung mit Open Banking (PSD2), automatischer Kategorisierung, Budgets, Vertragsmanagement, Sparziele und Dashboard-Analysen.
+Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
+
+**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🤖 KI-Assistent — weitere Module (Rezepte, Listen, Notizen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
 
 ## Tech-Stack
 
@@ -217,36 +219,54 @@ Orynthia/
 │   │   │   ├── migrations/            # Versionierte SQL-Migrationen (migrate deploy)
 │   │   │   └── seed.ts                # Optionale Demo-Daten
 │   │   └── src/
-│   │       ├── auth/           # JWT, 2FA, Login/Register
-│   │       ├── users/          # Profilverwaltung
-│   │       ├── accounts/       # Bankkonten
-│   │       ├── banking/        # Enable Banking API (PSD2)
-│   │       ├── transactions/   # Buchungen, Kategorisierung, CSV-Export
-│   │       ├── categories/     # Kategorien-System
-│   │       ├── budgets/        # Budget-Tracking
-│   │       ├── recurring-payments/ # Wiederkehrende Zahlungen
-│   │       ├── savings-goals/  # Sparziele
-│   │       ├── contracts/      # Vertragsmanagement & Anbietervergleich
-│   │       ├── investments/    # Depot-Positionen
-│   │       ├── notifications/  # Benachrichtigungen (Inbox + Cron-Trigger)
-│   │       ├── chat/           # KI-Assistent (Anthropic)
-│   │       ├── dashboard/      # Aggregierte Übersicht + Forecast
-│   │       ├── health/         # Liveness/Readiness-Endpoints
-│   │       ├── config/         # ENV-Validierung beim Bootstrap
+│   │       ├── platform/       # Querschnitt: auth (JWT, 2FA), users, mail,
+│   │       │                   # notifications, prisma, config, health, common
+│   │       ├── modules/
+│   │       │   ├── finance/    # accounts, banking (PSD2), transactions,
+│   │       │   │               # categories, budgets, recurring-payments,
+│   │       │   │               # savings-goals, contracts, investments, dashboard
+│   │       │   ├── tasks/      # Aufgaben & Aufgabenlisten
+│   │       │   └── calendar/   # Kalender & Termine (inkl. Serien)
+│   │       ├── assistant/      # KI-Assistent (Anthropic)
 │   │       └── demo-seed/      # Demo-Daten (nur Nicht-Production)
 │   └── frontend/
 │       └── src/
-│           ├── pages/          # Dashboard, Transaktionen, Budgets, etc.
+│           ├── platform/       # API-Client (axios + Refresh), Notifications-API
+│           ├── features/       # Eine Domain pro Ordner:
+│           │   ├── home/       # Modulares Widget-Dashboard
+│           │   ├── finance/    # Alle Finanz-Seiten + api.ts + types.ts
+│           │   ├── calendar/   # Monats-/Wochen-/Agenda-Ansicht
+│           │   ├── tasks/      # Aufgaben mit Listen & Prioritäten
+│           │   ├── auth/  assistant/  settings/
 │           ├── components/     # Layout, Sidebar, Header, CommandPalette (⌘K)
 │           │   └── ui/         # Btn, Card, Modal, Field, ConfirmDialog, …
 │           ├── stores/         # Zustand: Auth, Theme
-│           └── lib/            # API Client, Types, Utilities
+│           └── lib/            # Utilities
 └── docs/
     ├── FRONTEND_AUDIT.md       # Frontend-Audit inkl. Umsetzungsstatus
     └── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
 ```
 
 ## Features
+
+### Home-Dashboard
+- Modulares Widget-Grid als Startseite: Finanz-Überblick, „Heute & demnächst"
+  (Kalender), Aufgaben-Status, Verträge & Abos
+- Widgets pro Nutzer ein-/ausblendbar (serverseitig gespeichert)
+
+### Kalender
+- Monats-, Wochen- und Agenda-Ansicht, mehrere Kalender mit Farben
+- Termine mit Ort, Beschreibung, Ganztages-Terminen
+- Wiederkehrende Termine (täglich bis jährlich, Intervall + Enddatum) —
+  Serien-Instanzen werden serverseitig expandiert (Monatsend-Klemmung, gekappt)
+- Erinnerungen (5 Min bis 1 Tag vorher) über die Benachrichtigungs-Inbox
+- Vorbereitet für externe Kalender-Sync (Google/Apple/ICS) hinter Provider-Interface
+
+### Aufgaben
+- Aufgaben mit Prioritäten, Fälligkeiten, Notizen und Aufgabenlisten
+- Wiederkehrende Aufgaben: Beim Erledigen entsteht automatisch die nächste Instanz
+- Gruppierung nach Überfällig / Heute / Später, Quick-Add per Enter
+- Fälligkeits-Erinnerungen (täglich 08:00, idempotent) im Notification-Center
 
 ### Finanzen
 - Open Banking (PSD2) via Enable Banking - automatischer Kontoabgleich
@@ -451,6 +471,22 @@ Orynthia/
 ### KI-Assistent
 - `GET /api/chat/status` - Aktiviert? (true/false)
 - `POST /api/chat/message` - Nachricht senden (history-aware, kontext-injiziert)
+
+### Aufgaben
+- `GET /api/tasks` - Liste (`?status=open|completed|all&taskListId=&dueBefore=`)
+- `GET /api/tasks/summary` - Offen/Heute/Überfällig (Home-Widget)
+- `POST /api/tasks` / `PATCH /api/tasks/:id` / `DELETE /api/tasks/:id`
+- `GET/POST /api/tasks/lists`, `PATCH/DELETE /api/tasks/lists/:id`
+
+### Kalender
+- `GET /api/calendar/calendars` - Kalender (legt beim ersten Zugriff „Privat" an)
+- `POST /api/calendar/calendars` / `PATCH|DELETE /api/calendar/calendars/:id`
+- `GET /api/calendar/events?from=&to=` - Termin-Instanzen (Serien expandiert)
+- `GET /api/calendar/events/upcoming?days=&limit=` - Nächste Termine (Home-Widget)
+- `POST /api/calendar/events` / `PATCH|DELETE /api/calendar/events/:id`
+
+### Home-Layout
+- `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge
 
 ## Automatischer Konten-Import (Enable Banking)
 

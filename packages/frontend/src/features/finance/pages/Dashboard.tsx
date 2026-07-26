@@ -154,7 +154,7 @@ export function DashboardPage() {
             <Btn variant="ghost" icon={RefreshCw}>
               Synchronisieren
             </Btn>
-            <Link to="/transactions">
+            <Link to="/finance/transactions">
               <Btn variant="grad" icon={Plus}>
                 Transaktion
               </Btn>
@@ -229,7 +229,7 @@ export function DashboardPage() {
               </div>
               <div className="tnum mt-1 text-[1.8rem] font-bold">—</div>
               <Link
-                to="/contracts"
+                to="/finance/contracts"
                 className="mt-1 inline-block text-[0.82rem] font-semibold text-indigo hover:underline"
               >
                 Verträge prüfen →
@@ -340,7 +340,7 @@ export function DashboardPage() {
       <Card>
         <div className="mb-3.5 flex items-center justify-between">
           <div className="text-[1.05rem] font-bold text-ink">Deine Konten</div>
-          <Link to="/accounts" className="text-[0.85rem] font-semibold text-indigo hover:underline">
+          <Link to="/finance/accounts" className="text-[0.85rem] font-semibold text-indigo hover:underline">
             Alle ansehen →
           </Link>
         </div>
@@ -402,7 +402,7 @@ export function DashboardPage() {
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[1.05rem] font-bold text-ink">Letzte Transaktionen</div>
             <Link
-              to="/transactions"
+              to="/finance/transactions"
               className="text-[0.85rem] font-semibold text-indigo hover:underline"
             >
               Alle →

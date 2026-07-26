@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
+  Home,
+  Wallet,
+  Calendar,
+  CheckSquare,
   LayoutDashboard,
   ArrowLeftRight,
   Building2,
@@ -27,15 +31,19 @@ interface Command {
 }
 
 const NAV_COMMANDS: Command[] = [
-  { id: 'nav-dashboard', label: 'Dashboard', icon: LayoutDashboard, run: (n) => n('/') },
-  { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/transactions') },
-  { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/accounts') },
-  { id: 'nav-budgets', label: 'Budgets', icon: Target, run: (n) => n('/budgets') },
-  { id: 'nav-savings', label: 'Sparziele', icon: PiggyBank, run: (n) => n('/savings') },
-  { id: 'nav-investments', label: 'Depot', icon: LineChart, run: (n) => n('/investments') },
-  { id: 'nav-recurring', label: 'Wiederkehrende Zahlungen', icon: Repeat, run: (n) => n('/recurring') },
-  { id: 'nav-contracts', label: 'Verträge', icon: FileText, run: (n) => n('/contracts') },
-  { id: 'nav-savings-potential', label: 'Sparpotenzial', icon: Sparkles, run: (n) => n('/savings-potential') },
+  { id: 'nav-home', label: 'Home', icon: Home, run: (n) => n('/') },
+  { id: 'nav-finance', label: 'Finanzen', icon: Wallet, run: (n) => n('/finance') },
+  { id: 'nav-calendar', label: 'Kalender', icon: Calendar, run: (n) => n('/calendar') },
+  { id: 'nav-tasks', label: 'Aufgaben', icon: CheckSquare, run: (n) => n('/tasks') },
+  { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
+  { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },
+  { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/finance/accounts') },
+  { id: 'nav-budgets', label: 'Budgets', icon: Target, run: (n) => n('/finance/budgets') },
+  { id: 'nav-savings', label: 'Sparziele', icon: PiggyBank, run: (n) => n('/finance/savings') },
+  { id: 'nav-investments', label: 'Depot', icon: LineChart, run: (n) => n('/finance/investments') },
+  { id: 'nav-recurring', label: 'Wiederkehrende Zahlungen', icon: Repeat, run: (n) => n('/finance/recurring') },
+  { id: 'nav-contracts', label: 'Verträge', icon: FileText, run: (n) => n('/finance/contracts') },
+  { id: 'nav-savings-potential', label: 'Sparpotenzial', icon: Sparkles, run: (n) => n('/finance/savings-potential') },
   { id: 'nav-assistant', label: 'KI-Assistent', icon: Bot, run: (n) => n('/assistant') },
   { id: 'nav-settings', label: 'Einstellungen', icon: Settings, run: (n) => n('/settings') },
 ];
@@ -64,7 +72,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       label: `Transaktionen durchsuchen: „${query.trim()}“`,
       hint: 'Enter',
       icon: Search,
-      run: (n) => n(`/transactions?search=${encodeURIComponent(query.trim())}`),
+      run: (n) => n(`/finance/transactions?search=${encodeURIComponent(query.trim())}`),
     };
     return [txSearch, ...nav];
   }, [query]);

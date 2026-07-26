@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -24,6 +24,16 @@ const SavingsPotentialPage = lazy(() => import('@/features/finance/pages/Savings
 const AssistantPage = lazy(() => import('@/features/assistant/pages/Assistant').then((m) => ({ default: m.AssistantPage })));
 const InvestmentsPage = lazy(() => import('@/features/finance/pages/Investments').then((m) => ({ default: m.InvestmentsPage })));
 const SettingsPage = lazy(() => import('@/features/settings/pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const HomePage = lazy(() => import('@/features/home/pages/Home').then((m) => ({ default: m.HomePage })));
+const TasksPage = lazy(() => import('@/features/tasks/pages/Tasks').then((m) => ({ default: m.TasksPage })));
+const CalendarPage = lazy(() => import('@/features/calendar/pages/Calendar').then((m) => ({ default: m.CalendarPage })));
+
+// Alte Finanz-Routen leben als Redirects weiter – inklusive Query-String,
+// damit z. B. der Enable-Banking-Callback (/accounts?code=…) weiter ankommt.
+function LegacyRedirect({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+}
 
 function FullscreenLoader() {
   return (
@@ -92,17 +102,35 @@ export default function App() {
 
             {/* Protected Routes */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<DashboardPage />} />
-              <Route path="transactions" element={<TransactionsPage />} />
-              <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="accounts" element={<AccountsPage />} />
-              <Route path="recurring" element={<RecurringPaymentsPage />} />
-              <Route path="savings" element={<SavingsGoalsPage />} />
-              <Route path="contracts" element={<ContractsPage />} />
-              <Route path="savings-potential" element={<SavingsPotentialPage />} />
+              <Route index element={<HomePage />} />
+
+              {/* Modul: Finanzen */}
+              <Route path="finance" element={<DashboardPage />} />
+              <Route path="finance/transactions" element={<TransactionsPage />} />
+              <Route path="finance/budgets" element={<BudgetsPage />} />
+              <Route path="finance/accounts" element={<AccountsPage />} />
+              <Route path="finance/recurring" element={<RecurringPaymentsPage />} />
+              <Route path="finance/savings" element={<SavingsGoalsPage />} />
+              <Route path="finance/contracts" element={<ContractsPage />} />
+              <Route path="finance/savings-potential" element={<SavingsPotentialPage />} />
+              <Route path="finance/investments" element={<InvestmentsPage />} />
+
+              {/* Module: Kalender & Aufgaben */}
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+
               <Route path="assistant" element={<AssistantPage />} />
-              <Route path="investments" element={<InvestmentsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+
+              {/* Redirects der alten Finanz-Routen */}
+              <Route path="transactions" element={<LegacyRedirect to="/finance/transactions" />} />
+              <Route path="budgets" element={<LegacyRedirect to="/finance/budgets" />} />
+              <Route path="accounts" element={<LegacyRedirect to="/finance/accounts" />} />
+              <Route path="recurring" element={<LegacyRedirect to="/finance/recurring" />} />
+              <Route path="savings" element={<LegacyRedirect to="/finance/savings" />} />
+              <Route path="contracts" element={<LegacyRedirect to="/finance/contracts" />} />
+              <Route path="savings-potential" element={<LegacyRedirect to="/finance/savings-potential" />} />
+              <Route path="investments" element={<LegacyRedirect to="/finance/investments" />} />
             </Route>
 
             {/* Fallback: echte 404 statt stillem Redirect */}

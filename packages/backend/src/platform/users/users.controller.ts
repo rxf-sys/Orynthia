@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
-import { UpdateProfileDto, ChangePasswordDto, DeleteAccountDto, NotificationSettingsDto } from './dto/user.dto';
+import { UpdateProfileDto, ChangePasswordDto, DeleteAccountDto, NotificationSettingsDto, DashboardLayoutDto } from './dto/user.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -20,6 +20,16 @@ export class UsersController {
   @Patch('profile')
   async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user!.id, dto);
+  }
+
+  @Get('dashboard-layout')
+  async getDashboardLayout(@Req() req: Request) {
+    return this.usersService.getDashboardLayout(req.user!.id);
+  }
+
+  @Patch('dashboard-layout')
+  async updateDashboardLayout(@Req() req: Request, @Body() dto: DashboardLayoutDto) {
+    return this.usersService.updateDashboardLayout(req.user!.id, dto);
   }
 
   @Post('change-password')

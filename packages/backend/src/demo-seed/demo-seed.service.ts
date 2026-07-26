@@ -239,9 +239,100 @@ export class DemoSeedService implements OnModuleInit {
       ],
     });
 
+    // ---------- Aufgaben ----------
+    const errandsList = await this.prisma.taskList.create({
+      data: { userId: user.id, name: 'Haushalt', color: '#1f8a5b' },
+    });
+    await this.prisma.task.createMany({
+      data: [
+        {
+          userId: user.id,
+          title: 'Stromzähler ablesen',
+          priority: 'MEDIUM',
+          taskListId: errandsList.id,
+          dueAt: addDays(new Date(), 2),
+        },
+        {
+          userId: user.id,
+          title: 'Steuererklärung vorbereiten',
+          notes: 'Belege aus dem Ordner „Finanzen 2025“ heraussuchen',
+          priority: 'HIGH',
+          dueAt: addDays(new Date(), 7),
+        },
+        {
+          userId: user.id,
+          title: 'Miete überweisen',
+          priority: 'HIGH',
+          recurrence: 'MONTHLY',
+          dueAt: nextMonthStart(),
+        },
+        {
+          userId: user.id,
+          title: 'Altglas wegbringen',
+          priority: 'LOW',
+          taskListId: errandsList.id,
+        },
+        {
+          userId: user.id,
+          title: 'Versicherungsvergleich prüfen',
+          completedAt: addDays(new Date(), -1),
+          dueAt: addDays(new Date(), -1),
+        },
+      ],
+    });
+
+    // ---------- Kalender ----------
+    const privateCal = await this.prisma.calendar.create({
+      data: { userId: user.id, name: 'Privat', color: '#5b8def', isDefault: true },
+    });
+    const workCal = await this.prisma.calendar.create({
+      data: { userId: user.id, name: 'Arbeit', color: '#fda481' },
+    });
+    const at = (daysFromNow: number, hour: number, minutes = 0) => {
+      const d = addDays(new Date(), daysFromNow);
+      d.setHours(hour, minutes, 0, 0);
+      return d;
+    };
+    await this.prisma.calendarEvent.createMany({
+      data: [
+        {
+          calendarId: privateCal.id,
+          title: 'Zahnarzt',
+          location: 'Praxis Dr. Sommer',
+          startsAt: at(1, 9, 30),
+          endsAt: at(1, 10, 15),
+          reminderMinutes: 60,
+        },
+        {
+          calendarId: workCal.id,
+          title: 'Team-Meeting',
+          startsAt: at(2, 10, 0),
+          endsAt: at(2, 11, 0),
+          recurrence: 'WEEKLY',
+          reminderMinutes: 15,
+        },
+        {
+          calendarId: privateCal.id,
+          title: 'Geburtstag Lena',
+          startsAt: at(5, 0, 0),
+          endsAt: at(5, 23, 59),
+          isAllDay: true,
+          recurrence: 'YEARLY',
+        },
+        {
+          calendarId: privateCal.id,
+          title: 'Sport',
+          startsAt: at(3, 18, 30),
+          endsAt: at(3, 20, 0),
+          recurrence: 'WEEKLY',
+        },
+      ],
+    });
+
     this.logger.log(
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
-        `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, 4 wiederkehrende Zahlungen.`,
+        `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
+        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen.`,
     );
   }
 

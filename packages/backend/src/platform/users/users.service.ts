@@ -88,6 +88,27 @@ export class UsersService {
     return merged;
   }
 
+  async getDashboardLayout(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { dashboardLayout: true },
+    });
+    if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+    return (user.dashboardLayout as { hidden?: string[]; order?: string[] } | null) ?? { hidden: [], order: [] };
+  }
+
+  async updateDashboardLayout(userId: string, layout: { hidden?: string[]; order?: string[] }) {
+    const merged = {
+      hidden: layout.hidden ?? [],
+      order: layout.order ?? [],
+    };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { dashboardLayout: merged },
+    });
+    return merged;
+  }
+
   async deleteAccount(userId: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Benutzer nicht gefunden');

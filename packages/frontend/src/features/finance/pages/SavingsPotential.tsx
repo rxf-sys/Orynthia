@@ -157,7 +157,7 @@ export function SavingsPotentialPage() {
                   </div>
                 </div>
                 <Link
-                  to="/contracts"
+                  to="/finance/contracts"
                   className="text-[0.85rem] font-semibold text-indigo hover:underline"
                 >
                   Alle Verträge anzeigen
