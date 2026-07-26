@@ -24,6 +24,8 @@ const TITLE_MAP: Record<string, string> = {
   '/recipes': 'Rezepte',
   '/meal-plan': 'Wochenplan',
   '/lists': 'Listen',
+  '/notes': 'Notizen',
+  '/trips': 'Reisen',
   '/assistant': 'KI-Assistent',
   '/settings': 'Einstellungen',
 };

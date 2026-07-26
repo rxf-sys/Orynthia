@@ -3,9 +3,11 @@ import { TasksService } from '../modules/tasks/tasks.service';
 import { CalendarService } from '../modules/calendar/calendar.service';
 import { RecipesService } from '../modules/recipes/recipes.service';
 import { ListsService } from '../modules/lists/lists.service';
+import { NotesService } from '../modules/notes/notes.service';
+import { TripsService } from '../modules/trips/trips.service';
 
 export interface SearchHit {
-  module: 'tasks' | 'calendar' | 'recipes' | 'lists';
+  module: 'tasks' | 'calendar' | 'recipes' | 'lists' | 'notes' | 'trips';
   id: string;
   title: string;
   subtitle?: string;
@@ -27,17 +29,21 @@ export class SearchService {
     private calendar: CalendarService,
     private recipes: RecipesService,
     private lists: ListsService,
+    private notes: NotesService,
+    private trips: TripsService,
   ) {}
 
   async search(userId: string, rawQuery: string, limitPerModule = 4): Promise<SearchHit[]> {
     const q = rawQuery.trim();
     if (q.length < 2) return [];
 
-    const [tasks, events, recipes, listResults] = await Promise.all([
+    const [tasks, events, recipes, listResults, notes, trips] = await Promise.all([
       this.tasks.search(userId, q, limitPerModule),
       this.calendar.search(userId, q, limitPerModule),
       this.recipes.search(userId, q, limitPerModule),
       this.lists.search(userId, q, limitPerModule),
+      this.notes.search(userId, q, limitPerModule),
+      this.trips.search(userId, q, limitPerModule),
     ]);
 
     const hits: SearchHit[] = [
@@ -75,6 +81,22 @@ export class SearchService {
         title: i.name,
         subtitle: `Eintrag in ${i.list.name}`,
         to: `/lists/${i.list.id}`,
+      })),
+      ...notes.map((n) => ({
+        module: 'notes' as const,
+        id: n.id,
+        title: n.title || n.content.slice(0, 60) || 'Notiz',
+        subtitle: 'Notiz',
+        to: '/notes',
+      })),
+      ...trips.map((t) => ({
+        module: 'trips' as const,
+        id: t.id,
+        title: t.title,
+        subtitle: [t.destination, t.startDate.toLocaleDateString('de-DE')]
+          .filter(Boolean)
+          .join(' · '),
+        to: `/trips/${t.id}`,
       })),
     ];
 

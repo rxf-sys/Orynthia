@@ -5,9 +5,11 @@ import { TasksModule } from '../modules/tasks/tasks.module';
 import { CalendarModule } from '../modules/calendar/calendar.module';
 import { RecipesModule } from '../modules/recipes/recipes.module';
 import { ListsModule } from '../modules/lists/lists.module';
+import { NotesModule } from '../modules/notes/notes.module';
+import { TripsModule } from '../modules/trips/trips.module';
 
 @Module({
-  imports: [TasksModule, CalendarModule, RecipesModule, ListsModule],
+  imports: [TasksModule, CalendarModule, RecipesModule, ListsModule, NotesModule, TripsModule],
   controllers: [SearchController],
   providers: [SearchService],
 })

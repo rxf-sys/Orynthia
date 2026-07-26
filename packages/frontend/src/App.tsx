@@ -31,6 +31,9 @@ const RecipesPage = lazy(() => import('@/features/recipes/pages/Recipes').then((
 const RecipeDetailPage = lazy(() => import('@/features/recipes/pages/RecipeDetail').then((m) => ({ default: m.RecipeDetailPage })));
 const ListsPage = lazy(() => import('@/features/lists/pages/Lists').then((m) => ({ default: m.ListsPage })));
 const MealPlanPage = lazy(() => import('@/features/recipes/pages/MealPlan').then((m) => ({ default: m.MealPlanPage })));
+const NotesPage = lazy(() => import('@/features/notes/pages/Notes').then((m) => ({ default: m.NotesPage })));
+const TripsPage = lazy(() => import('@/features/trips/pages/Trips').then((m) => ({ default: m.TripsPage })));
+const TripDetailPage = lazy(() => import('@/features/trips/pages/TripDetail').then((m) => ({ default: m.TripDetailPage })));
 
 // Alte Finanz-Routen leben als Redirects weiter – inklusive Query-String,
 // damit z. B. der Enable-Banking-Callback (/accounts?code=…) weiter ankommt.
@@ -129,6 +132,11 @@ export default function App() {
               <Route path="meal-plan" element={<MealPlanPage />} />
               <Route path="lists" element={<ListsPage />} />
               <Route path="lists/:id" element={<ListsPage />} />
+
+              {/* Module: Notizen & Reisen */}
+              <Route path="notes" element={<NotesPage />} />
+              <Route path="trips" element={<TripsPage />} />
+              <Route path="trips/:id" element={<TripDetailPage />} />
 
               <Route path="assistant" element={<AssistantPage />} />
               <Route path="settings" element={<SettingsPage />} />

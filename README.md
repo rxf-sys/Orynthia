@@ -2,7 +2,7 @@
 
 Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
 
-**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 📆 Wochenplan · 🛒 Listen · 🤖 KI-Assistent — weitere Module (Notizen, Reisen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
+**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 📆 Wochenplan · 🛒 Listen · 📝 Notizen · ✈️ Reisen · 🤖 KI-Assistent — Hintergrund und Roadmap in [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
 
 **Die Module greifen ineinander:** Rezepte wandern in den Wochenplan, der Wochenplan
 erzeugt die Einkaufsliste, der erledigte Einkauf wird zur Ausgabe, fällige Aufgaben und
@@ -288,6 +288,21 @@ Orynthia/
 - Filter nach Mahlzeit, Ernährungsform, Zubereitungszeit und Favoriten, Volltextsuche
 - Bilder werden per URL verlinkt (kein Upload – bewusst schlank und ohne Storage)
 
+### Notizen
+- Freie Notizen mit optionalem Titel, Tags, Farbe und Anpinnen
+- Volltextsuche über Titel und Inhalt, Filter-Chips je Tag mit Häufigkeit
+- Angepinnte zuerst, danach nach letzter Bearbeitung sortiert
+
+### Reisen
+- Reisen mit Zeitraum, Ziel, Status und Budget (reine Planungsgröße –
+  **keine** Verbindung zu Konten oder Transaktionen)
+- **Bündelt bestehende Einträge:** Termine, Packlisten und Notizen lassen sich
+  mit einer Reise verknüpfen und erscheinen gebündelt auf der Reise-Seite –
+  die Einträge bleiben dabei in ihrem eigenen Modul
+- Packliste per Klick anlegen und automatisch verknüpfen
+- Verknüpfungen sind ungerichtet und dublettenfrei; beim Löschen einer Reise
+  verschwinden nur die Verknüpfungen, nicht die verknüpften Einträge
+
 ### Wochenplan (Meal-Planner)
 - Wochenansicht mit Frühstück/Mittag/Abend/Snack je Tag; Rezepte oder Freitext
   („Essen gehen") einplanen, Portionen je Mahlzeit frei wählbar
@@ -379,6 +394,8 @@ Orynthia/
 - `/api/health` (Liveness) + `/api/ready` (DB-Probe, optional Redis) für
   Container-Healthchecks; Backend-Container läuft als non-root
 - DSGVO-konform (Self-Hosted, keine Daten an Dritte, Fonts self-hosted)
+- Modul-Verknüpfungen prüfen die Zugehörigkeit **beider** Enden gegen die
+  Datenbank; Finanz-Entitäten sind bewusst nicht verknüpfbar
 
 ### Technik
 - Responsive Light/Dark-Theme UI mit Mobile-Tabbar inkl. „Mehr“-Sheet
@@ -555,8 +572,20 @@ Orynthia/
 - `POST /api/meal-plan` / `PATCH|DELETE /api/meal-plan/:id`
 - `POST /api/meal-plan/to-list` - Zutaten eines Zeitraums in eine Liste (`{listId, from, to}`)
 
+### Notizen
+- `GET /api/notes?search=&tag=` / `GET /api/notes/tags` / `GET /api/notes/:id`
+- `POST /api/notes` / `PATCH|DELETE /api/notes/:id` / `POST /api/notes/:id/pin`
+
+### Reisen
+- `GET /api/trips` / `GET /api/trips/:id` (inkl. aufgelöster Verknüpfungen)
+- `POST /api/trips` / `PATCH|DELETE /api/trips/:id`
+- `POST /api/trips/:id/links` - Termin, Liste, Notiz oder Rezept verknüpfen (`{type, id}`)
+- `DELETE /api/trips/:id/links/:linkId` - Verknüpfung lösen
+- `POST /api/trips/:id/packing-list` - Packliste anlegen und verknüpfen
+
 ### Suche
-- `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte, Listen)
+- `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte,
+  Listen, Notizen, Reisen)
 
 ### Home-Layout
 - `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge

@@ -8,6 +8,7 @@ import {
   Calendar as CalendarIcon,
   CheckSquare,
   ClipboardList,
+  Plane,
   Clock,
   Eye,
   EyeOff,
@@ -23,6 +24,7 @@ import { dashboardApi, contractsApi } from '@/features/finance/api';
 import { calendarApi } from '@/features/calendar/api';
 import { tasksApi } from '@/features/tasks/api';
 import { listsApi } from '@/features/lists/api';
+import { tripsApi } from '@/features/trips/api';
 import { LIST_TYPE_ICON } from '@/features/lists/types';
 import { homeApi } from '@/features/home/api';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -39,6 +41,7 @@ const WIDGETS = [
   { id: 'today', title: 'Heute & demnächst' },
   { id: 'tasks', title: 'Aufgaben' },
   { id: 'lists', title: 'Listen' },
+  { id: 'trips', title: 'Reisen' },
   { id: 'contracts', title: 'Verträge & Abos' },
 ] as const;
 
@@ -138,6 +141,8 @@ export function HomePage() {
               return <TasksWidget key={w.id} />;
             case 'lists':
               return <ListsWidget key={w.id} />;
+            case 'trips':
+              return <TripsWidget key={w.id} />;
             case 'contracts':
               return <ContractsWidget key={w.id} />;
           }
@@ -332,6 +337,58 @@ function ListsWidget() {
               </Link>
             </li>
           ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function TripsWidget() {
+  const { data: trips, isLoading } = useQuery({
+    queryKey: ['trips'],
+    queryFn: () => tripsApi.getAll().then((r) => r.data),
+  });
+
+  // Nur bevorstehende bzw. laufende Reisen sind auf dem Home relevant
+  const upcoming = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return (trips ?? []).filter((t) => t.endDate.slice(0, 10) >= today).slice(0, 3);
+  }, [trips]);
+
+  return (
+    <Card>
+      <WidgetHead title="Reisen" to="/trips" icon={Plane} />
+      {isLoading ? (
+        <WidgetSkeleton />
+      ) : upcoming.length === 0 ? (
+        <WidgetEmpty text="Keine Reise geplant." action={{ label: 'Reise anlegen', to: '/trips' }} />
+      ) : (
+        <ul className="space-y-2">
+          {upcoming.map((trip) => {
+            const start = parseISO(trip.startDate);
+            const daysUntil = Math.ceil((start.getTime() - Date.now()) / 86_400_000);
+            return (
+              <li key={trip.id}>
+                <Link
+                  to={`/trips/${trip.id}`}
+                  className="flex items-center gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-soft"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-ink">{trip.title}</div>
+                    <div className="text-xs text-ink-3">
+                      {format(start, 'd. MMM yyyy', { locale: de })}
+                      {trip.destination ? ` · ${trip.destination}` : ''}
+                    </div>
+                  </div>
+                  {daysUntil > 0 && (
+                    <span className="tnum shrink-0 text-xs font-semibold text-indigo">
+                      in {daysUntil} T
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>

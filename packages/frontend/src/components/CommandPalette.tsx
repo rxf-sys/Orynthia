@@ -10,6 +10,8 @@ import {
   CheckSquare,
   ChefHat,
   ClipboardList,
+  StickyNote,
+  Plane,
   Loader2,
   LayoutDashboard,
   ArrowLeftRight,
@@ -43,6 +45,8 @@ const NAV_COMMANDS: Command[] = [
   { id: 'nav-recipes', label: 'Rezepte', icon: ChefHat, run: (n) => n('/recipes') },
   { id: 'nav-meal-plan', label: 'Wochenplan', icon: ChefHat, run: (n) => n('/meal-plan') },
   { id: 'nav-lists', label: 'Listen', icon: ClipboardList, run: (n) => n('/lists') },
+  { id: 'nav-notes', label: 'Notizen', icon: StickyNote, run: (n) => n('/notes') },
+  { id: 'nav-trips', label: 'Reisen', icon: Plane, run: (n) => n('/trips') },
   { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
   { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },
   { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/finance/accounts') },
@@ -61,6 +65,8 @@ const MODULE_ICON: Record<SearchHit['module'], LucideIcon> = {
   calendar: Calendar,
   recipes: ChefHat,
   lists: ClipboardList,
+  notes: StickyNote,
+  trips: Plane,
 };
 
 interface CommandPaletteProps {

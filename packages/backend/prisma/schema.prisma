@@ -59,6 +59,9 @@ model User {
   recipes        Recipe[]
   lists          List[]
   mealPlan       MealPlanEntry[]
+  notes          Note[]
+  trips          Trip[]
+  entityLinks    EntityLink[]
 
   @@map("users")
 }
@@ -711,6 +714,89 @@ model ListItem {
 
   @@index([listId])
   @@map("list_items")
+}
+
+// ---------- Notizen ----------
+model Note {
+  id      String   @id @default(uuid())
+  userId  String   @map("user_id")
+  title   String?
+  content String   @default("")
+  tags    String[] @default([])
+  color   String?
+  pinned  Boolean  @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, pinned])
+  @@index([userId, updatedAt])
+  @@map("notes")
+}
+
+// ---------- Reisen ----------
+enum TripStatus {
+  PLANNED
+  ONGOING
+  DONE
+}
+
+// Reisen bündeln Termine, Packlisten und Notizen zu einem Vorhaben.
+// Das Reisebudget ist bewusst nur eine Planungsgröße im Modul – es
+// besteht keinerlei Verbindung zu Konten oder Transaktionen.
+model Trip {
+  id          String     @id @default(uuid())
+  userId      String     @map("user_id")
+  title       String
+  destination String?
+  startDate   DateTime   @map("start_date") @db.Date
+  endDate     DateTime   @map("end_date") @db.Date
+  budgetAmount Decimal?  @map("budget_amount") @db.Decimal(12, 2)
+  currency    String     @default("EUR")
+  status      TripStatus @default(PLANNED)
+  notes       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+  @@map("trips")
+}
+
+// ---------- Generische Verknüpfungen ----------
+// Für lose n:m-Beziehungen zwischen Alltags-Modulen (z. B. Reise ↔ Termin,
+// Reise ↔ Packliste, Notiz ↔ Termin). Harte, häufige Beziehungen bleiben
+// bewusst direkte Fremdschlüssel (ListItem→Recipe, Task→CalendarEvent).
+// Finanz-Entitäten sind hier absichtlich NICHT verknüpfbar – Banking-Daten
+// bleiben von den Alltags-Modulen getrennt.
+enum LinkableType {
+  TRIP
+  CALENDAR_EVENT
+  TASK
+  LIST
+  NOTE
+  RECIPE
+}
+
+model EntityLink {
+  id         String       @id @default(uuid())
+  userId     String       @map("user_id")
+  sourceType LinkableType @map("source_type")
+  sourceId   String       @map("source_id")
+  targetType LinkableType @map("target_type")
+  targetId   String       @map("target_id")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceType, sourceId, targetType, targetId])
+  @@index([userId, sourceType, sourceId])
+  @@index([userId, targetType, targetId])
+  @@map("entity_links")
 }
 
 // ---------- Externe Integrationen (Token-Vault) ----------

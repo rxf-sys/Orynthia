@@ -435,10 +435,99 @@ export class DemoSeedService implements OnModuleInit {
       ],
     });
 
+    // ---------- Notizen ----------
+    await this.prisma.note.createMany({
+      data: [
+        {
+          userId: user.id,
+          title: 'WLAN Ferienwohnung',
+          content: 'Netz: Gardasee-Gast\nPasswort: siehe Ordner im Flur',
+          tags: ['urlaub'],
+          color: '#5b8def',
+          pinned: true,
+        },
+        {
+          userId: user.id,
+          title: 'Ideen fürs Wohnzimmer',
+          content: 'Regal umstellen, Pflanze für die Ecke, Lampe warmweiß tauschen',
+          tags: ['wohnen', 'ideen'],
+        },
+        {
+          userId: user.id,
+          content: 'Autoschlüssel-Ersatz liegt bei den Nachbarn.',
+          tags: ['wichtig'],
+        },
+      ],
+    });
+
+    // ---------- Reise (Showcase: Termin + Packliste + Notiz) ----------
+    const tripStart = addDays(new Date(), 30);
+    const tripEnd = addDays(new Date(), 40);
+    const trip = await this.prisma.trip.create({
+      data: {
+        userId: user.id,
+        title: 'Sommerurlaub Italien',
+        destination: 'Gardasee',
+        startDate: new Date(Date.UTC(tripStart.getFullYear(), tripStart.getMonth(), tripStart.getDate())),
+        endDate: new Date(Date.UTC(tripEnd.getFullYear(), tripEnd.getMonth(), tripEnd.getDate())),
+        budgetAmount: 1800,
+        notes: 'Fähre nach Limone vorab buchen. Vignette für Österreich nicht vergessen.',
+      },
+    });
+    const packingList = await this.prisma.list.findFirst({
+      where: { userId: user.id, name: 'Packliste Urlaub' },
+    });
+    const wlanNote = await this.prisma.note.findFirst({
+      where: { userId: user.id, title: 'WLAN Ferienwohnung' },
+    });
+    const tripEvent = await this.prisma.calendarEvent.create({
+      data: {
+        calendarId: privateCal.id,
+        title: 'Abfahrt Italien',
+        startsAt: new Date(tripStart.setHours(6, 0, 0, 0)),
+        endsAt: new Date(new Date(tripStart).setHours(14, 0, 0, 0)),
+        reminderMinutes: 1440,
+      },
+    });
+    await this.prisma.entityLink.createMany({
+      data: [
+        ...(packingList
+          ? [
+              {
+                userId: user.id,
+                sourceType: 'TRIP' as const,
+                sourceId: trip.id,
+                targetType: 'LIST' as const,
+                targetId: packingList.id,
+              },
+            ]
+          : []),
+        ...(wlanNote
+          ? [
+              {
+                userId: user.id,
+                sourceType: 'TRIP' as const,
+                sourceId: trip.id,
+                targetType: 'NOTE' as const,
+                targetId: wlanNote.id,
+              },
+            ]
+          : []),
+        {
+          userId: user.id,
+          sourceType: 'TRIP' as const,
+          sourceId: trip.id,
+          targetType: 'CALENDAR_EVENT' as const,
+          targetId: tripEvent.id,
+        },
+      ],
+    });
+
     this.logger.log(
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
         `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
-        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen, 2 Rezepte, 2 Listen, 4 Wochenplan-Einträge.`,
+        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 5 Terminen, 2 Rezepte, 2 Listen, ` +
+        `4 Wochenplan-Einträge, 3 Notizen, 1 Reise mit 3 Verknüpfungen.`,
     );
   }
 

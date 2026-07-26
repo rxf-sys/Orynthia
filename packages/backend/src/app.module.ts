@@ -23,6 +23,8 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { ListsModule } from './modules/lists/lists.module';
+import { NotesModule } from './modules/notes/notes.module';
+import { TripsModule } from './modules/trips/trips.module';
 import { SearchModule } from './search/search.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 import { HealthModule } from './platform/health/health.module';
@@ -74,6 +76,8 @@ import { HealthModule } from './platform/health/health.module';
     CalendarModule,
     RecipesModule,
     ListsModule,
+    NotesModule,
+    TripsModule,
     SearchModule,
     DemoSeedModule,
     HealthModule,
