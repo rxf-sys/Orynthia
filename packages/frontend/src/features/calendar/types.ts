@@ -27,6 +27,7 @@ export interface EventOccurrence {
   recurrenceInterval: number | null;
   recurrenceUntil: string | null;
   isRecurringInstance: boolean;
+  readOnly: boolean;
 }
 
 export interface CreateEventData {
@@ -47,4 +48,19 @@ export interface UpdateEventData extends Partial<Omit<CreateEventData, 'reminder
   reminderMinutes?: number | null;
   recurrence?: EventRecurrence | null;
   recurrenceUntil?: string | null;
+}
+
+export interface CalendarIntegration {
+  id: string;
+  provider: 'GOOGLE_CALENDAR' | 'ICS' | 'APPLE_CALDAV';
+  label?: string | null;
+  status: 'CONNECTED' | 'ERROR' | 'REVOKED';
+  lastSyncAt?: string | null;
+  lastError?: string | null;
+  _count?: { calendars: number };
+}
+
+export interface IntegrationsResponse {
+  googleConfigured: boolean;
+  integrations: CalendarIntegration[];
 }

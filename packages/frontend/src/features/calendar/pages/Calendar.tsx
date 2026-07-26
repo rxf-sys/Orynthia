@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
   addDays,
   addMonths,
@@ -20,6 +21,10 @@ import { de } from 'date-fns/locale';
 import {
   Calendar as CalendarIcon,
   Check,
+  CloudDownload,
+  RefreshCw,
+  Link2,
+  Lock,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -99,6 +104,8 @@ export function CalendarPage() {
   const [form, setForm] = useState<EventFormState>(() => emptyForm(new Date()));
   const [manageOpen, setManageOpen] = useState(false);
   const [newCalendar, setNewCalendar] = useState({ name: '', color: CAL_COLORS[0] });
+  const [icsForm, setIcsForm] = useState({ url: '', name: '' });
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Sichtbarer Zeitraum je Ansicht (Agenda: 30 Tage ab heute)
   const range = useMemo(() => {
@@ -129,7 +136,69 @@ export function CalendarPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
     queryClient.invalidateQueries({ queryKey: ['calendars'] });
+    queryClient.invalidateQueries({ queryKey: ['calendar-integrations'] });
   };
+
+  const { data: integrationsData } = useQuery({
+    queryKey: ['calendar-integrations'],
+    queryFn: () => calendarApi.getIntegrations().then((r) => r.data),
+  });
+
+  const googleCallbackMutation = useMutation({
+    mutationFn: ({ code, state }: { code: string; state: string }) =>
+      calendarApi.googleCallback(code, state),
+    onSuccess: (r) => {
+      invalidate();
+      toast.success(`Google Kalender verbunden – ${r.data.imported} Termine importiert`);
+    },
+    onError: (e) => toast.error(parseApiError(e, 'Google-Verbindung fehlgeschlagen')),
+  });
+
+  // Rückkehr aus dem Google-OAuth-Flow: ?code=…&state=… einlösen und URL bereinigen
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    if (!code || !state) return;
+    googleCallbackMutation.mutate({ code, state });
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connectIcsMutation = useMutation({
+    mutationFn: calendarApi.connectIcs,
+    onSuccess: (r) => {
+      invalidate();
+      setIcsForm({ url: '', name: '' });
+      toast.success(`ICS-Kalender abonniert – ${r.data.imported} Termine importiert`);
+    },
+    onError: (e) => toast.error(parseApiError(e, 'ICS-Abo fehlgeschlagen')),
+  });
+
+  const googleConnectMutation = useMutation({
+    mutationFn: () => calendarApi.googleConnect(),
+    onSuccess: (r) => {
+      window.location.href = r.data.authUrl;
+    },
+    onError: (e) => toast.error(parseApiError(e, 'Google-Verbindung nicht möglich')),
+  });
+
+  const syncNowMutation = useMutation({
+    mutationFn: calendarApi.syncIntegration,
+    onSuccess: () => {
+      invalidate();
+      toast.success('Synchronisiert');
+    },
+    onError: (e) => toast.error(parseApiError(e, 'Sync fehlgeschlagen')),
+  });
+
+  const removeIntegrationMutation = useMutation({
+    mutationFn: calendarApi.removeIntegration,
+    onSuccess: () => {
+      invalidate();
+      toast.success('Verbindung getrennt');
+    },
+    onError: (e) => toast.error(parseApiError(e, 'Trennen fehlgeschlagen')),
+  });
 
   const createMutation = useMutation({
     mutationFn: calendarApi.createEvent,
@@ -186,6 +255,8 @@ export function CalendarPage() {
     setForm(emptyForm(date, def?.id ?? ''));
     setDialogOpen(true);
   };
+
+  const isReadOnlyEvent = editing?.readOnly === true;
 
   const openEdit = (occ: EventOccurrence) => {
     setEditing(occ);
@@ -333,6 +404,11 @@ export function CalendarPage() {
         onClose={() => setDialogOpen(false)}
         title={editing ? 'Termin bearbeiten' : 'Neuer Termin'}
         footer={
+          isReadOnlyEvent ? (
+            <Btn variant="ghost" onClick={() => setDialogOpen(false)}>
+              Schließen
+            </Btn>
+          ) : (
           <>
             {editing && (
               <Btn
@@ -366,14 +442,22 @@ export function CalendarPage() {
               </Btn>
             </div>
           </>
+          )
         }
       >
-        {editing?.isRecurringInstance && (
+        {isReadOnlyEvent && (
+          <p className="mb-3 flex items-center gap-2 rounded-md bg-soft px-3 py-2 text-xs text-ink-2">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Dieser Termin stammt aus „{editing?.calendarName}“ (synchronisiert) und ist schreibgeschützt.
+          </p>
+        )}
+        {!isReadOnlyEvent && editing?.isRecurringInstance && (
           <p className="mb-3 rounded-md bg-soft px-3 py-2 text-xs text-ink-2">
             Dies ist eine Instanz einer Serie – Änderungen gelten für die gesamte Serie.
           </p>
         )}
         <form id="event-form" onSubmit={submit} className="space-y-4">
+          <fieldset disabled={isReadOnlyEvent} className="contents">
           <Field label="Titel" required>
             <input
               className="input"
@@ -388,12 +472,16 @@ export function CalendarPage() {
                 className="select"
                 value={form.calendarId}
                 onChange={(e) => setForm({ ...form, calendarId: e.target.value })}
+                disabled={isReadOnlyEvent}
               >
-                {calendars?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {calendars
+                  ?.filter((c) => !c.readOnly || c.id === form.calendarId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.readOnly ? ' (synchronisiert)' : ''}
+                    </option>
+                  ))}
               </select>
             </Field>
             <Field label="Datum" required>
@@ -491,19 +579,25 @@ export function CalendarPage() {
               maxLength={5000}
             />
           </Field>
+          </fieldset>
         </form>
       </Modal>
 
       {/* Kalender verwalten */}
-      <Modal open={manageOpen} onClose={() => setManageOpen(false)} title="Kalender verwalten" size="sm">
+      <Modal open={manageOpen} onClose={() => setManageOpen(false)} title="Kalender verwalten">
         <div className="space-y-4">
           <div className="space-y-2">
             {calendars?.map((c) => (
               <div key={c.id} className="flex items-center gap-2.5 rounded-md border border-line px-3 py-2.5">
                 <span className="h-3 w-3 rounded-pill" style={{ background: c.color ?? 'var(--ink-4)' }} />
                 <span className="flex-1 text-sm font-medium text-ink">{c.name}</span>
+                {c.readOnly && (
+                  <span className="flex items-center gap-1 text-xs text-ink-3">
+                    <Lock className="h-3 w-3" /> Sync
+                  </span>
+                )}
                 {c.isDefault && <span className="text-xs text-ink-3">Standard</span>}
-                {!c.isDefault && (
+                {!c.isDefault && !c.readOnly && (
                   <Btn
                     variant="quiet"
                     size="sm"
@@ -512,7 +606,7 @@ export function CalendarPage() {
                     Als Standard
                   </Btn>
                 )}
-                {(calendars?.length ?? 0) > 1 && (
+                {(calendars?.length ?? 0) > 1 && !c.readOnly && (
                   <Btn
                     variant="quiet"
                     size="sm"
@@ -532,6 +626,123 @@ export function CalendarPage() {
               </div>
             ))}
           </div>
+          {/* Externe Kalender (read-only Sync) */}
+          <div className="space-y-3 border-t border-line pt-4">
+            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-3">
+              Externe Kalender (schreibgeschützt)
+            </p>
+            {(integrationsData?.integrations.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                {integrationsData!.integrations.map((integration) => (
+                  <div
+                    key={integration.id}
+                    className="flex items-center gap-2.5 rounded-md border border-line px-3 py-2.5"
+                  >
+                    <Link2 className="h-4 w-4 shrink-0 text-ink-3" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-ink">
+                        {integration.label ??
+                          (integration.provider === 'GOOGLE_CALENDAR' ? 'Google Kalender' : 'ICS-Abo')}
+                      </div>
+                      <div className="text-xs text-ink-3">
+                        {integration.status === 'ERROR' ? (
+                          <span className="text-neg" title={integration.lastError ?? undefined}>
+                            Fehler beim Sync
+                          </span>
+                        ) : integration.lastSyncAt ? (
+                          `Zuletzt: ${format(parseISO(integration.lastSyncAt), 'd.M. HH:mm')}`
+                        ) : (
+                          'Noch nicht synchronisiert'
+                        )}
+                      </div>
+                    </div>
+                    <Btn
+                      variant="quiet"
+                      size="sm"
+                      icon={RefreshCw}
+                      aria-label="Jetzt synchronisieren"
+                      disabled={syncNowMutation.isPending}
+                      onClick={() => syncNowMutation.mutate(integration.id)}
+                    />
+                    <Btn
+                      variant="quiet"
+                      size="sm"
+                      icon={Trash2}
+                      aria-label="Verbindung trennen"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: 'Verbindung trennen?',
+                          description:
+                            'Der synchronisierte Kalender und seine Termine werden aus Orynthia entfernt. Gespeicherte Zugangsdaten werden gelöscht.',
+                          confirmLabel: 'Trennen',
+                          destructive: true,
+                        });
+                        if (ok) removeIntegrationMutation.mutate(integration.id);
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!icsForm.url.trim()) return;
+                connectIcsMutation.mutate({
+                  url: icsForm.url.trim(),
+                  name: icsForm.name.trim() || undefined,
+                });
+              }}
+              className="space-y-2"
+            >
+              <Field
+                label="ICS-Kalender abonnieren"
+                hint="z. B. iCloud „Kalender teilen per Link“, Outlook oder Nextcloud (webcal:// oder https://)"
+              >
+                <input
+                  className="input"
+                  value={icsForm.url}
+                  onChange={(e) => setIcsForm({ ...icsForm, url: e.target.value })}
+                  placeholder="webcal://… oder https://….ics"
+                  maxLength={2000}
+                />
+              </Field>
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  value={icsForm.name}
+                  onChange={(e) => setIcsForm({ ...icsForm, name: e.target.value })}
+                  placeholder="Name (optional)"
+                  maxLength={100}
+                  aria-label="Name des ICS-Kalenders"
+                />
+                <Btn
+                  type="submit"
+                  size="sm"
+                  icon={CloudDownload}
+                  disabled={!icsForm.url.trim() || connectIcsMutation.isPending}
+                >
+                  Abonnieren
+                </Btn>
+              </div>
+            </form>
+            {integrationsData?.googleConfigured ? (
+              <Btn
+                variant="ghost"
+                size="sm"
+                icon={Link2}
+                disabled={googleConnectMutation.isPending}
+                onClick={() => googleConnectMutation.mutate()}
+              >
+                Mit Google Kalender verbinden
+              </Btn>
+            ) : (
+              <p className="text-xs text-ink-4">
+                Google-Sync verfügbar, sobald GOOGLE_CLIENT_ID/SECRET in der .env gesetzt sind (siehe README).
+              </p>
+            )}
+          </div>
+
           <form
             onSubmit={(e) => {
               e.preventDefault();

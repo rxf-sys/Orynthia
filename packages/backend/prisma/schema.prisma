@@ -55,6 +55,7 @@ model User {
   taskLists      TaskList[]
   tasks          Task[]
   calendars      Calendar[]
+  integrations   ExternalIntegration[]
 
   @@map("users")
 }
@@ -467,6 +468,7 @@ enum NotificationType {
   SYNC_ERROR         // Bank-Sync Fehler
   TASK_DUE           // Aufgabe fällig/überfällig
   EVENT_REMINDER     // Termin-Erinnerung
+  CALENDAR_SYNC_ERROR // Kalender-Sync Fehler (ICS/Google)
   SYSTEM             // System-Nachricht
 }
 
@@ -556,15 +558,56 @@ model Calendar {
   source    CalendarSource @default(LOCAL)
   externalId String?       @map("external_id")
   readOnly  Boolean        @default(false) @map("read_only")
+
+  // Externe Anbindung (ICS/Google); syncToken für inkrementellen Google-Sync
+  integrationId String?    @map("integration_id")
+  syncToken     String?    @map("sync_token")
+
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
 
-  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events CalendarEvent[]
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration ExternalIntegration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  events      CalendarEvent[]
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([integrationId])
   @@map("calendars")
+}
+
+// ---------- Externe Integrationen (Token-Vault) ----------
+// Credentials (OAuth-Refresh-Token, ICS-URL) liegen ausschließlich
+// AES-256-GCM-verschlüsselt in credentialEnc – nie im Klartext, nie in Logs.
+enum IntegrationProvider {
+  GOOGLE_CALENDAR
+  ICS
+  APPLE_CALDAV // vorbereitet für Phase 2b
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  ERROR
+  REVOKED
+}
+
+model ExternalIntegration {
+  id            String              @id @default(uuid())
+  userId        String              @map("user_id")
+  provider      IntegrationProvider
+  label         String?
+  credentialEnc String              @map("credential_enc")
+  status        IntegrationStatus   @default(CONNECTED)
+  lastSyncAt    DateTime?           @map("last_sync_at")
+  lastError     String?             @map("last_error")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendars Calendar[]
+
+  @@index([userId])
+  @@map("external_integrations")
 }
 
 model CalendarEvent {

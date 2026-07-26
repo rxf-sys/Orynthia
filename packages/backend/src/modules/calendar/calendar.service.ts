@@ -23,6 +23,7 @@ export interface EventOccurrence {
   recurrenceInterval: number | null;
   recurrenceUntil: string | null;
   isRecurringInstance: boolean;
+  readOnly: boolean;
 }
 
 // Obergrenze pro Event, damit fehlerhafte Wiederholungen keine
@@ -46,14 +47,14 @@ export class CalendarService {
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
       include: { _count: { select: { events: true } } },
     });
-    if (calendars.length > 0) return calendars;
+    if (calendars.some((c) => !c.readOnly)) return calendars;
     // Erster Zugriff: Standard-Kalender anlegen, damit Termine sofort
     // ohne Einrichtungs-Schritt funktionieren.
     const created = await this.prisma.calendar.create({
       data: { userId, name: 'Privat', color: '#5b8def', isDefault: true },
       include: { _count: { select: { events: true } } },
     });
-    return [created];
+    return [created, ...calendars];
   }
 
   async createCalendar(userId: string, dto: CreateCalendarDto) {
@@ -66,7 +67,11 @@ export class CalendarService {
   }
 
   async updateCalendar(userId: string, id: string, dto: UpdateCalendarDto) {
-    await this.assertCalendarOwnership(userId, id);
+    const calendar = await this.prisma.calendar.findFirst({ where: { id, userId } });
+    if (!calendar) throw new NotFoundException('Kalender nicht gefunden');
+    if (dto.isDefault && calendar.readOnly) {
+      throw new BadRequestException('Ein synchronisierter Kalender kann nicht Standard sein');
+    }
     if (dto.isDefault) await this.clearDefault(userId);
     return this.prisma.calendar.update({ where: { id }, data: dto });
   }
@@ -74,7 +79,12 @@ export class CalendarService {
   async removeCalendar(userId: string, id: string) {
     const calendar = await this.prisma.calendar.findFirst({ where: { id, userId } });
     if (!calendar) throw new NotFoundException('Kalender nicht gefunden');
-    const count = await this.prisma.calendar.count({ where: { userId } });
+    if (calendar.integrationId) {
+      throw new BadRequestException(
+        'Synchronisierte Kalender werden über „Verbindung trennen" bei den Integrationen entfernt',
+      );
+    }
+    const count = await this.prisma.calendar.count({ where: { userId, integrationId: null } });
     if (count <= 1) throw new BadRequestException('Der letzte Kalender kann nicht gelöscht werden');
     await this.prisma.calendar.delete({ where: { id } });
     if (calendar.isDefault) {
@@ -105,7 +115,7 @@ export class CalendarService {
           { recurrence: { not: null }, startsAt: { lt: to } },
         ],
       },
-      include: { calendar: { select: { name: true, color: true } } },
+      include: { calendar: { select: { name: true, color: true, readOnly: true } } },
       take: 2000,
     });
 
@@ -124,10 +134,12 @@ export class CalendarService {
 
     let calendarId = dto.calendarId;
     if (calendarId) {
-      await this.assertCalendarOwnership(userId, calendarId);
+      await this.assertCalendarWritable(userId, calendarId);
     } else {
       const calendars = await this.findAllCalendars(userId);
-      calendarId = (calendars.find((c) => c.isDefault) ?? calendars[0]).id;
+      const writable = calendars.filter((c) => !c.readOnly);
+      if (writable.length === 0) throw new BadRequestException('Kein beschreibbarer Kalender vorhanden');
+      calendarId = (writable.find((c) => c.isDefault) ?? writable[0]).id;
     }
 
     return this.prisma.calendarEvent.create({
@@ -151,9 +163,13 @@ export class CalendarService {
   async updateEvent(userId: string, id: string, dto: UpdateEventDto) {
     const event = await this.prisma.calendarEvent.findFirst({
       where: { id, calendar: { userId } },
+      include: { calendar: { select: { readOnly: true } } },
     });
     if (!event) throw new NotFoundException('Termin nicht gefunden');
-    if (dto.calendarId) await this.assertCalendarOwnership(userId, dto.calendarId);
+    if (event.calendar.readOnly) {
+      throw new BadRequestException('Termine aus synchronisierten Kalendern sind schreibgeschützt');
+    }
+    if (dto.calendarId) await this.assertCalendarWritable(userId, dto.calendarId);
 
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : event.startsAt;
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : event.endsAt;
@@ -183,9 +199,12 @@ export class CalendarService {
   async removeEvent(userId: string, id: string) {
     const event = await this.prisma.calendarEvent.findFirst({
       where: { id, calendar: { userId } },
-      select: { id: true },
+      select: { id: true, calendar: { select: { readOnly: true } } },
     });
     if (!event) throw new NotFoundException('Termin nicht gefunden');
+    if (event.calendar.readOnly) {
+      throw new BadRequestException('Termine aus synchronisierten Kalendern sind schreibgeschützt');
+    }
     await this.prisma.calendarEvent.delete({ where: { id } });
     return { message: 'Termin gelöscht' };
   }
@@ -240,7 +259,7 @@ export class CalendarService {
   // ---------- interne Helfer ----------
 
   private expand(
-    event: CalendarEvent & { calendar: { name: string; color: string | null } },
+    event: CalendarEvent & { calendar: { name: string; color: string | null; readOnly?: boolean } },
     from: Date,
     to: Date,
   ): EventOccurrence[] {
@@ -261,6 +280,7 @@ export class CalendarService {
       recurrenceInterval: event.recurrenceInterval,
       recurrenceUntil: event.recurrenceUntil?.toISOString() ?? null,
       isRecurringInstance: isInstance,
+      readOnly: event.calendar.readOnly ?? false,
     });
 
     if (!event.recurrence) {
@@ -297,6 +317,17 @@ export class CalendarService {
 
   private async clearDefault(userId: string) {
     await this.prisma.calendar.updateMany({ where: { userId, isDefault: true }, data: { isDefault: false } });
+  }
+
+  private async assertCalendarWritable(userId: string, calendarId: string) {
+    const calendar = await this.prisma.calendar.findFirst({
+      where: { id: calendarId, userId },
+      select: { id: true, readOnly: true },
+    });
+    if (!calendar) throw new NotFoundException('Kalender nicht gefunden');
+    if (calendar.readOnly) {
+      throw new BadRequestException('Dieser Kalender ist schreibgeschützt (synchronisiert)');
+    }
   }
 
   private async assertCalendarOwnership(userId: string, calendarId: string) {

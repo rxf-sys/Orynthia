@@ -195,6 +195,7 @@ Vollständige Vorlage mit Kommentaren: [`.env.example`](.env.example).
 | `COOKIE_SECURE` | – | `true` bei HTTPS-Deployments |
 | `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | – | Token-Lebensdauern (Default: `15m` / `7d`) |
 | `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_PRIVATE_KEY` | – | Open Banking (PSD2); ohne sie nur manuelle Konten |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google-Calendar-Sync (read-only); ohne sie nur ICS-Abos |
 | `ANTHROPIC_API_KEY` | – | Aktiviert den KI-Assistenten |
 | `ANTHROPIC_MODEL` | – | Claude-Modell (Default: `claude-opus-4-8`) |
 | `CHAT_DAILY_TOKEN_LIMIT` | – | Tages-Token-Budget pro User für den Assistenten (0 = unbegrenzt) |
@@ -260,7 +261,13 @@ Orynthia/
 - Wiederkehrende Termine (täglich bis jährlich, Intervall + Enddatum) —
   Serien-Instanzen werden serverseitig expandiert (Monatsend-Klemmung, gekappt)
 - Erinnerungen (5 Min bis 1 Tag vorher) über die Benachrichtigungs-Inbox
-- Vorbereitet für externe Kalender-Sync (Google/Apple/ICS) hinter Provider-Interface
+- **ICS-Abo (read-only):** iCloud „Kalender teilen per Link", Outlook, Nextcloud u. a.
+  per webcal://- oder https://-URL abonnieren; Auto-Refresh stündlich
+- **Google Calendar (read-only):** OAuth-Anbindung mit eigenen Client-Credentials,
+  inkrementeller Sync per syncToken alle 15 Minuten, Sync-Fehler als Benachrichtigung
+- Credentials (OAuth-Refresh-Token, ICS-URLs) liegen AES-256-GCM-verschlüsselt im
+  Integration-Vault; synchronisierte Kalender sind in Orynthia schreibgeschützt
+- Apple-Kalender: per iCloud-ICS-Link sofort nutzbar; CalDAV-Anbindung vorbereitet (Phase 2b)
 
 ### Aufgaben
 - Aufgaben mit Prioritäten, Fälligkeiten, Notizen und Aufgabenlisten
@@ -484,6 +491,12 @@ Orynthia/
 - `GET /api/calendar/events?from=&to=` - Termin-Instanzen (Serien expandiert)
 - `GET /api/calendar/events/upcoming?days=&limit=` - Nächste Termine (Home-Widget)
 - `POST /api/calendar/events` / `PATCH|DELETE /api/calendar/events/:id`
+- `GET /api/calendar/integrations` - Verbundene externe Kalender (+ googleConfigured)
+- `POST /api/calendar/integrations/ics` - ICS-Feed abonnieren (`{url, name?, color?}`)
+- `POST /api/calendar/integrations/google/connect` - OAuth-URL holen
+- `POST /api/calendar/integrations/google/callback` - OAuth-Code einlösen (`{code, state}`)
+- `POST /api/calendar/integrations/:id/sync` - Sofort synchronisieren
+- `DELETE /api/calendar/integrations/:id` - Verbindung trennen (inkl. Token-Revoke)
 
 ### Home-Layout
 - `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge

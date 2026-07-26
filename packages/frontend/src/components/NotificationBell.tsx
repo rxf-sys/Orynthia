@@ -29,6 +29,7 @@ const ICON_MAP: Record<NotificationType, LucideIcon> = {
   SYNC_ERROR: CloudOff,
   TASK_DUE: ListChecks,
   EVENT_REMINDER: CalendarClock,
+  CALENDAR_SYNC_ERROR: CloudOff,
   SYSTEM: Info,
 };
 
@@ -41,6 +42,7 @@ const ACCENT_MAP: Record<NotificationType, string> = {
   SYNC_ERROR: 'var(--neg)',
   TASK_DUE: 'var(--info)',
   EVENT_REMINDER: 'var(--info)',
+  CALENDAR_SYNC_ERROR: 'var(--neg)',
   SYSTEM: 'var(--ink-3)',
 };
 

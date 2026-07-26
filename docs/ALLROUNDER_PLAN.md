@@ -4,7 +4,7 @@
 Frontend-/Backend-Modularisierung, modulare Navigation (Sidebar/Tabbar/⌘K), Home-Widget-Dashboard mit Personalisierung,
 Aufgaben-Domain und lokale Kalender-Domain inkl. Migration `6_add_tasks_and_calendar`, Demo-Seed und README.
 Verifiziert per Build, Lint, 88 Tests sowie End-to-End-Smoke-Test gegen echte PostgreSQL-Instanz
-(Migrationen, Boot, Login, Aufgaben-Recurrence, Serien-Expansion, Dashboard-Layout). Offen: Phase 2+ (Tasks 11–17).
+(Migrationen, Boot, Login, Aufgaben-Recurrence, Serien-Expansion, Dashboard-Layout). Phase 2 (Tasks 11+12) ist ebenfalls umgesetzt: Integration-Vault (external_integrations, AES-256-GCM), ICS-Abo read-only mit Stunden-Refresh und Google Calendar read-only (OAuth mit eigenen Client-Creds, syncToken-Inkremental-Sync alle 15 min, Fehler-Notifications); synchronisierte Kalender sind app-weit schreibgeschützt. Einzige neue Dependency: node-ical. Offen: Google bidirektional (Task 13), Apple CalDAV (Task 14), Phase 3+ (Tasks 15–17).
 **Stand:** 2026-07-26
 **Analysierte Repositories:** `rxf-sys/Orynthia` (Commit `a9a92df`), `rxf-sys/standby-web`
 

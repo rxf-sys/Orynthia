@@ -161,6 +161,58 @@ describe('CalendarService', () => {
     });
   });
 
+  describe('read-only (synchronisierte Kalender)', () => {
+    it('lehnt Termin-Erstellung in schreibgeschützten Kalendern ab', async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({ id: 'c-ics', readOnly: true });
+      await expect(
+        service.createEvent('u1', {
+          calendarId: 'c-ics',
+          title: 'X',
+          startsAt: '2026-08-01T09:00:00.000Z',
+          endsAt: '2026-08-01T10:00:00.000Z',
+        }),
+      ).rejects.toThrow('schreibgeschützt');
+    });
+
+    it('lehnt Bearbeiten und Löschen von Sync-Terminen ab', async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue({
+        id: 'e1',
+        startsAt: new Date(),
+        endsAt: new Date(),
+        calendar: { readOnly: true },
+      });
+      await expect(service.updateEvent('u1', 'e1', { title: 'Neu' })).rejects.toThrow(
+        'schreibgeschützt',
+      );
+      await expect(service.removeEvent('u1', 'e1')).rejects.toThrow('schreibgeschützt');
+      expect(mockPrisma.calendarEvent.update).not.toHaveBeenCalled();
+      expect(mockPrisma.calendarEvent.delete).not.toHaveBeenCalled();
+    });
+
+    it('verhindert das direkte Löschen synchronisierter Kalender', async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({
+        id: 'c-ics',
+        integrationId: 'int1',
+        isDefault: false,
+      });
+      await expect(service.removeCalendar('u1', 'c-ics')).rejects.toThrow('Integrationen');
+    });
+
+    it('wählt als Default-Ziel nie einen read-only Kalender', async () => {
+      mockPrisma.calendar.findMany.mockResolvedValue([
+        { id: 'c-ics', isDefault: false, readOnly: true },
+        { id: 'c-local', isDefault: false, readOnly: false },
+      ]);
+      mockPrisma.calendarEvent.create.mockResolvedValue({});
+      await service.createEvent('u1', {
+        title: 'X',
+        startsAt: '2026-08-01T09:00:00.000Z',
+        endsAt: '2026-08-01T10:00:00.000Z',
+      });
+      expect(mockPrisma.calendarEvent.create.mock.calls[0][0].data.calendarId).toBe('c-local');
+    });
+  });
+
   describe('removeCalendar', () => {
     it('verweigert das Löschen des letzten Kalenders', async () => {
       mockPrisma.calendar.findFirst.mockResolvedValue({ id: 'c1', isDefault: true });

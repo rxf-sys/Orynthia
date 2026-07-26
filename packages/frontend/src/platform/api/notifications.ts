@@ -9,6 +9,7 @@ export type NotificationType =
   | 'SYNC_ERROR'
   | 'TASK_DUE'
   | 'EVENT_REMINDER'
+  | 'CALENDAR_SYNC_ERROR'
   | 'SYSTEM';
 
 export interface Notification {
