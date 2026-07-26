@@ -1,26 +1,26 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { validateEnv } from './config/env.validation';
+import { validateEnv } from './platform/config/env.validation';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { PrismaModule } from './prisma/prisma.module';
-import { MailModule } from './mail/mail.module';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { TransactionsModule } from './transactions/transactions.module';
-import { CategoriesModule } from './categories/categories.module';
-import { AccountsModule } from './accounts/accounts.module';
-import { BudgetsModule } from './budgets/budgets.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { BankingModule } from './banking/banking.module';
-import { RecurringPaymentsModule } from './recurring-payments/recurring-payments.module';
-import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
-import { ContractsModule } from './contracts/contracts.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { ChatModule } from './chat/chat.module';
-import { InvestmentsModule } from './investments/investments.module';
+import { PrismaModule } from './platform/prisma/prisma.module';
+import { MailModule } from './platform/mail/mail.module';
+import { AuthModule } from './platform/auth/auth.module';
+import { UsersModule } from './platform/users/users.module';
+import { TransactionsModule } from './modules/finance/transactions/transactions.module';
+import { CategoriesModule } from './modules/finance/categories/categories.module';
+import { AccountsModule } from './modules/finance/accounts/accounts.module';
+import { BudgetsModule } from './modules/finance/budgets/budgets.module';
+import { DashboardModule } from './modules/finance/dashboard/dashboard.module';
+import { BankingModule } from './modules/finance/banking/banking.module';
+import { RecurringPaymentsModule } from './modules/finance/recurring-payments/recurring-payments.module';
+import { SavingsGoalsModule } from './modules/finance/savings-goals/savings-goals.module';
+import { ContractsModule } from './modules/finance/contracts/contracts.module';
+import { NotificationsModule } from './platform/notifications/notifications.module';
+import { ChatModule } from './assistant/chat/chat.module';
+import { InvestmentsModule } from './modules/finance/investments/investments.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from './platform/health/health.module';
 
 @Module({
   imports: [
