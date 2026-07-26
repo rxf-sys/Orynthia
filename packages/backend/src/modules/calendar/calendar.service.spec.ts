@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { NotificationsService } from '../../platform/notifications/notifications.service';
+import { CalendarSyncService } from './calendar-sync.service';
 
 describe('CalendarService', () => {
   let service: CalendarService;
@@ -28,6 +29,13 @@ describe('CalendarService', () => {
 
   const mockNotifications = { create: jest.fn() };
 
+  // Ohne bidirektionale Integration liefert der Sync null → rein lokaler Pfad
+  const mockSync = {
+    pushCreate: jest.fn().mockResolvedValue(null),
+    pushUpdate: jest.fn().mockResolvedValue(null),
+    pushDelete: jest.fn().mockResolvedValue(undefined),
+  };
+
   const baseEvent = {
     id: 'e1',
     calendarId: 'c1',
@@ -49,11 +57,15 @@ describe('CalendarService', () => {
         CalendarService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: CalendarSyncService, useValue: mockSync },
       ],
     }).compile();
 
     service = module.get<CalendarService>(CalendarService);
     jest.clearAllMocks();
+    mockSync.pushCreate.mockResolvedValue(null);
+    mockSync.pushUpdate.mockResolvedValue(null);
+    mockSync.pushDelete.mockResolvedValue(undefined);
   });
 
   describe('findEvents', () => {
@@ -210,6 +222,78 @@ describe('CalendarService', () => {
         endsAt: '2026-08-01T10:00:00.000Z',
       });
       expect(mockPrisma.calendarEvent.create.mock.calls[0][0].data.calendarId).toBe('c-local');
+    });
+  });
+
+  describe('bidirektionaler Sync', () => {
+    it('legt den Termin erst extern an und übernimmt externalId + etag', async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({ id: 'c-google', readOnly: false });
+      mockSync.pushCreate.mockResolvedValue({ externalId: 'g-123', etag: '"v1"' });
+      mockPrisma.calendarEvent.create.mockResolvedValue({});
+
+      await service.createEvent('u1', {
+        calendarId: 'c-google',
+        title: 'Meeting',
+        startsAt: '2026-08-01T09:00:00.000Z',
+        endsAt: '2026-08-01T10:00:00.000Z',
+      });
+
+      expect(mockSync.pushCreate).toHaveBeenCalledTimes(1);
+      const data = mockPrisma.calendarEvent.create.mock.calls[0][0].data;
+      expect(data.externalId).toBe('g-123');
+      expect(data.etag).toBe('"v1"');
+    });
+
+    it('speichert nichts lokal, wenn das externe Anlegen scheitert', async () => {
+      mockPrisma.calendar.findFirst.mockResolvedValue({ id: 'c-google', readOnly: false });
+      mockSync.pushCreate.mockRejectedValue(new Error('Google events.insert fehlgeschlagen (500)'));
+
+      await expect(
+        service.createEvent('u1', {
+          calendarId: 'c-google',
+          title: 'Meeting',
+          startsAt: '2026-08-01T09:00:00.000Z',
+          endsAt: '2026-08-01T10:00:00.000Z',
+        }),
+      ).rejects.toThrow();
+      expect(mockPrisma.calendarEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('reicht das etag beim Update mit und übernimmt das neue', async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue({
+        id: 'e1',
+        calendarId: 'c-google',
+        externalId: 'g-123',
+        etag: '"v1"',
+        title: 'Alt',
+        description: null,
+        location: null,
+        startsAt: new Date('2026-08-01T09:00:00.000Z'),
+        endsAt: new Date('2026-08-01T10:00:00.000Z'),
+        isAllDay: false,
+        calendar: { readOnly: false },
+      });
+      mockSync.pushUpdate.mockResolvedValue({ etag: '"v2"' });
+      mockPrisma.calendarEvent.update.mockResolvedValue({});
+
+      await service.updateEvent('u1', 'e1', { title: 'Neu' });
+
+      expect(mockSync.pushUpdate.mock.calls[0][3]).toBe('"v1"');
+      expect(mockPrisma.calendarEvent.update.mock.calls[0][0].data.etag).toBe('"v2"');
+    });
+
+    it('löscht bei Konflikt nicht lokal', async () => {
+      mockPrisma.calendarEvent.findFirst.mockResolvedValue({
+        id: 'e1',
+        calendarId: 'c-google',
+        externalId: 'g-123',
+        etag: '"v1"',
+        calendar: { readOnly: false },
+      });
+      mockSync.pushDelete.mockRejectedValue(new Error('Konflikt'));
+
+      await expect(service.removeEvent('u1', 'e1')).rejects.toThrow();
+      expect(mockPrisma.calendarEvent.delete).not.toHaveBeenCalled();
     });
   });
 

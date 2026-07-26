@@ -820,6 +820,8 @@ model ExternalIntegration {
   provider      IntegrationProvider
   label         String?
   credentialEnc String              @map("credential_enc")
+  /// true = Schreibrichtung aktiv (bidirektionaler Sync)
+  writable      Boolean             @default(false)
   status        IntegrationStatus   @default(CONNECTED)
   lastSyncAt    DateTime?           @map("last_sync_at")
   lastError     String?             @map("last_error")

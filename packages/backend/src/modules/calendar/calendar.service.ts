@@ -5,6 +5,7 @@ import { PrismaService } from '../../platform/prisma/prisma.service';
 import { NotificationsService } from '../../platform/notifications/notifications.service';
 import { addRecurrence } from '../../platform/common/dates';
 import { CreateCalendarDto, CreateEventDto, UpdateCalendarDto, UpdateEventDto } from './dto/calendar.dto';
+import { CalendarSyncService } from './calendar-sync.service';
 
 /** Eine konkrete Termin-Instanz (bei Wiederholungen expandiert). */
 export interface EventOccurrence {
@@ -37,6 +38,7 @@ export class CalendarService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private sync: CalendarSyncService,
   ) {}
 
   // ---------- Kalender ----------
@@ -142,6 +144,18 @@ export class CalendarService {
       calendarId = (writable.find((c) => c.isDefault) ?? writable[0]).id;
     }
 
+    // Bei bidirektional verbundenen Kalendern zuerst extern anlegen: nur
+    // wenn das gelingt, entsteht lokal ein Termin – so laufen beide Seiten
+    // nicht auseinander.
+    const remote = await this.sync.pushCreate(calendarId, {
+      title: dto.title,
+      description: dto.description,
+      location: dto.location,
+      startsAt,
+      endsAt,
+      isAllDay: dto.isAllDay ?? false,
+    });
+
     return this.prisma.calendarEvent.create({
       data: {
         calendarId,
@@ -155,6 +169,8 @@ export class CalendarService {
         recurrence: dto.recurrence,
         recurrenceInterval: dto.recurrence ? (dto.recurrenceInterval ?? 1) : null,
         recurrenceUntil: dto.recurrenceUntil ? new Date(dto.recurrenceUntil) : null,
+        externalId: remote?.externalId,
+        etag: remote?.etag,
       },
       include: { calendar: { select: { name: true, color: true } } },
     });
@@ -175,6 +191,26 @@ export class CalendarService {
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : event.endsAt;
     if (endsAt < startsAt) throw new BadRequestException('Ende darf nicht vor dem Beginn liegen');
 
+    // Bei bidirektionalem Sync erst extern schreiben (mit etag-Prüfung);
+    // ein Konflikt bricht hier ab, statt die Remote-Version zu überschreiben.
+    let remoteEtag: string | null | undefined;
+    if (event.externalId) {
+      const pushed = await this.sync.pushUpdate(
+        dto.calendarId ?? event.calendarId,
+        event.externalId,
+        {
+          title: dto.title ?? event.title,
+          description: dto.description !== undefined ? dto.description : event.description,
+          location: dto.location !== undefined ? dto.location : event.location,
+          startsAt,
+          endsAt,
+          isAllDay: dto.isAllDay ?? event.isAllDay,
+        },
+        event.etag,
+      );
+      remoteEtag = pushed?.etag;
+    }
+
     return this.prisma.calendarEvent.update({
       where: { id },
       data: {
@@ -191,6 +227,7 @@ export class CalendarService {
         ...(dto.recurrenceUntil !== undefined
           ? { recurrenceUntil: dto.recurrenceUntil ? new Date(dto.recurrenceUntil) : null }
           : {}),
+        ...(remoteEtag !== undefined ? { etag: remoteEtag } : {}),
       },
       include: { calendar: { select: { name: true, color: true } } },
     });
@@ -199,11 +236,20 @@ export class CalendarService {
   async removeEvent(userId: string, id: string) {
     const event = await this.prisma.calendarEvent.findFirst({
       where: { id, calendar: { userId } },
-      select: { id: true, calendar: { select: { readOnly: true } } },
+      select: {
+        id: true,
+        calendarId: true,
+        externalId: true,
+        etag: true,
+        calendar: { select: { readOnly: true } },
+      },
     });
     if (!event) throw new NotFoundException('Termin nicht gefunden');
     if (event.calendar.readOnly) {
       throw new BadRequestException('Termine aus synchronisierten Kalendern sind schreibgeschützt');
+    }
+    if (event.externalId) {
+      await this.sync.pushDelete(event.calendarId, event.externalId, event.etag);
     }
     await this.prisma.calendarEvent.delete({ where: { id } });
     return { message: 'Termin gelöscht' };
@@ -360,6 +406,8 @@ export class CalendarService {
       select: { id: true, readOnly: true },
     });
     if (!calendar) throw new NotFoundException('Kalender nicht gefunden');
+    // readOnly ist bei bidirektional verbundenen Kalendern false – dort
+    // sind Änderungen erlaubt und werden zusätzlich nach außen gespiegelt.
     if (calendar.readOnly) {
       throw new BadRequestException('Dieser Kalender ist schreibgeschützt (synchronisiert)');
     }

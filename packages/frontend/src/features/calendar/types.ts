@@ -54,6 +54,7 @@ export interface CalendarIntegration {
   id: string;
   provider: 'GOOGLE_CALENDAR' | 'ICS' | 'APPLE_CALDAV';
   label?: string | null;
+  writable: boolean;
   status: 'CONNECTED' | 'ERROR' | 'REVOKED';
   lastSyncAt?: string | null;
   lastError?: string | null;

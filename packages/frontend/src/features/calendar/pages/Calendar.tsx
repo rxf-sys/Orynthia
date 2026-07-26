@@ -109,6 +109,8 @@ export function CalendarPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [newCalendar, setNewCalendar] = useState({ name: '', color: CAL_COLORS[0] });
   const [icsForm, setIcsForm] = useState({ url: '', name: '' });
+  const [calDavForm, setCalDavForm] = useState({ username: '', appPassword: '' });
+  const [calDavOpen, setCalDavOpen] = useState(false);
   // Zusatz-Layer: Aufgaben mit Fälligkeit und geplante Mahlzeiten
   const [showTasks, setShowTasks] = useState(true);
   const [showMeals, setShowMeals] = useState(true);
@@ -203,8 +205,21 @@ export function CalendarPage() {
     onError: (e) => toast.error(parseApiError(e, 'ICS-Abo fehlgeschlagen')),
   });
 
+  const calDavMutation = useMutation({
+    mutationFn: calendarApi.connectCalDav,
+    onSuccess: (r) => {
+      invalidate();
+      setCalDavForm({ username: '', appPassword: '' });
+      setCalDavOpen(false);
+      toast.success(
+        `Apple Kalender verbunden – ${r.data.calendars} Kalender, ${r.data.imported} Termine`,
+      );
+    },
+    onError: (e) => toast.error(parseApiError(e, 'CalDAV-Verbindung fehlgeschlagen')),
+  });
+
   const googleConnectMutation = useMutation({
-    mutationFn: () => calendarApi.googleConnect(),
+    mutationFn: (writable: boolean) => calendarApi.googleConnect(writable),
     onSuccess: (r) => {
       window.location.href = r.data.authUrl;
     },
@@ -658,6 +673,77 @@ export function CalendarPage() {
         </form>
       </Modal>
 
+      {/* Apple/CalDAV verbinden */}
+      <Modal
+        open={calDavOpen}
+        onClose={() => setCalDavOpen(false)}
+        title="Apple Kalender verbinden"
+        size="sm"
+        footer={
+          <>
+            <Btn variant="ghost" onClick={() => setCalDavOpen(false)}>
+              Abbrechen
+            </Btn>
+            <Btn
+              variant="grad"
+              icon={Link2}
+              type="submit"
+              form="caldav-form"
+              disabled={
+                calDavMutation.isPending ||
+                !calDavForm.username.trim() ||
+                calDavForm.appPassword.length < 8
+              }
+            >
+              Verbinden
+            </Btn>
+          </>
+        }
+      >
+        <form
+          id="caldav-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            calDavMutation.mutate({
+              username: calDavForm.username.trim(),
+              appPassword: calDavForm.appPassword,
+            });
+          }}
+          className="space-y-4"
+        >
+          <div className="flex gap-2 rounded-md bg-soft px-3 py-2.5 text-xs leading-relaxed text-ink-2">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div>
+              Apple bietet keine Kalender-API – die Anbindung läuft über CalDAV. Verwende dafür
+              ein <strong>app-spezifisches Passwort</strong> (appleid.apple.com → Anmeldung und
+              Sicherheit), niemals dein Apple-ID-Passwort. Es wird verschlüsselt gespeichert und
+              kann jederzeit hier oder bei Apple widerrufen werden. Der Import ist schreibgeschützt.
+            </div>
+          </div>
+          <Field label="Apple-ID" required>
+            <input
+              className="input"
+              type="email"
+              autoComplete="off"
+              value={calDavForm.username}
+              onChange={(e) => setCalDavForm({ ...calDavForm, username: e.target.value })}
+              placeholder="name@icloud.com"
+              maxLength={200}
+            />
+          </Field>
+          <Field label="App-spezifisches Passwort" required hint="Format: xxxx-xxxx-xxxx-xxxx">
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              value={calDavForm.appPassword}
+              onChange={(e) => setCalDavForm({ ...calDavForm, appPassword: e.target.value })}
+              maxLength={200}
+            />
+          </Field>
+        </form>
+      </Modal>
+
       {/* Kalender verwalten */}
       <Modal open={manageOpen} onClose={() => setManageOpen(false)} title="Kalender verwalten">
         <div className="space-y-4">
@@ -720,6 +806,11 @@ export function CalendarPage() {
                           (integration.provider === 'GOOGLE_CALENDAR' ? 'Google Kalender' : 'ICS-Abo')}
                       </div>
                       <div className="text-xs text-ink-3">
+                        {integration.writable && (
+                          <span className="mr-1.5 rounded-pill bg-soft px-1.5 py-0.5 text-[0.65rem] font-semibold text-indigo">
+                            bidirektional
+                          </span>
+                        )}
                         {integration.status === 'ERROR' ? (
                           <span className="text-neg" title={integration.lastError ?? undefined}>
                             Fehler beim Sync
@@ -802,20 +893,35 @@ export function CalendarPage() {
               </div>
             </form>
             {integrationsData?.googleConfigured ? (
-              <Btn
-                variant="ghost"
-                size="sm"
-                icon={Link2}
-                disabled={googleConnectMutation.isPending}
-                onClick={() => googleConnectMutation.mutate()}
-              >
-                Mit Google Kalender verbinden
-              </Btn>
+              <div className="flex flex-wrap gap-2">
+                <Btn
+                  variant="ghost"
+                  size="sm"
+                  icon={Link2}
+                  disabled={googleConnectMutation.isPending}
+                  onClick={() => googleConnectMutation.mutate(false)}
+                >
+                  Google verbinden (nur lesen)
+                </Btn>
+                <Btn
+                  variant="ghost"
+                  size="sm"
+                  icon={RefreshCw}
+                  disabled={googleConnectMutation.isPending}
+                  onClick={() => googleConnectMutation.mutate(true)}
+                >
+                  Google bidirektional
+                </Btn>
+              </div>
             ) : (
               <p className="text-xs text-ink-4">
                 Google-Sync verfügbar, sobald GOOGLE_CLIENT_ID/SECRET in der .env gesetzt sind (siehe README).
               </p>
             )}
+
+            <Btn variant="ghost" size="sm" icon={Link2} onClick={() => setCalDavOpen(true)}>
+              Apple Kalender verbinden (iCloud)
+            </Btn>
           </div>
 
           <form

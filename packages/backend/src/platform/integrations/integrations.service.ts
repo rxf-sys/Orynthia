@@ -8,6 +8,7 @@ const PUBLIC_SELECT = {
   id: true,
   provider: true,
   label: true,
+  writable: true,
   status: true,
   lastSyncAt: true,
   lastError: true,
@@ -24,9 +25,15 @@ const PUBLIC_SELECT = {
 export class IntegrationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, provider: IntegrationProvider, credential: string, label?: string) {
+  async create(
+    userId: string,
+    provider: IntegrationProvider,
+    credential: string,
+    label?: string,
+    writable = false,
+  ) {
     return this.prisma.externalIntegration.create({
-      data: { userId, provider, label, credentialEnc: encrypt(credential) },
+      data: { userId, provider, label, writable, credentialEnc: encrypt(credential) },
     });
   }
 

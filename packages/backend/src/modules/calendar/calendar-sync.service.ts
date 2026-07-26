@@ -5,7 +5,13 @@ import { PrismaService } from '../../platform/prisma/prisma.service';
 import { NotificationsService } from '../../platform/notifications/notifications.service';
 import { IntegrationsService } from '../../platform/integrations/integrations.service';
 import { IcsProvider } from './providers/ics.provider';
-import { GoogleCalendarProvider, SyncTokenExpiredError } from './providers/google.provider';
+import { CalDavProvider, type CalDavCredentials } from './providers/caldav.provider';
+import {
+  GoogleCalendarProvider,
+  RemoteConflictError,
+  SyncTokenExpiredError,
+  type WritableEvent,
+} from './providers/google.provider';
 import { defaultSyncWindow, ExternalEventInstance } from './providers/calendar-provider.interface';
 
 // ICS-Feeds ändern sich selten – stündlich reicht; Google alle 15 Minuten.
@@ -21,6 +27,7 @@ export class CalendarSyncService {
     private notifications: NotificationsService,
     private ics: IcsProvider,
     private google: GoogleCalendarProvider,
+    private caldav: CalDavProvider,
   ) {}
 
   // ---------- Verbinden ----------
@@ -44,23 +51,62 @@ export class CalendarSyncService {
     return { integrationId: integration.id, calendarId: calendar.id, imported: instances.length };
   }
 
-  googleStart(userId: string) {
+  /**
+   * Apple-/CalDAV-Konto verbinden. Das app-spezifische Passwort wird
+   * sofort gegen den Server geprüft und danach nur verschlüsselt abgelegt.
+   */
+  async connectCalDav(
+    userId: string,
+    dto: { username: string; appPassword: string; serverUrl?: string; label?: string },
+  ) {
+    const credentials: CalDavCredentials = {
+      serverUrl: this.caldav.normalizeServerUrl(dto.serverUrl),
+      username: dto.username.trim(),
+      appPassword: dto.appPassword,
+    };
+
+    const externalCalendars = await this.caldav.listCalendars(credentials);
+    if (externalCalendars.length === 0) {
+      throw new BadRequestException('Es wurden keine CalDAV-Kalender gefunden');
+    }
+
+    const integration = await this.integrations.create(
+      userId,
+      'APPLE_CALDAV',
+      JSON.stringify(credentials),
+      dto.label?.trim() || 'Apple Kalender',
+    );
+
+    let imported = 0;
+    try {
+      imported = await this.syncCalDav(integration, credentials);
+      await this.integrations.markSynced(integration.id);
+    } catch (e) {
+      await this.integrations.markError(integration.id, (e as Error).message);
+      throw new BadRequestException('CalDAV-Kalender konnten nicht importiert werden');
+    }
+    this.logger.log(`CalDAV verbunden (${externalCalendars.length} Kalender, ${imported} Termine)`);
+    return { integrationId: integration.id, calendars: externalCalendars.length, imported };
+  }
+
+  googleStart(userId: string, writable = false) {
     if (!this.google.isConfigured()) {
       throw new ServiceUnavailableException(
         'Google-Integration ist nicht konfiguriert (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET in .env)',
       );
     }
-    return { authUrl: this.google.buildAuthUrl(userId) };
+    return { authUrl: this.google.buildAuthUrl(userId, writable) };
   }
 
   async googleCallback(userId: string, code: string, state: string) {
-    this.google.verifyState(state, userId);
+    const { writable } = this.google.verifyState(state, userId);
     const { refreshToken, accessToken } = await this.google.exchangeCode(code);
     const integration = await this.integrations.create(
       userId,
       'GOOGLE_CALENDAR',
       JSON.stringify({ refreshToken }),
-      'Google Kalender',
+      writable ? 'Google Kalender (bidirektional)' : 'Google Kalender',
+      writable,
     );
     try {
       const imported = await this.syncGoogle(integration, accessToken);
@@ -126,8 +172,13 @@ export class CalendarSyncService {
         const { refreshToken } = JSON.parse(this.integrations.getCredential(integration));
         const accessToken = await this.google.refreshAccessToken(refreshToken);
         await this.syncGoogle(integration, accessToken);
+      } else if (integration.provider === 'APPLE_CALDAV') {
+        const credentials: CalDavCredentials = JSON.parse(
+          this.integrations.getCredential(integration),
+        );
+        await this.syncCalDav(integration, credentials);
       } else {
-        return; // APPLE_CALDAV: Phase 2b
+        return;
       }
       await this.integrations.markSynced(integration.id);
     } catch (e) {
@@ -162,6 +213,7 @@ export class CalendarSyncService {
           color: external.color,
           source: 'GOOGLE',
           externalId: external.externalId,
+          writable: integration.writable,
         });
       }
 
@@ -216,12 +268,138 @@ export class CalendarSyncService {
     return page.upserts.length;
   }
 
+  // ---------- CalDAV-Sync ----------
+
+  /** Importiert alle CalDAV-Kalender einer Verbindung (read-only). */
+  private async syncCalDav(
+    integration: ExternalIntegration,
+    credentials: CalDavCredentials,
+  ): Promise<number> {
+    const externalCalendars = await this.caldav.listCalendars(credentials);
+    const window = defaultSyncWindow();
+    let total = 0;
+
+    for (const external of externalCalendars) {
+      let calendar = await this.prisma.calendar.findFirst({
+        where: { integrationId: integration.id, externalId: external.externalId },
+      });
+      if (!calendar) {
+        calendar = await this.createExternalCalendar(integration.userId, integration.id, {
+          name: external.name,
+          color: external.color,
+          source: 'APPLE',
+          externalId: external.externalId,
+        });
+      }
+
+      const { instances, ctag } = await this.caldav.fetchInstances(
+        credentials,
+        external.externalId,
+        window,
+      );
+      // ctag ist die Sammel-Version des Kalenders: unverändert = nichts zu tun
+      if (ctag && calendar.syncToken === ctag) {
+        total += instances.length;
+        continue;
+      }
+      await this.replaceCalendarEvents(calendar.id, instances);
+      await this.prisma.calendar.update({
+        where: { id: calendar.id },
+        data: { syncToken: ctag ?? null },
+      });
+      total += instances.length;
+    }
+
+    // Kalender entfernen, die es beim Server nicht mehr gibt
+    await this.prisma.calendar.deleteMany({
+      where: {
+        integrationId: integration.id,
+        externalId: { notIn: externalCalendars.map((c) => c.externalId) },
+      },
+    });
+    return total;
+  }
+
+  // ---------- Schreibrichtung (bidirektionaler Sync) ----------
+
+  /**
+   * Zugang für einen schreibbaren externen Kalender. Liefert null, wenn der
+   * Kalender lokal ist oder die Integration keine Schreibrechte hat – dann
+   * bleibt alles rein lokal.
+   */
+  private async writeContext(calendarId: string) {
+    const calendar = await this.prisma.calendar.findUnique({
+      where: { id: calendarId },
+      include: { integration: true },
+    });
+    if (!calendar?.integration?.writable || !calendar.externalId) return null;
+    if (calendar.integration.provider !== 'GOOGLE_CALENDAR') return null;
+
+    const { refreshToken } = JSON.parse(this.integrations.getCredential(calendar.integration));
+    const accessToken = await this.google.refreshAccessToken(refreshToken);
+    return { calendar, accessToken, integrationId: calendar.integration.id };
+  }
+
+  /** Nach dem Anlegen: Termin bei Google erzeugen und Provenienz zurückgeben. */
+  async pushCreate(
+    calendarId: string,
+    event: WritableEvent,
+  ): Promise<{ externalId: string; etag: string | null } | null> {
+    const ctx = await this.writeContext(calendarId);
+    if (!ctx) return null;
+    return this.google.createEvent(ctx.accessToken, ctx.calendar.externalId!, event);
+  }
+
+  async pushUpdate(
+    calendarId: string,
+    externalId: string,
+    event: WritableEvent,
+    etag: string | null,
+  ): Promise<{ etag: string | null } | null> {
+    const ctx = await this.writeContext(calendarId);
+    if (!ctx) return null;
+    try {
+      return await this.google.updateEvent(
+        ctx.accessToken,
+        ctx.calendar.externalId!,
+        externalId,
+        event,
+        etag,
+      );
+    } catch (e) {
+      if (e instanceof RemoteConflictError) await this.notifyConflict(ctx.calendar.userId, event.title);
+      throw e;
+    }
+  }
+
+  async pushDelete(calendarId: string, externalId: string, etag: string | null): Promise<void> {
+    const ctx = await this.writeContext(calendarId);
+    if (!ctx) return;
+    await this.google.deleteEvent(ctx.accessToken, ctx.calendar.externalId!, externalId, etag);
+  }
+
+  private async notifyConflict(userId: string, title: string) {
+    await this.notifications.create({
+      userId,
+      type: 'CALENDAR_SYNC_ERROR',
+      title: 'Termin-Konflikt',
+      message: `„${title}" wurde extern geändert. Deine Änderung wurde nicht übernommen – bitte nach dem nächsten Sync erneut versuchen.`,
+      dedupeKey: `calendar-conflict:${title}:${new Date().toISOString().slice(0, 16)}`,
+    });
+  }
+
   // ---------- Persistenz-Helfer ----------
 
   private async createExternalCalendar(
     userId: string,
     integrationId: string,
-    data: { name: string; color?: string; source: 'ICS' | 'GOOGLE'; externalId: string },
+    data: {
+      name: string;
+      color?: string;
+      source: 'ICS' | 'GOOGLE' | 'APPLE';
+      externalId: string;
+      writable?: boolean;
+    },
   ) {
     // @@unique([userId, name]) – bei Namenskollision Suffix anhängen
     let name = data.name.slice(0, 100);
@@ -238,7 +416,7 @@ export class CalendarSyncService {
         source: data.source,
         externalId: data.externalId,
         integrationId,
-        readOnly: true,
+        readOnly: !data.writable,
         isDefault: false,
       },
     });

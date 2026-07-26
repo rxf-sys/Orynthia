@@ -7,7 +7,9 @@ const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
-const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPE_READONLY = 'https://www.googleapis.com/auth/calendar.readonly';
+// Schreibrechte nur auf Termine – nicht auf Kalender-Verwaltung/Einstellungen
+const SCOPE_READWRITE = 'https://www.googleapis.com/auth/calendar.events';
 const STATE_TTL_MS = 10 * 60_000;
 
 /** Signalisiert einen abgelaufenen syncToken (HTTP 410) → voller Resync nötig. */
@@ -15,6 +17,26 @@ export class SyncTokenExpiredError extends Error {
   constructor() {
     super('syncToken abgelaufen');
   }
+}
+
+/**
+ * Der Termin wurde bei Google zwischenzeitlich geändert (HTTP 412 auf
+ * If-Match). Wird bewusst nach oben gereicht, statt stumm zu überschreiben.
+ */
+export class RemoteConflictError extends Error {
+  constructor() {
+    super('Der Termin wurde bei Google zwischenzeitlich geändert');
+  }
+}
+
+/** Feldsatz, den Orynthia nach Google schreibt. */
+export interface WritableEvent {
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  isAllDay: boolean;
 }
 
 interface GoogleEventItem {
@@ -68,12 +90,12 @@ export class GoogleCalendarProvider {
   // ---------- OAuth ----------
 
   /** CSRF-Schutz: state trägt userId + Zeitstempel, AES-verschlüsselt. */
-  buildState(userId: string): string {
-    return encodeURIComponent(encrypt(JSON.stringify({ u: userId, t: Date.now() })));
+  buildState(userId: string, writable = false): string {
+    return encodeURIComponent(encrypt(JSON.stringify({ u: userId, t: Date.now(), w: writable })));
   }
 
-  verifyState(state: string, userId: string): void {
-    let parsed: { u?: string; t?: number };
+  verifyState(state: string, userId: string): { writable: boolean } {
+    let parsed: { u?: string; t?: number; w?: boolean };
     try {
       parsed = JSON.parse(decrypt(decodeURIComponent(state)));
     } catch {
@@ -82,17 +104,18 @@ export class GoogleCalendarProvider {
     if (parsed.u !== userId || !parsed.t || Date.now() - parsed.t > STATE_TTL_MS) {
       throw new BadRequestException('OAuth-State abgelaufen oder ungültig');
     }
+    return { writable: parsed.w === true };
   }
 
-  buildAuthUrl(userId: string): string {
+  buildAuthUrl(userId: string, writable = false): string {
     const params = new URLSearchParams({
       client_id: this.clientId(),
       redirect_uri: this.redirectUri(),
       response_type: 'code',
-      scope: SCOPE,
+      scope: writable ? SCOPE_READWRITE : SCOPE_READONLY,
       access_type: 'offline',
       prompt: 'consent',
-      state: this.buildState(userId),
+      state: this.buildState(userId, writable),
     });
     return `${AUTH_URL}?${params.toString()}`;
   }
@@ -210,6 +233,95 @@ export class GoogleCalendarProvider {
     } while (pageToken);
 
     return { upserts, cancelledIds, nextSyncToken };
+  }
+
+  // ---------- Schreibrichtung (bidirektionaler Sync) ----------
+
+  /** Google erwartet bei Ganztages-Terminen ein exklusives Enddatum. */
+  private toGoogleBody(event: WritableEvent) {
+    const dayString = (d: Date) => d.toISOString().slice(0, 10);
+    return {
+      summary: event.title,
+      description: event.description ?? undefined,
+      location: event.location ?? undefined,
+      start: event.isAllDay
+        ? { date: dayString(event.startsAt) }
+        : { dateTime: event.startsAt.toISOString() },
+      end: event.isAllDay
+        ? { date: dayString(new Date(event.endsAt.getTime() + 1000)) }
+        : { dateTime: event.endsAt.toISOString() },
+    };
+  }
+
+  async createEvent(
+    accessToken: string,
+    calendarExternalId: string,
+    event: WritableEvent,
+  ): Promise<{ externalId: string; etag: string | null }> {
+    const res = await fetch(
+      `${API_BASE}/calendars/${encodeURIComponent(calendarExternalId)}/events`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(this.toGoogleBody(event)),
+      },
+    );
+    if (!res.ok) throw new Error(`Google events.insert fehlgeschlagen (${res.status})`);
+    const data = (await res.json()) as { id: string; etag?: string };
+    return { externalId: data.id, etag: data.etag ?? null };
+  }
+
+  async updateEvent(
+    accessToken: string,
+    calendarExternalId: string,
+    externalId: string,
+    event: WritableEvent,
+    etag?: string | null,
+  ): Promise<{ etag: string | null }> {
+    const res = await fetch(
+      `${API_BASE}/calendars/${encodeURIComponent(calendarExternalId)}/events/${encodeURIComponent(externalId)}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          // Optimistic Locking: nur schreiben, wenn die Remote-Version
+          // noch die ist, die wir zuletzt gesehen haben.
+          ...(etag ? { 'If-Match': etag } : {}),
+        },
+        body: JSON.stringify(this.toGoogleBody(event)),
+      },
+    );
+    if (res.status === 412) throw new RemoteConflictError();
+    if (!res.ok) throw new Error(`Google events.update fehlgeschlagen (${res.status})`);
+    const data = (await res.json()) as { etag?: string };
+    return { etag: data.etag ?? null };
+  }
+
+  async deleteEvent(
+    accessToken: string,
+    calendarExternalId: string,
+    externalId: string,
+    etag?: string | null,
+  ): Promise<void> {
+    const res = await fetch(
+      `${API_BASE}/calendars/${encodeURIComponent(calendarExternalId)}/events/${encodeURIComponent(externalId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(etag ? { 'If-Match': etag } : {}),
+        },
+      },
+    );
+    if (res.status === 412) throw new RemoteConflictError();
+    // 410 = bei Google bereits gelöscht; für uns ein Erfolg
+    if (!res.ok && res.status !== 404 && res.status !== 410) {
+      throw new Error(`Google events.delete fehlgeschlagen (${res.status})`);
+    }
   }
 
   private mapEvent(item: GoogleEventItem): ExternalEventInstance | null {

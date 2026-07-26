@@ -20,7 +20,18 @@ export const calendarApi = {
   getIntegrations: () => api.get<IntegrationsResponse>('/calendar/integrations'),
   connectIcs: (data: { url: string; name?: string; color?: string }) =>
     api.post<{ integrationId: string; imported: number }>('/calendar/integrations/ics', data),
-  googleConnect: () => api.post<{ authUrl: string }>('/calendar/integrations/google/connect'),
+  googleConnect: (writable = false) =>
+    api.post<{ authUrl: string }>('/calendar/integrations/google/connect', { writable }),
+  connectCalDav: (data: {
+    username: string;
+    appPassword: string;
+    serverUrl?: string;
+    label?: string;
+  }) =>
+    api.post<{ integrationId: string; calendars: number; imported: number }>(
+      '/calendar/integrations/caldav',
+      data,
+    ),
   googleCallback: (code: string, state: string) =>
     api.post<{ integrationId: string; imported: number }>('/calendar/integrations/google/callback', { code, state }),
   syncIntegration: (id: string) => api.post(`/calendar/integrations/${id}/sync`),
