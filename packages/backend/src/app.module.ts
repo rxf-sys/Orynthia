@@ -19,6 +19,8 @@ import { ContractsModule } from './modules/finance/contracts/contracts.module';
 import { NotificationsModule } from './platform/notifications/notifications.module';
 import { ChatModule } from './assistant/chat/chat.module';
 import { InvestmentsModule } from './modules/finance/investments/investments.module';
+import { TasksModule } from './modules/tasks/tasks.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { DemoSeedModule } from './demo-seed/demo-seed.module';
 import { HealthModule } from './platform/health/health.module';
 
@@ -65,6 +67,8 @@ import { HealthModule } from './platform/health/health.module';
     NotificationsModule,
     ChatModule,
     InvestmentsModule,
+    TasksModule,
+    CalendarModule,
     DemoSeedModule,
     HealthModule,
   ],

@@ -44,6 +44,23 @@ export function addFrequency(date: Date, freq: string, anchorDay?: number): Date
   }
 }
 
+/**
+ * Nächste Instanz für Aufgaben-/Termin-Wiederholungen. Ergänzt `addFrequency`
+ * um DAILY und einen Intervall-Faktor (z. B. alle 2 Wochen = WEEKLY + interval 2).
+ */
+export function addRecurrence(date: Date, freq: string, interval = 1, anchorDay?: number): Date {
+  let next = new Date(date);
+  const steps = Math.max(1, interval);
+  if (freq === 'DAILY') {
+    next.setDate(next.getDate() + steps);
+    return next;
+  }
+  for (let i = 0; i < steps; i++) {
+    next = addFrequency(next, freq, anchorDay);
+  }
+  return next;
+}
+
 /** Frequenz → monatlicher Faktor (52/12 bzw. 26/12, konsistent app-weit). */
 export function frequencyToMonthly(amount: number, freq: string): number {
   switch (freq) {

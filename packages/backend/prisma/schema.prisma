@@ -30,6 +30,7 @@ model User {
 
   // Einstellungen
   notificationSettings Json? @map("notification_settings")
+  dashboardLayout      Json? @map("dashboard_layout")
 
   // Status
   isActive       Boolean   @default(true) @map("is_active")
@@ -51,6 +52,9 @@ model User {
   contracts      Contract[]
   investments    InvestmentPosition[]
   sessions       UserSession[]
+  taskLists      TaskList[]
+  tasks          Task[]
+  calendars      Calendar[]
 
   @@map("users")
 }
@@ -461,7 +465,139 @@ enum NotificationType {
   RECURRING_DETECTED // Neues Abo erkannt
   SAVINGS_MILESTONE  // Sparziel Meilenstein
   SYNC_ERROR         // Bank-Sync Fehler
+  TASK_DUE           // Aufgabe fällig/überfällig
+  EVENT_REMINDER     // Termin-Erinnerung
   SYSTEM             // System-Nachricht
+}
+
+// ---------- Aufgaben ----------
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Bewusst einfache, eigene Wiederholungs-Frequenz (kein RFC-5545-Parser):
+// beim Abschluss einer wiederkehrenden Aufgabe wird die nächste Instanz
+// aus dueAt + Frequenz erzeugt.
+enum TaskRecurrence {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model TaskList {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  color     String?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("task_lists")
+}
+
+model Task {
+  id          String        @id @default(uuid())
+  userId      String        @map("user_id")
+  taskListId  String?       @map("task_list_id")
+  title       String
+  notes       String?
+  priority    TaskPriority  @default(MEDIUM)
+  dueAt       DateTime?     @map("due_at")
+  completedAt DateTime?     @map("completed_at")
+  recurrence  TaskRecurrence?
+  calendarEventId String?   @map("calendar_event_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskList      TaskList?      @relation(fields: [taskListId], references: [id], onDelete: SetNull)
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+
+  @@index([userId, completedAt])
+  @@index([userId, dueAt])
+  @@index([taskListId])
+  @@map("tasks")
+}
+
+// ---------- Kalender ----------
+// source LOCAL = in Orynthia gepflegt; GOOGLE/APPLE/ICS sind für die
+// Sync-Provider der Phase 2 vorbereitet (CalendarProviderInterface).
+enum CalendarSource {
+  LOCAL
+  GOOGLE
+  APPLE
+  ICS
+}
+
+enum EventRecurrence {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model Calendar {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  name      String
+  color     String?
+  isDefault Boolean        @default(false) @map("is_default")
+  source    CalendarSource @default(LOCAL)
+  externalId String?       @map("external_id")
+  readOnly  Boolean        @default(false) @map("read_only")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events CalendarEvent[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("calendars")
+}
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  calendarId  String   @map("calendar_id")
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime @map("starts_at")
+  endsAt      DateTime @map("ends_at")
+  isAllDay    Boolean  @default(false) @map("is_all_day")
+  reminderMinutes Int? @map("reminder_minutes")
+
+  // Einfache Wiederholung (Frequenz + optionales Ende); Expansion der
+  // Instanzen erfolgt zur Laufzeit im CalendarService.
+  recurrence         EventRecurrence?
+  recurrenceInterval Int?             @map("recurrence_interval")
+  recurrenceUntil    DateTime?        @map("recurrence_until")
+
+  // Sync-Provenienz (Phase 2)
+  externalId  String?  @map("external_id")
+  etag        String?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  calendar Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+
+  @@unique([calendarId, externalId])
+  @@index([calendarId, startsAt])
+  @@index([startsAt])
+  @@map("calendar_events")
 }
 
 // ---------- Bank-Verbindungen (Open Banking) ----------
