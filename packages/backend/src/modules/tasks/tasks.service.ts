@@ -23,7 +23,12 @@ export class TasksService {
 
   async findAll(
     userId: string,
-    opts: { status?: 'open' | 'completed' | 'all'; taskListId?: string; dueBefore?: string } = {},
+    opts: {
+      status?: 'open' | 'completed' | 'all';
+      taskListId?: string;
+      dueBefore?: string;
+      dueAfter?: string;
+    } = {},
   ) {
     const status = opts.status ?? 'open';
     const tasks = await this.prisma.task.findMany({
@@ -32,7 +37,14 @@ export class TasksService {
         ...(status === 'open' ? { completedAt: null } : {}),
         ...(status === 'completed' ? { completedAt: { not: null } } : {}),
         ...(opts.taskListId ? { taskListId: opts.taskListId } : {}),
-        ...(opts.dueBefore ? { dueAt: { lte: new Date(opts.dueBefore) } } : {}),
+        ...(opts.dueBefore || opts.dueAfter
+          ? {
+              dueAt: {
+                ...(opts.dueAfter ? { gte: new Date(opts.dueAfter) } : {}),
+                ...(opts.dueBefore ? { lte: new Date(opts.dueBefore) } : {}),
+              },
+            }
+          : {}),
       },
       include: TASK_INCLUDE,
       orderBy: [{ completedAt: 'asc' }, { dueAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],

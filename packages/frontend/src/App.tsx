@@ -30,6 +30,7 @@ const CalendarPage = lazy(() => import('@/features/calendar/pages/Calendar').the
 const RecipesPage = lazy(() => import('@/features/recipes/pages/Recipes').then((m) => ({ default: m.RecipesPage })));
 const RecipeDetailPage = lazy(() => import('@/features/recipes/pages/RecipeDetail').then((m) => ({ default: m.RecipeDetailPage })));
 const ListsPage = lazy(() => import('@/features/lists/pages/Lists').then((m) => ({ default: m.ListsPage })));
+const MealPlanPage = lazy(() => import('@/features/recipes/pages/MealPlan').then((m) => ({ default: m.MealPlanPage })));
 
 // Alte Finanz-Routen leben als Redirects weiter – inklusive Query-String,
 // damit z. B. der Enable-Banking-Callback (/accounts?code=…) weiter ankommt.
@@ -125,6 +126,7 @@ export default function App() {
               {/* Module: Rezepte & Listen */}
               <Route path="recipes" element={<RecipesPage />} />
               <Route path="recipes/:id" element={<RecipeDetailPage />} />
+              <Route path="meal-plan" element={<MealPlanPage />} />
               <Route path="lists" element={<ListsPage />} />
               <Route path="lists/:id" element={<ListsPage />} />
 

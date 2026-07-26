@@ -8,19 +8,21 @@ interface ChatMessage {
   content: string;
 }
 
-const SYSTEM_PROMPT_STATIC = `Du bist Orynthia AI, ein hilfsbereiter Finanz-Assistent für persönliche Finanzverwaltung.
+const SYSTEM_PROMPT_STATIC = `Du bist Orynthia AI, ein hilfsbereiter Assistent für den persönlichen Alltag – Finanzen, Termine, Aufgaben, Essensplanung und Listen.
 
 Deine Aufgaben:
 - Beantworte Fragen zu Ausgaben, Einnahmen, Budgets, Konten, Verträgen, Sparzielen und wiederkehrenden Zahlungen anhand der bereitgestellten Nutzerdaten.
+- Beantworte ebenso Fragen zu anstehenden Terminen, offenen Aufgaben, der Essensplanung und offenen Listeneinträgen.
+- Denke über Modulgrenzen hinweg mit: verbinde z. B. anstehende Termine mit Aufgaben, Essensplanung mit Einkaufsliste oder Verträge mit Kündigungsfristen, wenn das der Frage dient.
 - Gib konkrete, datenbasierte Antworten. Beziehe dich auf Zahlen und Posten aus dem Kontext.
 - Schlage Sparmaßnahmen vor, wenn es Sinn ergibt (z.B. Verträge über Marktdurchschnitt, ungenutzte Abos, Kategorien-Überzüge).
-- Wenn eine Information nicht im Kontext steht, sag das ehrlich – erfinde keine Zahlen oder Konten.
+- Wenn eine Information nicht im Kontext steht, sag das ehrlich – erfinde keine Zahlen, Konten oder Termine.
 - Sei sachlich und prägnant. Format: kurze Absätze, ggf. Stichpunkte. Beträge in Euro mit Tausenderpunkt.
 - Schreibe immer auf Deutsch.
 
 Du hast KEINEN Zugriff auf Echtzeit-Daten, externe Banken oder Web-APIs. Du arbeitest ausschließlich mit dem Kontext, den ich dir pro Anfrage mitliefere.
 
-Antworte nicht auf Themen außerhalb persönlicher Finanzen – lenke dann freundlich zurück zum Finanz-Thema.`;
+Antworte nicht auf Themen außerhalb des persönlichen Alltags des Nutzers – lenke dann freundlich zurück.`;
 
 @Injectable()
 export class ChatService {
@@ -139,13 +141,27 @@ export class ChatService {
     else this.usageByUser.set(userId, { day: today, tokens });
   }
 
-  /** Aggregiert eine kompakte Finanzübersicht des Users als Markdown. */
+  /** Aggregiert eine kompakte Übersicht aller Module des Users als Markdown. */
   private async buildUserContext(userId: string): Promise<string> {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [accounts, budgets, recentTx, expensesAgg, recurring, contracts, savingsGoals] =
-      await Promise.all([
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAhead = new Date(todayStart.getTime() + 7 * 86_400_000);
+
+    const [
+      accounts,
+      budgets,
+      recentTx,
+      expensesAgg,
+      recurring,
+      contracts,
+      savingsGoals,
+      openTasks,
+      upcomingEvents,
+      mealPlan,
+      openLists,
+    ] = await Promise.all([
         this.prisma.bankAccount.findMany({
           where: { userId, isActive: true },
           select: { bankName: true, accountName: true, accountType: true, balance: true },
@@ -191,6 +207,38 @@ export class ChatService {
           where: { userId, isCompleted: false },
           select: { name: true, targetAmount: true, currentAmount: true, deadline: true },
           take: 20,
+        }),
+        // Alltags-Module: geben dem Assistenten Kontext über Termine,
+        // Aufgaben, Essensplanung und offene Listen.
+        this.prisma.task.findMany({
+          where: { userId, completedAt: null },
+          select: { title: true, dueAt: true, priority: true },
+          orderBy: { dueAt: { sort: 'asc', nulls: 'last' } },
+          take: 20,
+        }),
+        this.prisma.calendarEvent.findMany({
+          where: {
+            calendar: { userId },
+            startsAt: { gte: todayStart, lte: weekAhead },
+          },
+          select: { title: true, startsAt: true, isAllDay: true, location: true },
+          orderBy: { startsAt: 'asc' },
+          take: 20,
+        }),
+        this.prisma.mealPlanEntry.findMany({
+          where: { userId, date: { gte: todayStart, lte: weekAhead } },
+          select: { date: true, slot: true, title: true, recipe: { select: { title: true } } },
+          orderBy: [{ date: 'asc' }, { slot: 'asc' }],
+          take: 30,
+        }),
+        this.prisma.list.findMany({
+          where: { userId },
+          select: {
+            name: true,
+            type: true,
+            _count: { select: { items: { where: { checked: false } } } },
+          },
+          take: 15,
         }),
       ]);
 
@@ -289,6 +337,65 @@ export class ChatService {
                 g.deadline ? `, Frist ${g.deadline.toLocaleDateString('de-DE')}` : ''
               }`,
           )
+          .join('\n'),
+      );
+    }
+
+    sections.push(`\n## Termine (nächste 7 Tage)`);
+    if (upcomingEvents.length === 0) {
+      sections.push('Keine Termine.');
+    } else {
+      sections.push(
+        upcomingEvents
+          .map(
+            (e) =>
+              `- ${e.startsAt.toLocaleDateString('de-DE')}${
+                e.isAllDay
+                  ? ' (ganztägig)'
+                  : ` ${e.startsAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+              }: ${e.title}${e.location ? ` (${e.location})` : ''}`,
+          )
+          .join('\n'),
+      );
+    }
+
+    sections.push(`\n## Offene Aufgaben`);
+    if (openTasks.length === 0) {
+      sections.push('Keine offenen Aufgaben.');
+    } else {
+      sections.push(
+        openTasks
+          .map(
+            (t) =>
+              `- ${t.title}${
+                t.dueAt ? ` (fällig ${t.dueAt.toLocaleDateString('de-DE')})` : ''
+              }${t.priority === 'HIGH' ? ' [hohe Priorität]' : ''}`,
+          )
+          .join('\n'),
+      );
+    }
+
+    sections.push(`\n## Essensplanung (nächste 7 Tage)`);
+    if (mealPlan.length === 0) {
+      sections.push('Nichts geplant.');
+    } else {
+      sections.push(
+        mealPlan
+          .map(
+            (m) =>
+              `- ${m.date.toLocaleDateString('de-DE')} ${m.slot}: ${m.recipe?.title ?? m.title ?? '—'}`,
+          )
+          .join('\n'),
+      );
+    }
+
+    sections.push(`\n## Listen`);
+    if (openLists.length === 0) {
+      sections.push('Keine Listen angelegt.');
+    } else {
+      sections.push(
+        openLists
+          .map((l) => `- ${l.name} (${l.type}): ${l._count.items} offene Einträge`)
           .join('\n'),
       );
     }

@@ -41,6 +41,7 @@ const NAV_COMMANDS: Command[] = [
   { id: 'nav-calendar', label: 'Kalender', icon: Calendar, run: (n) => n('/calendar') },
   { id: 'nav-tasks', label: 'Aufgaben', icon: CheckSquare, run: (n) => n('/tasks') },
   { id: 'nav-recipes', label: 'Rezepte', icon: ChefHat, run: (n) => n('/recipes') },
+  { id: 'nav-meal-plan', label: 'Wochenplan', icon: ChefHat, run: (n) => n('/meal-plan') },
   { id: 'nav-lists', label: 'Listen', icon: ClipboardList, run: (n) => n('/lists') },
   { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
   { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },

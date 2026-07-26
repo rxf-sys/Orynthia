@@ -193,6 +193,8 @@ export class DemoSeedService implements OnModuleInit {
           billingCycle: 'MONTHLY',
           autoRenewal: true,
           startDate: addMonths(new Date(), -22),
+          cancellationDate: addDays(new Date(), 21),
+          noticePeriod: '3 Monate',
           counterpartName: 'Telekom Deutschland',
         },
       ],
@@ -360,7 +362,7 @@ export class DemoSeedService implements OnModuleInit {
         },
       },
     });
-    await this.prisma.recipe.create({
+    const porridge = await this.prisma.recipe.create({
       data: {
         userId: user.id,
         title: 'Porridge mit Beeren',
@@ -419,10 +421,24 @@ export class DemoSeedService implements OnModuleInit {
       },
     });
 
+    // ---------- Wochenplan (Rezepte ↔ Kalender/Einkauf) ----------
+    const planDay = (offset: number) => {
+      const d = addDays(new Date(), offset);
+      return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    };
+    await this.prisma.mealPlanEntry.createMany({
+      data: [
+        { userId: user.id, recipeId: bolognese.id, date: planDay(1), slot: 'DINNER', servings: 4 },
+        { userId: user.id, recipeId: porridge.id, date: planDay(1), slot: 'BREAKFAST', servings: 2 },
+        { userId: user.id, recipeId: porridge.id, date: planDay(3), slot: 'BREAKFAST', servings: 2 },
+        { userId: user.id, title: 'Essen gehen', date: planDay(5), slot: 'DINNER', servings: 2 },
+      ],
+    });
+
     this.logger.log(
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
         `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
-        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen, 2 Rezepte, 2 Listen.`,
+        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 4 Terminen, 2 Rezepte, 2 Listen, 4 Wochenplan-Einträge.`,
     );
   }
 

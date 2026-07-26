@@ -40,6 +40,7 @@ const TABS: Tab[] = [
 // Bereiche, die keinen eigenen Tab haben — erreichbar über das "Mehr"-Sheet.
 const MORE_ITEMS: Tab[] = [
   { to: '/recipes', label: 'Rezepte', icon: ChefHat },
+  { to: '/meal-plan', label: 'Wochenplan', icon: ChefHat },
   { to: '/lists', label: 'Listen', icon: ClipboardList },
   { to: '/finance/transactions', label: 'Transaktionen', icon: ArrowLeftRight },
   { to: '/finance/accounts', label: 'Konten', icon: Building2 },

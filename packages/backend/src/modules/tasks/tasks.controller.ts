@@ -18,8 +18,9 @@ export class TasksController {
     @Query('status') status?: 'open' | 'completed' | 'all',
     @Query('taskListId') taskListId?: string,
     @Query('dueBefore') dueBefore?: string,
+    @Query('dueAfter') dueAfter?: string,
   ) {
-    return this.tasksService.findAll(req.user!.id, { status, taskListId, dueBefore });
+    return this.tasksService.findAll(req.user!.id, { status, taskListId, dueBefore, dueAfter });
   }
 
   @Get('summary')

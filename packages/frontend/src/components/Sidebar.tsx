@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckSquare,
   ChefHat,
+  CalendarRange,
   ClipboardList,
   ArrowLeftRight,
   Building2,
@@ -43,8 +44,9 @@ const MODULES: NavItem[] = [
   { to: '/', end: true, icon: Home, label: 'Home' },
   { to: '/calendar', icon: Calendar, label: 'Kalender' },
   { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
-  { to: '/recipes', icon: ChefHat, label: 'Rezepte', badge: 'Neu' },
-  { to: '/lists', icon: ClipboardList, label: 'Listen', badge: 'Neu' },
+  { to: '/recipes', icon: ChefHat, label: 'Rezepte' },
+  { to: '/meal-plan', icon: CalendarRange, label: 'Wochenplan', badge: 'Neu' },
+  { to: '/lists', icon: ClipboardList, label: 'Listen' },
   { to: '/assistant', icon: Bot, label: 'KI-Assistent', badge: 'Beta' },
 ];
 

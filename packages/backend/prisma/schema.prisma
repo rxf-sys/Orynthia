@@ -58,6 +58,7 @@ model User {
   integrations   ExternalIntegration[]
   recipes        Recipe[]
   lists          List[]
+  mealPlan       MealPlanEntry[]
 
   @@map("users")
 }
@@ -613,10 +614,44 @@ model Recipe {
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   ingredients RecipeIngredient[]
   listItems   ListItem[]
+  mealPlan    MealPlanEntry[]
 
   @@index([userId])
   @@index([userId, isFavorite])
   @@map("recipes")
+}
+
+// ---------- Meal-Planner (Rezepte ↔ Wochenplan) ----------
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+// Ein geplantes Essen an einem Tag. Bewusst eigene Entität statt
+// Kalender-Termin: der Wochenplan hat eigene Semantik (Portionen,
+// Slot statt Uhrzeit) und soll den Kalender nicht mit Pseudo-Terminen
+// füllen – die Kalender-Ansicht blendet ihn als eigenen Layer ein.
+model MealPlanEntry {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  recipeId String?  @map("recipe_id")
+  /// Freitext für Mahlzeiten ohne hinterlegtes Rezept ("Reste", "Essen gehen")
+  title    String?
+  date     DateTime @db.Date
+  slot     MealSlot @default(DINNER)
+  servings Int      @default(2)
+  note     String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("meal_plan_entries")
 }
 
 model RecipeIngredient {

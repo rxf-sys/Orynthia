@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ChefHat,
+  Receipt,
   Circle,
   CheckCircle2,
   ClipboardList,
@@ -15,13 +16,14 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { listsApi } from '@/features/lists/api';
+import { accountsApi, categoriesApi, transactionsApi } from '@/features/finance/api';
 import {
   LIST_TYPE_ICON,
   LIST_TYPE_LABEL,
   type ListItem,
   type ListType,
 } from '@/features/lists/types';
-import { cn, parseApiError } from '@/lib/utils';
+import { cn, parseApiError, parseDecimal } from '@/lib/utils';
 import { Btn, Card, EmptyState, Field, IconBtn, Modal, PageHead, useConfirm } from '@/components/ui';
 
 export function ListsPage() {
@@ -36,6 +38,7 @@ export function ListsPage() {
     type: 'SHOPPING',
   });
   const [quickItem, setQuickItem] = useState('');
+  const [expenseOpen, setExpenseOpen] = useState(false);
 
   const { data: lists, isLoading: listsLoading } = useQuery({
     queryKey: ['lists'],
@@ -203,6 +206,11 @@ export function ListsPage() {
               <span className="text-xs font-medium text-ink-3">{LIST_TYPE_LABEL[list.type]}</span>
             </h2>
             <div className="flex gap-1">
+              {checked.length > 0 && list.type === 'SHOPPING' && (
+                <Btn variant="ghost" size="sm" icon={Receipt} onClick={() => setExpenseOpen(true)}>
+                  Als Ausgabe erfassen
+                </Btn>
+              )}
               {checked.length > 0 && (
                 <Btn
                   variant="ghost"
@@ -262,6 +270,15 @@ export function ListsPage() {
             </Card>
           )}
         </>
+      )}
+
+      {list && (
+        <ExpenseFromListModal
+          open={expenseOpen}
+          onClose={() => setExpenseOpen(false)}
+          listName={list.name}
+          checkedCount={checked.length}
+        />
       )}
 
       {/* Neue Liste */}
@@ -438,5 +455,151 @@ function ListRow({
         <IconBtn variant="quiet" size="sm" icon={Trash2} aria-label="Löschen" onClick={onDelete} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Erledigten Einkauf als Ausgabe erfassen.
+ *
+ * Bewusst im Frontend orchestriert: das Listen-Modul bekommt serverseitig
+ * keinen Zugriff auf Finanz-Services. Hier wird lediglich die bestehende
+ * Transaktions-API mit vorbefüllten Werten aufgerufen – der Nutzer
+ * bestätigt Konto, Betrag und Kategorie selbst.
+ */
+function ExpenseFromListModal({
+  open,
+  onClose,
+  listName,
+  checkedCount,
+}: {
+  open: boolean;
+  onClose: () => void;
+  listName: string;
+  checkedCount: number;
+}) {
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
+
+  const { data: accounts } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => accountsApi.getAll().then((r) => r.data),
+    enabled: open,
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.getAll().then((r) => r.data),
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (!accountId && accounts?.length) {
+      setAccountId(accounts.find((a) => a.accountType === 'CHECKING')?.id ?? accounts[0].id);
+    }
+  }, [accounts, accountId]);
+
+  useEffect(() => {
+    if (!categoryId && categories?.length) {
+      setCategoryId(categories.find((c) => c.name === 'Lebensmittel')?.id ?? '');
+    }
+  }, [categories, categoryId]);
+
+  const createMutation = useMutation({
+    mutationFn: (value: number) =>
+      transactionsApi.create({
+        bankAccountId: accountId,
+        amount: -Math.abs(value),
+        date: new Date().toISOString(),
+        type: 'EXPENSE',
+        purpose: `Einkauf: ${listName}`,
+        categoryId: categoryId || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success('Ausgabe erfasst');
+      setAmount('');
+      onClose();
+    },
+    onError: (e) => toast.error(parseApiError(e, 'Fehler beim Erfassen')),
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = parseDecimal(amount);
+    if (value === null || value <= 0) {
+      setAmountError('Bitte einen Betrag größer 0 angeben');
+      return;
+    }
+    setAmountError(null);
+    createMutation.mutate(value);
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Einkauf als Ausgabe erfassen"
+      size="sm"
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>
+            Abbrechen
+          </Btn>
+          <Btn
+            variant="grad"
+            icon={Check}
+            type="submit"
+            form="expense-form"
+            disabled={createMutation.isPending || !accountId}
+          >
+            Ausgabe buchen
+          </Btn>
+        </>
+      }
+    >
+      <form id="expense-form" onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-ink-2">
+          {checkedCount} erledigte{checkedCount === 1 ? 'r Eintrag' : ' Einträge'} aus „{listName}".
+          Trage den tatsächlich gezahlten Betrag ein.
+        </p>
+        <Field label="Betrag (€)" required error={amountError}>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="42,80"
+            autoFocus
+          />
+        </Field>
+        <Field label="Konto" required>
+          <select className="select" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            {accounts?.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.bankName} · {a.accountName}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Kategorie">
+          <select
+            className="select"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">Ohne Kategorie</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </form>
+    </Modal>
   );
 }

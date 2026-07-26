@@ -22,6 +22,7 @@ const TITLE_MAP: Record<string, string> = {
   '/calendar': 'Kalender',
   '/tasks': 'Aufgaben',
   '/recipes': 'Rezepte',
+  '/meal-plan': 'Wochenplan',
   '/lists': 'Listen',
   '/assistant': 'KI-Assistent',
   '/settings': 'Einstellungen',

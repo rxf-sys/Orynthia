@@ -148,7 +148,7 @@ describe('ListsService', () => {
   });
 
   describe('addItems (bulk)', () => {
-    it('fasst doppelte Zutaten innerhalb eines Aufrufs zusammen', async () => {
+    it('fasst doppelte Zutaten innerhalb eines Aufrufs zu einem Eintrag zusammen', async () => {
       mockPrisma.list.findFirst.mockResolvedValue(ownedList);
       mockPrisma.listItem.findMany.mockResolvedValue([]);
       mockPrisma.listItem.findFirst.mockResolvedValue(null);
@@ -160,9 +160,54 @@ describe('ListsService', () => {
         ],
       });
 
-      // Der zweite Eintrag landet als Update auf dem gerade erzeugten
-      expect(result.added).toBe(1);
-      expect(result.updated).toBe(1);
+      // Ein einziger neuer Eintrag mit summierter Menge – kein Update auf
+      // einen noch gar nicht existierenden Datensatz.
+      expect(result).toEqual({ added: 1, updated: 0 });
+      const created = mockPrisma.listItem.createMany.mock.calls[0][0].data;
+      expect(created).toHaveLength(1);
+      expect(created[0].amount).toBe(3);
+      expect(mockPrisma.listItem.update).not.toHaveBeenCalled();
+    });
+
+    it('summiert mehrfache Treffer auf denselben bestehenden Eintrag in einem Update', async () => {
+      mockPrisma.list.findFirst.mockResolvedValue(ownedList);
+      mockPrisma.listItem.findMany.mockResolvedValue([
+        {
+          id: 'existing1',
+          listId: 'list1',
+          name: 'Haferflocken',
+          amount: new Prisma.Decimal(100),
+          unit: 'g',
+          checked: false,
+          sortOrder: 0,
+          recipeId: null,
+        },
+      ]);
+
+      const result = await service.addItems('user1', 'list1', {
+        items: [
+          { name: 'Haferflocken', amount: 50, unit: 'g' },
+          { name: 'haferflocken', amount: 25, unit: 'Gramm' },
+        ],
+      });
+
+      expect(result).toEqual({ added: 0, updated: 1 });
+      expect(mockPrisma.listItem.update).toHaveBeenCalledTimes(1);
+      // 100 bestehend + 50 + 25 = 175 (nicht nur der letzte Wert)
+      expect(mockPrisma.listItem.update.mock.calls[0][0].data.amount).toBe(175);
+    });
+
+    it('lässt mengenlose Zutaten mengenlos', async () => {
+      mockPrisma.list.findFirst.mockResolvedValue(ownedList);
+      mockPrisma.listItem.findMany.mockResolvedValue([]);
+
+      await service.addItems('user1', 'list1', {
+        items: [{ name: 'Salz' }, { name: 'salz' }],
+      });
+
+      const created = mockPrisma.listItem.createMany.mock.calls[0][0].data;
+      expect(created).toHaveLength(1);
+      expect(created[0].amount).toBeNull();
     });
   });
 

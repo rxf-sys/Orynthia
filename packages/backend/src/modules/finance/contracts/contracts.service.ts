@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { ContractType, BillingCycle, Prisma } from '@prisma/client';
 import type { InputJsonValue } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../platform/prisma/prisma.service';
+import { NotificationsService } from '../../../platform/notifications/notifications.service';
 import { CreateContractDto, UpdateContractDto } from './dto/contract.dto';
 import { roundMoney, sumMoney } from '../../../platform/common/money';
 
@@ -104,7 +106,55 @@ export interface DetectedContract {
 export class ContractsService {
   private readonly logger = new Logger(ContractsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
+
+  /**
+   * Kündigungsfristen im Blick behalten: täglich 08:15 prüfen, welche
+   * Verträge in den nächsten 30 Tagen kündbar sind, und rechtzeitig
+   * erinnern. dedupeKey macht den Lauf idempotent (ein Hinweis pro
+   * Vertrag und Frist, nicht pro Tag).
+   */
+  @Cron('15 8 * * *')
+  async notifyUpcomingCancellations() {
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 30 * 86_400_000);
+    const contracts = await this.prisma.contract.findMany({
+      where: {
+        isActive: true,
+        cancellationDate: { gte: now, lte: horizon },
+      },
+      select: {
+        id: true,
+        userId: true,
+        name: true,
+        provider: true,
+        cancellationDate: true,
+        monthlyCost: true,
+      },
+      take: 500,
+    });
+
+    let sent = 0;
+    for (const contract of contracts) {
+      const deadline = contract.cancellationDate!;
+      const daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / 86_400_000);
+      const created = await this.notifications.create({
+        userId: contract.userId,
+        type: 'SYSTEM',
+        title: 'Kündigungsfrist läuft ab',
+        message:
+          `${contract.name} (${contract.provider}) ist noch ${daysLeft} Tag(e) kündbar – ` +
+          `Frist: ${deadline.toLocaleDateString('de-DE')}`,
+        dedupeKey: `contract-cancellation:${contract.id}:${deadline.toISOString().slice(0, 10)}`,
+        data: { contractId: contract.id, cancellationDate: deadline.toISOString() },
+      });
+      if (created) sent++;
+    }
+    if (sent > 0) this.logger.log(`Kündigungsfristen: ${sent} Hinweis(e) versendet`);
+  }
 
   async create(userId: string, dto: CreateContractDto) {
     // Monatlich/jährlich berechnen wenn nur eins angegeben

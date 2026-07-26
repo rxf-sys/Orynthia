@@ -78,3 +78,32 @@ export const DIFFICULTY_LABEL: Record<RecipeDifficulty, string> = {
   MEDIUM: 'Mittel',
   HARD: 'Anspruchsvoll',
 };
+
+export type MealSlot = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+
+export const MEAL_SLOTS: Array<{ value: MealSlot; label: string }> = [
+  { value: 'BREAKFAST', label: 'Frühstück' },
+  { value: 'LUNCH', label: 'Mittag' },
+  { value: 'DINNER', label: 'Abend' },
+  { value: 'SNACK', label: 'Snack' },
+];
+
+export interface MealPlanEntry {
+  id: string;
+  recipeId?: string | null;
+  title?: string | null;
+  date: string;
+  slot: MealSlot;
+  servings: number;
+  note?: string | null;
+  recipe?: { id: string; title: string; imageUrl?: string | null; servings: number } | null;
+}
+
+export interface CreateMealPlanEntryData {
+  recipeId?: string;
+  title?: string;
+  date: string;
+  slot?: MealSlot;
+  servings?: number;
+  note?: string;
+}

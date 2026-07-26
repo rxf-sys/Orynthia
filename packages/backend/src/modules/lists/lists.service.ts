@@ -49,6 +49,18 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/**
+ * Mengen zusammenführen: Nur addieren, wenn beide Seiten eine Menge haben –
+ * "500 g Mehl" + "Mehl (ohne Menge)" bleibt bei 500 g, zwei mengenlose
+ * Einträge bleiben mengenlos.
+ */
+function addAmounts(a: number | null | undefined, b: number | null | undefined): number | null {
+  if (a == null && b == null) return null;
+  if (a == null) return b!;
+  if (b == null) return a;
+  return Math.round((a + b) * 100) / 100;
+}
+
 @Injectable()
 export class ListsService {
   constructor(private prisma: PrismaService) {}
@@ -202,6 +214,20 @@ export class ListsService {
     };
   }
 
+  /**
+   * Schmale Public API für andere Module (z. B. Meal-Planner): Einträge
+   * hinzufügen und dabei gleichnamige zusammenführen. Die Ownership der
+   * Liste wird hier geprüft, der Aufrufer muss das nicht wissen.
+   */
+  async addMergedItems(
+    userId: string,
+    listId: string,
+    items: Array<{ name: string; amount?: number; unit?: string }>,
+  ) {
+    await this.assertListOwnership(userId, listId);
+    return this.mergeIntoList(listId, items);
+  }
+
   /** Schmale Public API für die globale Suche. */
   async search(userId: string, q: string, limit = 5) {
     const [lists, items] = await Promise.all([
@@ -231,61 +257,58 @@ export class ListsService {
     recipeId?: string,
   ) {
     const existing = await this.prisma.listItem.findMany({ where: { listId } });
-    const index = new Map<string, (typeof existing)[number]>();
+    const existingIndex = new Map<string, (typeof existing)[number]>();
     for (const item of existing) {
-      index.set(`${normalizeName(item.name)}|${normalizeUnit(item.unit)}`, item);
+      existingIndex.set(`${normalizeName(item.name)}|${normalizeUnit(item.unit)}`, item);
     }
 
     let nextOrder = await this.nextSortOrder(listId);
     const creates: Prisma.ListItemCreateManyInput[] = [];
-    const updates: Array<{ id: string; amount: number | null }> = [];
+    // Zutaten, die in diesem Aufruf mehrfach vorkommen, landen im selben
+    // create-Eintrag; bestehende Einträge werden je Ziel-ID einmal summiert.
+    const createIndex = new Map<string, Prisma.ListItemCreateManyInput>();
+    const updates = new Map<string, number | null>();
 
     for (const item of items) {
       const key = `${normalizeName(item.name)}|${normalizeUnit(item.unit)}`;
-      const match = index.get(key);
-      if (match) {
-        // Mengen nur addieren, wenn beide Seiten eine Menge haben
-        const combined =
-          match.amount !== null && item.amount !== undefined
-            ? Math.round((Number(match.amount) + item.amount) * 100) / 100
-            : (item.amount ?? (match.amount !== null ? Number(match.amount) : null));
-        updates.push({ id: match.id, amount: combined });
-      } else {
-        creates.push({
-          listId,
-          name: item.name,
-          amount: item.amount,
-          unit: item.unit,
-          sortOrder: nextOrder++,
-          recipeId,
-        });
-        // Innerhalb desselben Aufrufs doppelte Zutaten ebenfalls zusammenführen
-        index.set(key, {
-          id: 'pending',
-          listId,
-          name: item.name,
-          amount: item.amount != null ? new Prisma.Decimal(item.amount) : null,
-          unit: item.unit ?? null,
-          checked: false,
-          sortOrder: 0,
-          recipeId: recipeId ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+
+      const pending = createIndex.get(key);
+      if (pending) {
+        pending.amount = addAmounts(pending.amount as number | null | undefined, item.amount);
+        continue;
       }
+
+      const match = existingIndex.get(key);
+      if (match) {
+        const current = updates.has(match.id)
+          ? updates.get(match.id)!
+          : match.amount !== null
+            ? Number(match.amount)
+            : null;
+        updates.set(match.id, addAmounts(current, item.amount));
+        continue;
+      }
+
+      const create: Prisma.ListItemCreateManyInput = {
+        listId,
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit,
+        sortOrder: nextOrder++,
+        recipeId,
+      };
+      creates.push(create);
+      createIndex.set(key, create);
     }
 
     await this.prisma.$transaction([
       ...(creates.length ? [this.prisma.listItem.createMany({ data: creates })] : []),
-      ...updates.map((u) =>
-        this.prisma.listItem.update({
-          where: { id: u.id },
-          data: { amount: u.amount, checked: false },
-        }),
+      ...[...updates.entries()].map(([id, amount]) =>
+        this.prisma.listItem.update({ where: { id }, data: { amount, checked: false } }),
       ),
     ]);
 
-    return { added: creates.length, updated: updates.length };
+    return { added: creates.length, updated: updates.size };
   }
 
   private async nextSortOrder(listId: string): Promise<number> {

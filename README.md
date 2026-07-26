@@ -2,7 +2,12 @@
 
 Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
 
-**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 🛒 Listen · 🤖 KI-Assistent — weitere Module (Notizen, Reisen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
+**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 📆 Wochenplan · 🛒 Listen · 🤖 KI-Assistent — weitere Module (Notizen, Reisen) folgen gemäß [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
+
+**Die Module greifen ineinander:** Rezepte wandern in den Wochenplan, der Wochenplan
+erzeugt die Einkaufsliste, der erledigte Einkauf wird zur Ausgabe, fällige Aufgaben und
+geplantes Essen erscheinen im Kalender, Kündigungsfristen melden sich rechtzeitig – und
+der Assistent kennt alle Bereiche.
 
 ## Tech-Stack
 
@@ -274,6 +279,7 @@ Orynthia/
 - Wiederkehrende Aufgaben: Beim Erledigen entsteht automatisch die nächste Instanz
 - Gruppierung nach Überfällig / Heute / Später, Quick-Add per Enter
 - Fälligkeits-Erinnerungen (täglich 08:00, idempotent) im Notification-Center
+- Fällige Aufgaben erscheinen als Layer im Kalender (ein-/ausblendbar)
 
 ### Rezepte
 - Eigene Rezepte mit Zutaten, Zubereitungsschritten, Portionen, Zeiten und Schwierigkeit
@@ -282,6 +288,14 @@ Orynthia/
 - Filter nach Mahlzeit, Ernährungsform, Zubereitungszeit und Favoriten, Volltextsuche
 - Bilder werden per URL verlinkt (kein Upload – bewusst schlank und ohne Storage)
 
+### Wochenplan (Meal-Planner)
+- Wochenansicht mit Frühstück/Mittag/Abend/Snack je Tag; Rezepte oder Freitext
+  („Essen gehen") einplanen, Portionen je Mahlzeit frei wählbar
+- **Wochenplan → Einkaufsliste:** Zutaten aller geplanten Rezepte einer Woche werden
+  auf die jeweils geplanten Portionen skaliert, zusammengeführt und gebündelt in eine
+  Liste übernommen
+- Geplante Mahlzeiten erscheinen als eigener Layer im Kalender
+
 ### Listen
 - Einkaufs-, Pack-, Check- und Wunschlisten mit Quick-Add, Abhaken und „Aufräumen"
 - **Rezept → Einkaufsliste:** Zutaten eines Rezepts mit einem Klick übernehmen –
@@ -289,6 +303,8 @@ Orynthia/
   Einheit werden zusammengeführt statt doppelt angelegt (inkl. Synonymen wie
   „g"/„Gramm"), abgehakte Treffer werden dabei reaktiviert
 - Einträge zeigen ihre Herkunft („aus Rezept")
+- **Einkauf → Ausgabe:** ein erledigter Einkauf lässt sich mit einem Klick als Ausgabe
+  buchen (Konto und Kategorie werden vorgeschlagen, der Betrag wird bestätigt)
 
 ### Finanzen
 - Open Banking (PSD2) via Enable Banking - automatischer Kontoabgleich
@@ -315,6 +331,8 @@ Orynthia/
 - Monatliche/jährliche Kostenübersicht
 - Anbietervergleich für Versicherungen und Energieanbieter (Check24, Verivox)
 - Kündigungsfristen und automatische Verlängerung im Blick
+- Erinnerung, sobald eine Kündigungsfrist in den nächsten 30 Tagen abläuft
+  (täglich 08:15, ein Hinweis je Vertrag und Frist)
 
 ### Sparen & Planung
 - Sparziele mit Fortschrittsbalken
@@ -333,7 +351,9 @@ Orynthia/
 
 ### KI-Assistent (Beta)
 - Chat-Oberfläche unter /assistant, beantwortet Fragen zu Konten, Ausgaben,
-  Budgets, Verträgen, Sparzielen anhand deiner echten Daten
+  Budgets, Verträgen, Sparzielen **sowie zu Terminen, offenen Aufgaben,
+  Essensplanung und Listen** anhand deiner echten Daten – und denkt dabei
+  über Modulgrenzen hinweg mit
 - Modell konfigurierbar via `ANTHROPIC_MODEL` (Default: Claude Opus 4.8),
   mit adaptive thinking + Prompt-Caching
 - Kostenkontrolle: Token-Usage wird pro Anfrage geloggt; optionales
@@ -529,6 +549,11 @@ Orynthia/
 - `POST /api/lists/:id/from-recipe` - Zutaten aus Rezept übernehmen (`{recipeId, servings?, ingredientIds?}`)
 - `DELETE /api/lists/:id/checked` - Abgehakte Einträge entfernen
 - `PATCH|DELETE /api/lists/items/:itemId`
+
+### Wochenplan
+- `GET /api/meal-plan?from=&to=` - Geplante Mahlzeiten eines Zeitraums
+- `POST /api/meal-plan` / `PATCH|DELETE /api/meal-plan/:id`
+- `POST /api/meal-plan/to-list` - Zutaten eines Zeitraums in eine Liste (`{listId, from, to}`)
 
 ### Suche
 - `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte, Listen)

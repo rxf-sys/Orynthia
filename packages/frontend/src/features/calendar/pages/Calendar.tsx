@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   addDays,
   addMonths,
@@ -34,9 +34,13 @@ import {
   Plus,
   Repeat,
   Trash2,
+  CheckSquare,
+  UtensilsCrossed,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { calendarApi } from '@/features/calendar/api';
+import { tasksApi } from '@/features/tasks/api';
+import { mealPlanApi } from '@/features/recipes/api';
 import type { CreateEventData, EventOccurrence, EventRecurrence, UpdateEventData } from '@/features/calendar/types';
 import { cn, parseApiError } from '@/lib/utils';
 import { Btn, Card, EmptyState, Field, Modal, PageHead, useConfirm } from '@/components/ui';
@@ -105,6 +109,9 @@ export function CalendarPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [newCalendar, setNewCalendar] = useState({ name: '', color: CAL_COLORS[0] });
   const [icsForm, setIcsForm] = useState({ url: '', name: '' });
+  // Zusatz-Layer: Aufgaben mit Fälligkeit und geplante Mahlzeiten
+  const [showTasks, setShowTasks] = useState(true);
+  const [showMeals, setShowMeals] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Sichtbarer Zeitraum je Ansicht (Agenda: 30 Tage ab heute)
@@ -131,6 +138,28 @@ export function CalendarPage() {
     queryKey: ['calendar-events', range.from.toISOString(), range.to.toISOString()],
     queryFn: () =>
       calendarApi.getEvents(range.from.toISOString(), range.to.toISOString()).then((r) => r.data),
+  });
+
+  const { data: dueTasks } = useQuery({
+    queryKey: ['calendar-tasks', range.from.toISOString(), range.to.toISOString()],
+    queryFn: () =>
+      tasksApi
+        .getAll({
+          status: 'open',
+          dueAfter: range.from.toISOString(),
+          dueBefore: range.to.toISOString(),
+        })
+        .then((r) => r.data),
+    enabled: showTasks,
+  });
+
+  const { data: meals } = useQuery({
+    queryKey: ['calendar-meals', range.from.toISOString(), range.to.toISOString()],
+    queryFn: () =>
+      mealPlanApi
+        .getRange(format(range.from, 'yyyy-MM-dd'), format(range.to, 'yyyy-MM-dd'))
+        .then((r) => r.data),
+    enabled: showMeals,
   });
 
   const invalidate = () => {
@@ -321,6 +350,28 @@ export function CalendarPage() {
     }
   };
 
+  // Layer-Daten nach Kalendertag gruppieren, damit die Ansichten sie
+  // ohne eigene Logik einblenden können.
+  const extrasByDay = useMemo(() => {
+    const map = new Map<string, { tasks: typeof dueTasks; meals: typeof meals }>();
+    const ensure = (key: string) => {
+      if (!map.has(key)) map.set(key, { tasks: [], meals: [] });
+      return map.get(key)!;
+    };
+    if (showTasks) {
+      for (const task of dueTasks ?? []) {
+        if (!task.dueAt) continue;
+        ensure(format(parseISO(task.dueAt), 'yyyy-MM-dd')).tasks!.push(task);
+      }
+    }
+    if (showMeals) {
+      for (const meal of meals ?? []) {
+        ensure(meal.date.slice(0, 10)).meals!.push(meal);
+      }
+    }
+    return map;
+  }, [dueTasks, meals, showTasks, showMeals]);
+
   const goToday = () => setCursor(new Date());
   const step = (dir: 1 | -1) => {
     if (view === 'month') setCursor((c) => addMonths(c, dir));
@@ -376,6 +427,30 @@ export function CalendarPage() {
             <Btn variant="ghost" size="sm" icon={ChevronRight} onClick={() => step(1)} aria-label="Weiter" />
           </div>
         )}
+        <div className="flex gap-1 rounded-md border border-line bg-elev p-0.5">
+          <button
+            onClick={() => setShowTasks((v) => !v)}
+            aria-pressed={showTasks}
+            title="Fällige Aufgaben einblenden"
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1.5 text-xs font-semibold',
+              showTasks ? 'bg-soft text-ink' : 'text-ink-3 hover:text-ink',
+            )}
+          >
+            <CheckSquare className="h-3.5 w-3.5" /> Aufgaben
+          </button>
+          <button
+            onClick={() => setShowMeals((v) => !v)}
+            aria-pressed={showMeals}
+            title="Geplante Mahlzeiten einblenden"
+            className={cn(
+              'flex items-center gap-1 rounded px-2 py-1.5 text-xs font-semibold',
+              showMeals ? 'bg-soft text-ink' : 'text-ink-3 hover:text-ink',
+            )}
+          >
+            <UtensilsCrossed className="h-3.5 w-3.5" /> Essen
+          </button>
+        </div>
         <div className="ml-auto flex flex-wrap items-center gap-2.5 text-xs text-ink-3">
           {calendars?.map((c) => (
             <span key={c.id} className="flex items-center gap-1.5">
@@ -391,9 +466,9 @@ export function CalendarPage() {
           <Loader2 className="h-6 w-6 animate-spin text-ink-3" />
         </div>
       ) : view === 'month' ? (
-        <MonthGrid cursor={cursor} events={events ?? []} onDayClick={openCreate} onEventClick={openEdit} />
+        <MonthGrid cursor={cursor} events={events ?? []} extras={extrasByDay} onDayClick={openCreate} onEventClick={openEdit} />
       ) : view === 'week' ? (
-        <WeekList cursor={cursor} events={events ?? []} onDayClick={openCreate} onEventClick={openEdit} />
+        <WeekList cursor={cursor} events={events ?? []} extras={extrasByDay} onDayClick={openCreate} onEventClick={openEdit} />
       ) : (
         <AgendaList events={events ?? []} onEventClick={openEdit} onCreate={() => openCreate(new Date())} />
       )}
@@ -787,12 +862,54 @@ export function CalendarPage() {
 
 // ---------- Ansichten ----------
 
+interface DayExtra {
+  tasks?: Array<{ id: string; title: string; dueAt?: string | null }>;
+  meals?: Array<{ id: string; title?: string | null; recipe?: { title: string } | null }>;
+}
+
 interface ViewProps {
   events: EventOccurrence[];
+  extras?: Map<string, DayExtra>;
   onEventClick: (occ: EventOccurrence) => void;
 }
 
-function MonthGrid({ cursor, events, onDayClick, onEventClick }: ViewProps & { cursor: Date; onDayClick: (d: Date) => void }) {
+/** Aufgaben- und Essens-Layer eines Tages – bewusst dezent, damit
+ *  Termine die Hauptrolle behalten. */
+function DayExtras({ extra, compact }: { extra?: DayExtra; compact?: boolean }) {
+  const tasks = extra?.tasks ?? [];
+  const meals = extra?.meals ?? [];
+  if (tasks.length === 0 && meals.length === 0) return null;
+  return (
+    <>
+      {tasks.slice(0, compact ? 2 : 3).map((task) => (
+        <Link
+          key={`t-${task.id}`}
+          to="/tasks"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          className="flex items-center gap-1 truncate rounded border border-dashed border-line px-1.5 py-0.5 text-[0.68rem] text-ink-2 hover:border-indigo"
+          title={`Aufgabe: ${task.title}`}
+        >
+          <CheckSquare className="h-2.5 w-2.5 shrink-0 text-ink-3" />
+          <span className="truncate">{task.title}</span>
+        </Link>
+      ))}
+      {meals.slice(0, compact ? 1 : 2).map((meal) => (
+        <Link
+          key={`m-${meal.id}`}
+          to="/meal-plan"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          className="flex items-center gap-1 truncate rounded border border-dashed border-line px-1.5 py-0.5 text-[0.68rem] text-ink-2 hover:border-indigo"
+          title={`Geplant: ${meal.recipe?.title ?? meal.title ?? ''}`}
+        >
+          <UtensilsCrossed className="h-2.5 w-2.5 shrink-0 text-ink-3" />
+          <span className="truncate">{meal.recipe?.title ?? meal.title}</span>
+        </Link>
+      ))}
+    </>
+  );
+}
+
+function MonthGrid({ cursor, events, extras, onDayClick, onEventClick }: ViewProps & { cursor: Date; onDayClick: (d: Date) => void }) {
   const days = useMemo(() => {
     const from = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
     const to = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
@@ -870,6 +987,7 @@ function MonthGrid({ cursor, events, onDayClick, onEventClick }: ViewProps & { c
                 {dayEvents.length > 3 && (
                   <span className="px-1 text-[0.68rem] text-ink-3">+{dayEvents.length - 3} weitere</span>
                 )}
+                <DayExtras extra={extras?.get(key)} compact />
               </div>
             </button>
           );
@@ -879,7 +997,7 @@ function MonthGrid({ cursor, events, onDayClick, onEventClick }: ViewProps & { c
   );
 }
 
-function WeekList({ cursor, events, onDayClick, onEventClick }: ViewProps & { cursor: Date; onDayClick: (d: Date) => void }) {
+function WeekList({ cursor, events, extras, onDayClick, onEventClick }: ViewProps & { cursor: Date; onDayClick: (d: Date) => void }) {
   const days = useMemo(() => {
     const from = startOfWeek(cursor, { weekStartsOn: 1 });
     return eachDayOfInterval({ start: from, end: addDays(from, 6) });
@@ -904,7 +1022,11 @@ function WeekList({ cursor, events, onDayClick, onEventClick }: ViewProps & { cu
               </span>
             </button>
             <div className="space-y-1.5">
-              {dayEvents.length === 0 && <p className="text-xs text-ink-4">–</p>}
+              {dayEvents.length === 0 &&
+                (extras?.get(format(day, 'yyyy-MM-dd'))?.tasks?.length ?? 0) === 0 &&
+                (extras?.get(format(day, 'yyyy-MM-dd'))?.meals?.length ?? 0) === 0 && (
+                  <p className="text-xs text-ink-4">–</p>
+                )}
               {dayEvents.map((occ, i) => (
                 <button
                   key={`${occ.id}-${occ.startsAt}-${i}`}
@@ -918,6 +1040,7 @@ function WeekList({ cursor, events, onDayClick, onEventClick }: ViewProps & { cu
                   {occ.title}
                 </button>
               ))}
+              <DayExtras extra={extras?.get(format(day, 'yyyy-MM-dd'))} />
             </div>
           </Card>
         );
