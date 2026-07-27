@@ -141,8 +141,16 @@ gunzip -c /backup/orynthia-2026-06-10.sql.gz \
   | docker exec -i orynthia-postgres psql -U orynthia orynthia
 ```
 
-> Zusätzlich die `.env` sichern — **ohne `ENCRYPTION_KEY` sind Banking-Verbindungen
-> und 2FA-Secrets aus einem DB-Backup nicht wiederherstellbar.**
+Dokumente liegen **nicht** in der Datenbank, sondern als verschlüsselte Dateien
+im Volume `documents_data` (`DOCUMENTS_PATH`). Sie gehören separat ins Backup:
+
+```bash
+docker run --rm -v orynthia_documents_data:/data -v /backup:/backup alpine \
+  tar czf /backup/orynthia-documents-$(date +%F).tar.gz -C /data .
+```
+
+> Zusätzlich die `.env` sichern — **ohne `ENCRYPTION_KEY` sind Banking-Verbindungen,
+> 2FA-Secrets und Dokumente aus einem Backup nicht wiederherstellbar.**
 
 ### Updates einspielen
 
@@ -193,7 +201,8 @@ Vollständige Vorlage mit Kommentaren: [`.env.example`](.env.example).
 |----------|---------|-------|
 | `DATABASE_URL`, `POSTGRES_*` | ✅ | PostgreSQL-Verbindung (beim Start validiert) |
 | `JWT_SECRET`, `JWT_REFRESH_SECRET` | ✅ | Token-Signierung, je min. 32 Zeichen (validiert) |
-| `ENCRYPTION_KEY` | ✅ | AES-256-GCM für 2FA-Secrets & Banking-Sessions, 64 Hex-Zeichen |
+| `ENCRYPTION_KEY` | ✅ | AES-256-GCM für 2FA-Secrets, Banking-Sessions & Dokumente, 64 Hex-Zeichen |
+| `DOCUMENTS_PATH` | – | Ablage der verschlüsselten Dokumente (Default: `./data/documents`); muss persistent sein |
 | `REDIS_PASSWORD` | ✅ | Redis-Absicherung im Compose-Stack |
 | `FRONTEND_URL` | ✅ (Prod) | CORS-Origin + Banking-Redirect + Reset-Links |
 | `NODE_ENV`, `APP_PORT` | – | Laufzeitumgebung (Default: `production` / `3000`) |
@@ -226,23 +235,29 @@ Orynthia/
 │   │   │   └── seed.ts                # Optionale Demo-Daten
 │   │   └── src/
 │   │       ├── platform/       # Querschnitt: auth (JWT, 2FA), users, mail,
-│   │       │                   # notifications, prisma, config, health, common
+│   │       │                   # notifications, links, prisma, config, health, common
 │   │       ├── modules/
 │   │       │   ├── finance/    # accounts, banking (PSD2), transactions,
 │   │       │   │               # categories, budgets, recurring-payments,
 │   │       │   │               # savings-goals, contracts, investments, dashboard
 │   │       │   ├── tasks/      # Aufgaben & Aufgabenlisten
-│   │       │   └── calendar/   # Kalender & Termine (inkl. Serien)
+│   │       │   ├── calendar/   # Kalender & Termine (Serien, ICS/Google/CalDAV)
+│   │       │   ├── recipes/  lists/  notes/  trips/
+│   │       │   ├── documents/  # Verschlüsselte Dokumenten-Ablage
+│   │       │   └── habits/     # Gewohnheiten & Serien
+│   │       ├── search/         # Modulübergreifende Suche (⌘K)
 │   │       ├── assistant/      # KI-Assistent (Anthropic)
 │   │       └── demo-seed/      # Demo-Daten (nur Nicht-Production)
 │   └── frontend/
 │       └── src/
-│           ├── platform/       # API-Client (axios + Refresh), Notifications-API
+│           ├── platform/       # API-Client (axios + Refresh), Suche,
+│           │                   # Offline-Cache-Persistenz
 │           ├── features/       # Eine Domain pro Ordner:
 │           │   ├── home/       # Modulares Widget-Dashboard
 │           │   ├── finance/    # Alle Finanz-Seiten + api.ts + types.ts
 │           │   ├── calendar/   # Monats-/Wochen-/Agenda-Ansicht
 │           │   ├── tasks/      # Aufgaben mit Listen & Prioritäten
+│           │   ├── recipes/  lists/  notes/  trips/  documents/  habits/
 │           │   ├── auth/  assistant/  settings/
 │           ├── components/     # Layout, Sidebar, Header, CommandPalette (⌘K)
 │           │   └── ui/         # Btn, Card, Modal, Field, ConfirmDialog, …
@@ -250,14 +265,16 @@ Orynthia/
 │           └── lib/            # Utilities
 └── docs/
     ├── FRONTEND_AUDIT.md       # Frontend-Audit inkl. Umsetzungsstatus
-    └── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
+    ├── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
+    ├── ALLROUNDER_PLAN.md      # Produktvision & Umsetzungsplan „One App for Everyday Life"
+    └── DOCUMENTS_SECURITY.md   # Schutzkonzept der Dokumenten-Ablage
 ```
 
 ## Features
 
 ### Home-Dashboard
 - Modulares Widget-Grid als Startseite: Finanz-Überblick, „Heute & demnächst"
-  (Kalender), Aufgaben-Status, Verträge & Abos
+  (Kalender), Aufgaben-Status, Listen, Reisen, Gewohnheiten, Verträge & Abos
 - Widgets pro Nutzer ein-/ausblendbar (serverseitig gespeichert)
 
 ### Kalender
@@ -302,6 +319,24 @@ Orynthia/
 - Packliste per Klick anlegen und automatisch verknüpfen
 - Verknüpfungen sind ungerichtet und dublettenfrei; beim Löschen einer Reise
   verschwinden nur die Verknüpfungen, nicht die verknüpften Einträge
+
+### Dokumente
+- Verträge, Rechnungen und Ausweise an einem Ort – **AES-256-GCM-verschlüsselt
+  im Dateisystem**, die Datenbank kennt nur Metadaten
+- Upload mit Typ-Whitelist (PDF, Bilder, Office), Magic-Bytes-Prüfung und
+  20-MB-Limit; aktive Inhalte (HTML, SVG) werden abgewiesen
+- Download läuft über die angemeldete Sitzung und immer als Anhang – es gibt
+  keine öffentlichen Datei-URLs
+- Tags, Volltextsuche über Titel/Dateiname und optionales „Gültig bis" für
+  ablaufende Papiere; mit Reisen verknüpfbar
+- Details zum Schutzkonzept: [`docs/DOCUMENTS_SECURITY.md`](docs/DOCUMENTS_SECURITY.md)
+
+### Gewohnheiten
+- Tägliche oder wöchentliche Routinen mit Zielanzahl je Periode und Farbe
+- Aktuelle Serie („Streak") und 4-Wochen-Raster; einzelne Tage lassen sich
+  nachträglich abhaken
+- Heute noch offene Gewohnheiten direkt vom Home-Widget aus erledigen
+- Archivieren statt löschen, wenn eine Routine gerade pausiert
 
 ### Wochenplan (Meal-Planner)
 - Wochenansicht mit Frühstück/Mittag/Abend/Snack je Tag; Rezepte oder Freitext
@@ -408,6 +443,13 @@ Orynthia/
 - **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop); Service
   Worker lädt HTML network-first (deploy-sicher, keine veralteten Versionen)
   und cached nur unveränderliche Assets, /api bleibt live
+- **Offline lesbar**: der zuletzt geladene Stand der Alltags-Module (Aufgaben,
+  Kalender, Rezepte, Wochenplan, Listen, Notizen, Reisen, Gewohnheiten)
+  überlebt einen Reload und ist ohne Verbindung sichtbar – mit deutlichem
+  Offline-Banner. **Finanz-, Banking- und Dokumentdaten werden bewusst nicht
+  im Browser zwischengespeichert.** Schreibende Aktionen sind offline gesperrt,
+  damit keine Änderung im Nichts verschwindet; beim Abmelden wird der Cache
+  gelöscht
 - **Barrierefreiheit**: Fokus-Trap + Fokus-Rückgabe in allen Dialogen,
   Label-/Fehler-Verknüpfung an allen Formularfeldern (`aria-describedby`,
   `role="alert"`), Skip-Link, Tastaturnavigation in Menüs,
@@ -579,13 +621,25 @@ Orynthia/
 ### Reisen
 - `GET /api/trips` / `GET /api/trips/:id` (inkl. aufgelöster Verknüpfungen)
 - `POST /api/trips` / `PATCH|DELETE /api/trips/:id`
-- `POST /api/trips/:id/links` - Termin, Liste, Notiz oder Rezept verknüpfen (`{type, id}`)
+- `POST /api/trips/:id/links` - Termin, Liste, Notiz, Rezept oder Dokument verknüpfen (`{type, id}`)
 - `DELETE /api/trips/:id/links/:linkId` - Verknüpfung lösen
 - `POST /api/trips/:id/packing-list` - Packliste anlegen und verknüpfen
 
+### Dokumente
+- `GET /api/documents?search=&tag=` / `GET /api/documents/tags` / `GET /api/documents/:id`
+- `POST /api/documents` - Upload (`multipart/form-data`: `file`, optional `title`, `tags`, `notes`, `expiresAt`)
+- `GET /api/documents/:id/download` - Entschlüsselt, immer als Anhang
+- `PATCH /api/documents/:id` / `DELETE /api/documents/:id`
+
+### Gewohnheiten
+- `GET /api/habits?includeArchived=` - Liste inkl. Streak und 30-Tage-Historie
+- `GET /api/habits/summary` - Erledigt/Gesamt/beste Serie (Home-Widget)
+- `POST /api/habits` / `PATCH /api/habits/:id` / `DELETE /api/habits/:id`
+- `POST /api/habits/:id/toggle` - Tag abhaken bzw. Haken entfernen (`{date?}`)
+
 ### Suche
 - `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte,
-  Listen, Notizen, Reisen)
+  Listen, Notizen, Reisen, Dokumente)
 
 ### Home-Layout
 - `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge

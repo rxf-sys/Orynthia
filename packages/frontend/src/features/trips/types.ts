@@ -1,6 +1,13 @@
 export type TripStatus = 'PLANNED' | 'ONGOING' | 'DONE';
 
-export type LinkableType = 'TRIP' | 'CALENDAR_EVENT' | 'TASK' | 'LIST' | 'NOTE' | 'RECIPE';
+export type LinkableType =
+  | 'TRIP'
+  | 'CALENDAR_EVENT'
+  | 'TASK'
+  | 'LIST'
+  | 'NOTE'
+  | 'RECIPE'
+  | 'DOCUMENT';
 
 export interface LinkedEntity {
   linkId: string;
@@ -49,4 +56,5 @@ export const LINKABLE_LABEL: Record<LinkableType, string> = {
   LIST: 'Liste',
   NOTE: 'Notiz',
   RECIPE: 'Rezept',
+  DOCUMENT: 'Dokument',
 };

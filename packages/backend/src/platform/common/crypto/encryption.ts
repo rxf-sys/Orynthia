@@ -76,6 +76,33 @@ export function decrypt(payload: string): string {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
+/**
+ * Verschlüsselt beliebige Binärdaten (z. B. hochgeladene Dokumente).
+ * Ausgabeformat identisch zu `encrypt()`: iv | tag | ciphertext – hier
+ * aber als Buffer, damit große Dateien nicht durch base64 aufgebläht werden.
+ */
+export function encryptBuffer(plaintext: Buffer): Buffer {
+  const key = loadKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
+}
+
+/** Gegenstück zu `encryptBuffer()`; wirft bei manipulierten Daten (GCM-Tag). */
+export function decryptBuffer(payload: Buffer): Buffer {
+  if (payload.length < IV_LENGTH + TAG_LENGTH) {
+    throw new Error('decryptBuffer(): payload zu kurz oder beschädigt.');
+  }
+  const key = loadKey();
+  const iv = payload.subarray(0, IV_LENGTH);
+  const tag = payload.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const ciphertext = payload.subarray(IV_LENGTH + TAG_LENGTH);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
 /** True, wenn der Wert wie ein per encrypt() produzierter base64-Blob aussieht (>= 29 Bytes nach base64-Decode). */
 export function isEncrypted(value: string | null | undefined): boolean {
   if (!value) return false;

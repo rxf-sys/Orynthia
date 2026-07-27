@@ -460,6 +460,46 @@ export class DemoSeedService implements OnModuleInit {
       ],
     });
 
+    // ---------- Gewohnheiten (mit Historie, damit Streaks sichtbar sind) ----------
+    const utcToday = (() => {
+      const now = new Date();
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    })();
+    const dayBefore = (offset: number) => new Date(utcToday - offset * 86_400_000);
+
+    const lesen = await this.prisma.habit.create({
+      data: {
+        userId: user.id,
+        title: '30 Minuten lesen',
+        notes: 'Abends statt Handy.',
+        frequency: 'DAILY',
+        color: '#5b8def',
+      },
+    });
+    const sport = await this.prisma.habit.create({
+      data: {
+        userId: user.id,
+        title: 'Sport',
+        frequency: 'WEEKLY',
+        targetPerPeriod: 3,
+        color: '#1f8a5b',
+      },
+    });
+    const wasser = await this.prisma.habit.create({
+      data: { userId: user.id, title: '2 Liter Wasser', frequency: 'DAILY', color: '#3aa3a5' },
+    });
+
+    await this.prisma.habitEntry.createMany({
+      data: [
+        // Lesen: lückenlose Serie seit gestern, heute noch offen
+        ...[1, 2, 3, 4, 5, 6].map((d) => ({ habitId: lesen.id, date: dayBefore(d) })),
+        // Sport: verteilt über die letzten drei Wochen
+        ...[1, 4, 6, 8, 11, 15, 18].map((d) => ({ habitId: sport.id, date: dayBefore(d) })),
+        // Wasser: heute bereits erledigt
+        ...[0, 1, 2, 4, 5].map((d) => ({ habitId: wasser.id, date: dayBefore(d) })),
+      ],
+    });
+
     // ---------- Reise (Showcase: Termin + Packliste + Notiz) ----------
     const tripStart = addDays(new Date(), 30);
     const tripEnd = addDays(new Date(), 40);
@@ -527,7 +567,9 @@ export class DemoSeedService implements OnModuleInit {
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
         `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
         `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 5 Terminen, 2 Rezepte, 2 Listen, ` +
-        `4 Wochenplan-Einträge, 3 Notizen, 1 Reise mit 3 Verknüpfungen.`,
+        `4 Wochenplan-Einträge, 3 Notizen, 3 Gewohnheiten mit Historie, ` +
+        `1 Reise mit 3 Verknüpfungen. Dokumente werden bewusst nicht geseedet – ` +
+        `sie liegen als verschlüsselte Dateien außerhalb der Datenbank.`,
     );
   }
 

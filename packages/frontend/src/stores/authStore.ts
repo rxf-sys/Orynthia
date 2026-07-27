@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '@/features/auth/api';
+import { clearOfflineCache } from '@/platform/offline/persistence';
 
 interface User {
   id: string;
@@ -44,6 +45,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       // Ignore errors on logout
     }
+    // Kein Datenrest im Browser: der persistierte Offline-Cache geht mit.
+    clearOfflineCache();
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 

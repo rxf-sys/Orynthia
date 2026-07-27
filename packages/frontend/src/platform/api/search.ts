@@ -1,7 +1,7 @@
 import { api } from './client';
 
 export interface SearchHit {
-  module: 'tasks' | 'calendar' | 'recipes' | 'lists' | 'notes' | 'trips';
+  module: 'tasks' | 'calendar' | 'recipes' | 'lists' | 'notes' | 'trips' | 'documents';
   id: string;
   title: string;
   subtitle?: string;

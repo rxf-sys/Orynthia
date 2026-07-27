@@ -34,6 +34,8 @@ const MealPlanPage = lazy(() => import('@/features/recipes/pages/MealPlan').then
 const NotesPage = lazy(() => import('@/features/notes/pages/Notes').then((m) => ({ default: m.NotesPage })));
 const TripsPage = lazy(() => import('@/features/trips/pages/Trips').then((m) => ({ default: m.TripsPage })));
 const TripDetailPage = lazy(() => import('@/features/trips/pages/TripDetail').then((m) => ({ default: m.TripDetailPage })));
+const DocumentsPage = lazy(() => import('@/features/documents/pages/Documents').then((m) => ({ default: m.DocumentsPage })));
+const HabitsPage = lazy(() => import('@/features/habits/pages/Habits').then((m) => ({ default: m.HabitsPage })));
 
 // Alte Finanz-Routen leben als Redirects weiter – inklusive Query-String,
 // damit z. B. der Enable-Banking-Callback (/accounts?code=…) weiter ankommt.
@@ -137,6 +139,10 @@ export default function App() {
               <Route path="notes" element={<NotesPage />} />
               <Route path="trips" element={<TripsPage />} />
               <Route path="trips/:id" element={<TripDetailPage />} />
+
+              {/* Module: Dokumente & Gewohnheiten */}
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="habits" element={<HabitsPage />} />
 
               <Route path="assistant" element={<AssistantPage />} />
               <Route path="settings" element={<SettingsPage />} />

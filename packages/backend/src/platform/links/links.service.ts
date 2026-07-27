@@ -98,6 +98,15 @@ export class LinksService {
             }
           : null;
       }
+      case 'DOCUMENT': {
+        const document = await this.prisma.document.findFirst({
+          where: { id, userId },
+          select: { id: true, title: true, mimeType: true },
+        });
+        return document
+          ? { type, id: document.id, title: document.title, subtitle: 'Dokument', to: '/documents' }
+          : null;
+      }
       case 'RECIPE': {
         const recipe = await this.prisma.recipe.findFirst({
           where: { id, userId },

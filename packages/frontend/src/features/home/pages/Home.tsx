@@ -13,6 +13,8 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Flame,
+  Goal,
   Plus,
   Settings2,
   TrendingDown,
@@ -25,6 +27,7 @@ import { calendarApi } from '@/features/calendar/api';
 import { tasksApi } from '@/features/tasks/api';
 import { listsApi } from '@/features/lists/api';
 import { tripsApi } from '@/features/trips/api';
+import { habitsApi } from '@/features/habits/api';
 import { LIST_TYPE_ICON } from '@/features/lists/types';
 import { homeApi } from '@/features/home/api';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -42,6 +45,7 @@ const WIDGETS = [
   { id: 'tasks', title: 'Aufgaben' },
   { id: 'lists', title: 'Listen' },
   { id: 'trips', title: 'Reisen' },
+  { id: 'habits', title: 'Gewohnheiten' },
   { id: 'contracts', title: 'Verträge & Abos' },
 ] as const;
 
@@ -143,6 +147,8 @@ export function HomePage() {
               return <ListsWidget key={w.id} />;
             case 'trips':
               return <TripsWidget key={w.id} />;
+            case 'habits':
+              return <HabitsWidget key={w.id} />;
             case 'contracts':
               return <ContractsWidget key={w.id} />;
           }
@@ -390,6 +396,86 @@ function TripsWidget() {
             );
           })}
         </ul>
+      )}
+    </Card>
+  );
+}
+
+function HabitsWidget() {
+  const queryClient = useQueryClient();
+  const { data: habits, isLoading } = useQuery({
+    queryKey: ['habits', false],
+    queryFn: () => habitsApi.getAll().then((r) => r.data),
+  });
+
+  // Offene zuerst: das Widget soll zeigen, was heute noch ansteht.
+  const shown = useMemo(
+    () => [...(habits ?? [])].sort((a, b) => Number(a.doneToday) - Number(b.doneToday)).slice(0, 4),
+    [habits],
+  );
+
+  const toggleMutation = useMutation({
+    mutationFn: (id: string) => habitsApi.toggle(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['habits'] }),
+  });
+
+  const doneToday = habits?.filter((h) => h.doneToday).length ?? 0;
+
+  return (
+    <Card>
+      <WidgetHead title="Gewohnheiten" to="/habits" icon={Goal} />
+      {isLoading ? (
+        <WidgetSkeleton />
+      ) : shown.length === 0 ? (
+        <WidgetEmpty
+          text="Noch keine Gewohnheiten."
+          action={{ label: 'Gewohnheit anlegen', to: '/habits' }}
+        />
+      ) : (
+        <>
+          <p className="mb-2 text-xs text-ink-3">
+            <span className="tnum font-semibold text-ink">
+              {doneToday}/{habits!.length}
+            </span>{' '}
+            für heute erledigt
+          </p>
+          <ul className="space-y-1">
+            {shown.map((habit) => (
+              <li key={habit.id}>
+                <button
+                  onClick={() => toggleMutation.mutate(habit.id)}
+                  disabled={toggleMutation.isPending}
+                  aria-pressed={habit.doneToday}
+                  className="flex w-full items-center gap-2.5 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-soft disabled:opacity-60"
+                >
+                  <span
+                    className={cn(
+                      'grid h-6 w-6 shrink-0 place-items-center rounded-pill border-2',
+                      habit.doneToday ? 'border-transparent text-white' : 'border-line text-ink-4',
+                    )}
+                    style={habit.doneToday ? { background: habit.color ?? 'var(--indigo)' } : undefined}
+                  >
+                    <CheckSquare className="h-3 w-3" />
+                  </span>
+                  <span
+                    className={cn(
+                      'min-w-0 flex-1 truncate text-sm',
+                      habit.doneToday ? 'text-ink-3 line-through' : 'text-ink',
+                    )}
+                  >
+                    {habit.title}
+                  </span>
+                  {habit.streak > 0 && (
+                    <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-ink-3">
+                      <Flame className="h-3.5 w-3.5 text-peach" />
+                      <span className="tnum">{habit.streak}</span>
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </Card>
   );

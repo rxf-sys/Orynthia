@@ -5,9 +5,10 @@ import { RecipesService } from '../modules/recipes/recipes.service';
 import { ListsService } from '../modules/lists/lists.service';
 import { NotesService } from '../modules/notes/notes.service';
 import { TripsService } from '../modules/trips/trips.service';
+import { DocumentsService } from '../modules/documents/documents.service';
 
 export interface SearchHit {
-  module: 'tasks' | 'calendar' | 'recipes' | 'lists' | 'notes' | 'trips';
+  module: 'tasks' | 'calendar' | 'recipes' | 'lists' | 'notes' | 'trips' | 'documents';
   id: string;
   title: string;
   subtitle?: string;
@@ -31,19 +32,21 @@ export class SearchService {
     private lists: ListsService,
     private notes: NotesService,
     private trips: TripsService,
+    private documents: DocumentsService,
   ) {}
 
   async search(userId: string, rawQuery: string, limitPerModule = 4): Promise<SearchHit[]> {
     const q = rawQuery.trim();
     if (q.length < 2) return [];
 
-    const [tasks, events, recipes, listResults, notes, trips] = await Promise.all([
+    const [tasks, events, recipes, listResults, notes, trips, documents] = await Promise.all([
       this.tasks.search(userId, q, limitPerModule),
       this.calendar.search(userId, q, limitPerModule),
       this.recipes.search(userId, q, limitPerModule),
       this.lists.search(userId, q, limitPerModule),
       this.notes.search(userId, q, limitPerModule),
       this.trips.search(userId, q, limitPerModule),
+      this.documents.search(userId, q, limitPerModule),
     ]);
 
     const hits: SearchHit[] = [
@@ -97,6 +100,13 @@ export class SearchService {
           .filter(Boolean)
           .join(' · '),
         to: `/trips/${t.id}`,
+      })),
+      ...documents.map((d) => ({
+        module: 'documents' as const,
+        id: d.id,
+        title: d.title,
+        subtitle: 'Dokument',
+        to: '/documents',
       })),
     ];
 

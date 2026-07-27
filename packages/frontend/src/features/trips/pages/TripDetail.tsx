@@ -13,6 +13,7 @@ import {
   Link2,
   Loader2,
   Luggage,
+  FolderLock,
   MapPin,
   Pencil,
   Plus,
@@ -34,6 +35,7 @@ import { calendarApi } from '@/features/calendar/api';
 import { tasksApi } from '@/features/tasks/api';
 import { listsApi } from '@/features/lists/api';
 import { notesApi } from '@/features/notes/api';
+import { documentsApi } from '@/features/documents/api';
 import { cn, formatCurrency, parseApiError, parseDecimal } from '@/lib/utils';
 import { Btn, Card, Field, IconBtn, Modal, PageHead, Tag, useConfirm } from '@/components/ui';
 
@@ -44,6 +46,7 @@ const LINK_ICON: Record<LinkableType, LucideIcon> = {
   LIST: ClipboardList,
   NOTE: StickyNote,
   RECIPE: ChefHat,
+  DOCUMENT: FolderLock,
 };
 
 export function TripDetailPage() {
@@ -444,6 +447,8 @@ function LinkEntityModal({
             id: t.id,
             label: t.title,
           }));
+        case 'DOCUMENT':
+          return (await documentsApi.getAll()).data.map((d) => ({ id: d.id, label: d.title }));
         case 'CALENDAR_EVENT': {
           const from = new Date();
           const to = new Date(from.getTime() + 365 * 86_400_000);
@@ -479,7 +484,7 @@ function LinkEntityModal({
     <Modal open={open} onClose={onClose} title="Mit der Reise verknüpfen" size="sm">
       <div className="space-y-4">
         <div className="flex flex-wrap gap-1.5">
-          {(['LIST', 'CALENDAR_EVENT', 'TASK', 'NOTE'] as LinkableType[]).map((t) => (
+          {(['LIST', 'CALENDAR_EVENT', 'TASK', 'NOTE', 'DOCUMENT'] as LinkableType[]).map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}

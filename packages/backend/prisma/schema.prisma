@@ -62,6 +62,8 @@ model User {
   notes          Note[]
   trips          Trip[]
   entityLinks    EntityLink[]
+  documents      Document[]
+  habits         Habit[]
 
   @@map("users")
 }
@@ -767,6 +769,75 @@ model Trip {
   @@map("trips")
 }
 
+// ---------- Dokumente ----------
+// Datei-Inhalte liegen NICHT in der Datenbank, sondern AES-256-GCM-
+// verschlüsselt im Storage-Verzeichnis; hier stehen nur Metadaten und
+// der Storage-Schlüssel. Details: docs/DOCUMENTS_SECURITY.md
+model Document {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  filename    String
+  mimeType    String    @map("mime_type")
+  sizeBytes   Int       @map("size_bytes")
+  /// Dateiname im Storage – zufällig, nie vom Nutzer beeinflusst
+  storageKey  String    @unique @map("storage_key")
+  /// SHA-256 des Klartexts, für Integritätsprüfung beim Download
+  checksum    String
+  tags        String[]  @default([])
+  notes       String?
+  expiresAt   DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("documents")
+}
+
+// ---------- Gewohnheiten ----------
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+}
+
+model Habit {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  title     String
+  notes     String?
+  frequency HabitFrequency @default(DAILY)
+  /// Zielanzahl pro Periode (z. B. 3× pro Woche)
+  targetPerPeriod Int      @default(1) @map("target_per_period")
+  color     String?
+  icon      String?
+  isArchived Boolean       @default(false) @map("is_archived")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries HabitEntry[]
+
+  @@index([userId, isArchived])
+  @@map("habits")
+}
+
+model HabitEntry {
+  id      String   @id @default(uuid())
+  habitId String   @map("habit_id")
+  date    DateTime @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([habitId, date])
+  @@map("habit_entries")
+}
+
 // ---------- Generische Verknüpfungen ----------
 // Für lose n:m-Beziehungen zwischen Alltags-Modulen (z. B. Reise ↔ Termin,
 // Reise ↔ Packliste, Notiz ↔ Termin). Harte, häufige Beziehungen bleiben
@@ -780,6 +851,7 @@ enum LinkableType {
   LIST
   NOTE
   RECIPE
+  DOCUMENT
 }
 
 model EntityLink {

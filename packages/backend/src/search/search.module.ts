@@ -7,9 +7,18 @@ import { RecipesModule } from '../modules/recipes/recipes.module';
 import { ListsModule } from '../modules/lists/lists.module';
 import { NotesModule } from '../modules/notes/notes.module';
 import { TripsModule } from '../modules/trips/trips.module';
+import { DocumentsModule } from '../modules/documents/documents.module';
 
 @Module({
-  imports: [TasksModule, CalendarModule, RecipesModule, ListsModule, NotesModule, TripsModule],
+  imports: [
+    TasksModule,
+    CalendarModule,
+    RecipesModule,
+    ListsModule,
+    NotesModule,
+    TripsModule,
+    DocumentsModule,
+  ],
   controllers: [SearchController],
   providers: [SearchService],
 })

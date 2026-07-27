@@ -12,6 +12,8 @@ import {
   ClipboardList,
   StickyNote,
   Plane,
+  FolderLock,
+  Goal,
   Loader2,
   LayoutDashboard,
   ArrowLeftRight,
@@ -47,6 +49,8 @@ const NAV_COMMANDS: Command[] = [
   { id: 'nav-lists', label: 'Listen', icon: ClipboardList, run: (n) => n('/lists') },
   { id: 'nav-notes', label: 'Notizen', icon: StickyNote, run: (n) => n('/notes') },
   { id: 'nav-trips', label: 'Reisen', icon: Plane, run: (n) => n('/trips') },
+  { id: 'nav-documents', label: 'Dokumente', icon: FolderLock, run: (n) => n('/documents') },
+  { id: 'nav-habits', label: 'Gewohnheiten', icon: Goal, run: (n) => n('/habits') },
   { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
   { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },
   { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/finance/accounts') },
@@ -67,6 +71,7 @@ const MODULE_ICON: Record<SearchHit['module'], LucideIcon> = {
   lists: ClipboardList,
   notes: StickyNote,
   trips: Plane,
+  documents: FolderLock,
 };
 
 interface CommandPaletteProps {

@@ -9,6 +9,30 @@ export const api = axios.create({
   timeout: 30_000, // hängende Requests nicht unbegrenzt offen halten
 });
 
+/**
+ * Offline-Guard: Lesen darf offline aus dem persistierten Query-Cache
+ * bedient werden, Schreiben nicht. Ohne diese Sperre würden Mutationen
+ * ins Leere laufen und der Nutzer hielte Änderungen für gespeichert, die
+ * den Server nie erreicht haben.
+ */
+export class OfflineWriteError extends Error {
+  constructor() {
+    super('Offline – Änderungen sind erst wieder möglich, sobald du verbunden bist.');
+    this.name = 'OfflineWriteError';
+  }
+}
+
+const READ_METHODS = new Set(['get', 'head', 'options']);
+
+api.interceptors.request.use((config) => {
+  const method = (config.method ?? 'get').toLowerCase();
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (offline && !READ_METHODS.has(method)) {
+    throw new OfflineWriteError();
+  }
+  return config;
+});
+
 // Response Interceptor: Token Refresh bei 401
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: unknown) => void }> = [];
@@ -55,6 +79,8 @@ api.interceptors.response.use(
         // die Route-Guards navigieren dann ohne Full-Reload (und ohne
         // Mehrfach-Redirects bei parallelen 401ern).
         const { useAuthStore } = await import('@/stores/authStore');
+        const { clearOfflineCache } = await import('@/platform/offline/persistence');
+        clearOfflineCache();
         useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
         return Promise.reject(refreshError);
       } finally {
