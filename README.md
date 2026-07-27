@@ -1,6 +1,13 @@
-# Orynthia - Persönliche Finanzverwaltung
+# Orynthia – Dein Alltag. Eine App.
 
-Eine Self-Hosted Web-App zur persönlichen Finanzverwaltung mit Open Banking (PSD2), automatischer Kategorisierung, Budgets, Vertragsmanagement, Sparziele und Dashboard-Analysen.
+Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
+
+**Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 📆 Wochenplan · 🛒 Listen · 📝 Notizen · ✈️ Reisen · 🤖 KI-Assistent — Hintergrund und Roadmap in [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).
+
+**Die Module greifen ineinander:** Rezepte wandern in den Wochenplan, der Wochenplan
+erzeugt die Einkaufsliste, der erledigte Einkauf wird zur Ausgabe, fällige Aufgaben und
+geplantes Essen erscheinen im Kalender, Kündigungsfristen melden sich rechtzeitig – und
+der Assistent kennt alle Bereiche.
 
 ## Tech-Stack
 
@@ -134,8 +141,16 @@ gunzip -c /backup/orynthia-2026-06-10.sql.gz \
   | docker exec -i orynthia-postgres psql -U orynthia orynthia
 ```
 
-> Zusätzlich die `.env` sichern — **ohne `ENCRYPTION_KEY` sind Banking-Verbindungen
-> und 2FA-Secrets aus einem DB-Backup nicht wiederherstellbar.**
+Dokumente liegen **nicht** in der Datenbank, sondern als verschlüsselte Dateien
+im Volume `documents_data` (`DOCUMENTS_PATH`). Sie gehören separat ins Backup:
+
+```bash
+docker run --rm -v orynthia_documents_data:/data -v /backup:/backup alpine \
+  tar czf /backup/orynthia-documents-$(date +%F).tar.gz -C /data .
+```
+
+> Zusätzlich die `.env` sichern — **ohne `ENCRYPTION_KEY` sind Banking-Verbindungen,
+> 2FA-Secrets und Dokumente aus einem Backup nicht wiederherstellbar.**
 
 ### Updates einspielen
 
@@ -186,13 +201,15 @@ Vollständige Vorlage mit Kommentaren: [`.env.example`](.env.example).
 |----------|---------|-------|
 | `DATABASE_URL`, `POSTGRES_*` | ✅ | PostgreSQL-Verbindung (beim Start validiert) |
 | `JWT_SECRET`, `JWT_REFRESH_SECRET` | ✅ | Token-Signierung, je min. 32 Zeichen (validiert) |
-| `ENCRYPTION_KEY` | ✅ | AES-256-GCM für 2FA-Secrets & Banking-Sessions, 64 Hex-Zeichen |
+| `ENCRYPTION_KEY` | ✅ | AES-256-GCM für 2FA-Secrets, Banking-Sessions & Dokumente, 64 Hex-Zeichen |
+| `DOCUMENTS_PATH` | – | Ablage der verschlüsselten Dokumente (Default: `./data/documents`); muss persistent sein |
 | `REDIS_PASSWORD` | ✅ | Redis-Absicherung im Compose-Stack |
 | `FRONTEND_URL` | ✅ (Prod) | CORS-Origin + Banking-Redirect + Reset-Links |
 | `NODE_ENV`, `APP_PORT` | – | Laufzeitumgebung (Default: `production` / `3000`) |
 | `COOKIE_SECURE` | – | `true` bei HTTPS-Deployments |
 | `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | – | Token-Lebensdauern (Default: `15m` / `7d`) |
 | `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_PRIVATE_KEY` | – | Open Banking (PSD2); ohne sie nur manuelle Konten |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google-Calendar-Sync (read-only); ohne sie nur ICS-Abos |
 | `ANTHROPIC_API_KEY` | – | Aktiviert den KI-Assistenten |
 | `ANTHROPIC_MODEL` | – | Claude-Modell (Default: `claude-opus-4-8`) |
 | `CHAT_DAILY_TOKEN_LIMIT` | – | Tages-Token-Budget pro User für den Assistenten (0 = unbegrenzt) |
@@ -217,36 +234,127 @@ Orynthia/
 │   │   │   ├── migrations/            # Versionierte SQL-Migrationen (migrate deploy)
 │   │   │   └── seed.ts                # Optionale Demo-Daten
 │   │   └── src/
-│   │       ├── auth/           # JWT, 2FA, Login/Register
-│   │       ├── users/          # Profilverwaltung
-│   │       ├── accounts/       # Bankkonten
-│   │       ├── banking/        # Enable Banking API (PSD2)
-│   │       ├── transactions/   # Buchungen, Kategorisierung, CSV-Export
-│   │       ├── categories/     # Kategorien-System
-│   │       ├── budgets/        # Budget-Tracking
-│   │       ├── recurring-payments/ # Wiederkehrende Zahlungen
-│   │       ├── savings-goals/  # Sparziele
-│   │       ├── contracts/      # Vertragsmanagement & Anbietervergleich
-│   │       ├── investments/    # Depot-Positionen
-│   │       ├── notifications/  # Benachrichtigungen (Inbox + Cron-Trigger)
-│   │       ├── chat/           # KI-Assistent (Anthropic)
-│   │       ├── dashboard/      # Aggregierte Übersicht + Forecast
-│   │       ├── health/         # Liveness/Readiness-Endpoints
-│   │       ├── config/         # ENV-Validierung beim Bootstrap
+│   │       ├── platform/       # Querschnitt: auth (JWT, 2FA), users, mail,
+│   │       │                   # notifications, links, prisma, config, health, common
+│   │       ├── modules/
+│   │       │   ├── finance/    # accounts, banking (PSD2), transactions,
+│   │       │   │               # categories, budgets, recurring-payments,
+│   │       │   │               # savings-goals, contracts, investments, dashboard
+│   │       │   ├── tasks/      # Aufgaben & Aufgabenlisten
+│   │       │   ├── calendar/   # Kalender & Termine (Serien, ICS/Google/CalDAV)
+│   │       │   ├── recipes/  lists/  notes/  trips/
+│   │       │   ├── documents/  # Verschlüsselte Dokumenten-Ablage
+│   │       │   └── habits/     # Gewohnheiten & Serien
+│   │       ├── search/         # Modulübergreifende Suche (⌘K)
+│   │       ├── assistant/      # KI-Assistent (Anthropic)
 │   │       └── demo-seed/      # Demo-Daten (nur Nicht-Production)
 │   └── frontend/
 │       └── src/
-│           ├── pages/          # Dashboard, Transaktionen, Budgets, etc.
+│           ├── platform/       # API-Client (axios + Refresh), Suche,
+│           │                   # Offline-Cache-Persistenz
+│           ├── features/       # Eine Domain pro Ordner:
+│           │   ├── home/       # Modulares Widget-Dashboard
+│           │   ├── finance/    # Alle Finanz-Seiten + api.ts + types.ts
+│           │   ├── calendar/   # Monats-/Wochen-/Agenda-Ansicht
+│           │   ├── tasks/      # Aufgaben mit Listen & Prioritäten
+│           │   ├── recipes/  lists/  notes/  trips/  documents/  habits/
+│           │   ├── auth/  assistant/  settings/
 │           ├── components/     # Layout, Sidebar, Header, CommandPalette (⌘K)
 │           │   └── ui/         # Btn, Card, Modal, Field, ConfirmDialog, …
 │           ├── stores/         # Zustand: Auth, Theme
-│           └── lib/            # API Client, Types, Utilities
+│           └── lib/            # Utilities
 └── docs/
     ├── FRONTEND_AUDIT.md       # Frontend-Audit inkl. Umsetzungsstatus
-    └── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
+    ├── BACKEND_AUDIT.md        # Backend-Audit inkl. Umsetzungsstatus
+    ├── ALLROUNDER_PLAN.md      # Produktvision & Umsetzungsplan „One App for Everyday Life"
+    └── DOCUMENTS_SECURITY.md   # Schutzkonzept der Dokumenten-Ablage
 ```
 
 ## Features
+
+### Home-Dashboard
+- Modulares Widget-Grid als Startseite: Finanz-Überblick, „Heute & demnächst"
+  (Kalender), Aufgaben-Status, Listen, Reisen, Gewohnheiten, Verträge & Abos
+- Widgets pro Nutzer ein-/ausblendbar (serverseitig gespeichert)
+
+### Kalender
+- Monats-, Wochen- und Agenda-Ansicht, mehrere Kalender mit Farben
+- Termine mit Ort, Beschreibung, Ganztages-Terminen
+- Wiederkehrende Termine (täglich bis jährlich, Intervall + Enddatum) —
+  Serien-Instanzen werden serverseitig expandiert (Monatsend-Klemmung, gekappt)
+- Erinnerungen (5 Min bis 1 Tag vorher) über die Benachrichtigungs-Inbox
+- **ICS-Abo (read-only):** iCloud „Kalender teilen per Link", Outlook, Nextcloud u. a.
+  per webcal://- oder https://-URL abonnieren; Auto-Refresh stündlich
+- **Google Calendar (read-only):** OAuth-Anbindung mit eigenen Client-Credentials,
+  inkrementeller Sync per syncToken alle 15 Minuten, Sync-Fehler als Benachrichtigung
+- Credentials (OAuth-Refresh-Token, ICS-URLs) liegen AES-256-GCM-verschlüsselt im
+  Integration-Vault; synchronisierte Kalender sind in Orynthia schreibgeschützt
+- Apple-Kalender: per iCloud-ICS-Link sofort nutzbar; CalDAV-Anbindung vorbereitet (Phase 2b)
+
+### Aufgaben
+- Aufgaben mit Prioritäten, Fälligkeiten, Notizen und Aufgabenlisten
+- Wiederkehrende Aufgaben: Beim Erledigen entsteht automatisch die nächste Instanz
+- Gruppierung nach Überfällig / Heute / Später, Quick-Add per Enter
+- Fälligkeits-Erinnerungen (täglich 08:00, idempotent) im Notification-Center
+- Fällige Aufgaben erscheinen als Layer im Kalender (ein-/ausblendbar)
+
+### Rezepte
+- Eigene Rezepte mit Zutaten, Zubereitungsschritten, Portionen, Zeiten und Schwierigkeit
+- Portionsrechner in der Detailansicht: Mengen werden live auf die gewünschte
+  Portionszahl umgerechnet
+- Filter nach Mahlzeit, Ernährungsform, Zubereitungszeit und Favoriten, Volltextsuche
+- Bilder werden per URL verlinkt (kein Upload – bewusst schlank und ohne Storage)
+
+### Notizen
+- Freie Notizen mit optionalem Titel, Tags, Farbe und Anpinnen
+- Volltextsuche über Titel und Inhalt, Filter-Chips je Tag mit Häufigkeit
+- Angepinnte zuerst, danach nach letzter Bearbeitung sortiert
+
+### Reisen
+- Reisen mit Zeitraum, Ziel, Status und Budget (reine Planungsgröße –
+  **keine** Verbindung zu Konten oder Transaktionen)
+- **Bündelt bestehende Einträge:** Termine, Packlisten und Notizen lassen sich
+  mit einer Reise verknüpfen und erscheinen gebündelt auf der Reise-Seite –
+  die Einträge bleiben dabei in ihrem eigenen Modul
+- Packliste per Klick anlegen und automatisch verknüpfen
+- Verknüpfungen sind ungerichtet und dublettenfrei; beim Löschen einer Reise
+  verschwinden nur die Verknüpfungen, nicht die verknüpften Einträge
+
+### Dokumente
+- Verträge, Rechnungen und Ausweise an einem Ort – **AES-256-GCM-verschlüsselt
+  im Dateisystem**, die Datenbank kennt nur Metadaten
+- Upload mit Typ-Whitelist (PDF, Bilder, Office), Magic-Bytes-Prüfung und
+  20-MB-Limit; aktive Inhalte (HTML, SVG) werden abgewiesen
+- Download läuft über die angemeldete Sitzung und immer als Anhang – es gibt
+  keine öffentlichen Datei-URLs
+- Tags, Volltextsuche über Titel/Dateiname und optionales „Gültig bis" für
+  ablaufende Papiere; mit Reisen verknüpfbar
+- Details zum Schutzkonzept: [`docs/DOCUMENTS_SECURITY.md`](docs/DOCUMENTS_SECURITY.md)
+
+### Gewohnheiten
+- Tägliche oder wöchentliche Routinen mit Zielanzahl je Periode und Farbe
+- Aktuelle Serie („Streak") und 4-Wochen-Raster; einzelne Tage lassen sich
+  nachträglich abhaken
+- Heute noch offene Gewohnheiten direkt vom Home-Widget aus erledigen
+- Archivieren statt löschen, wenn eine Routine gerade pausiert
+
+### Wochenplan (Meal-Planner)
+- Wochenansicht mit Frühstück/Mittag/Abend/Snack je Tag; Rezepte oder Freitext
+  („Essen gehen") einplanen, Portionen je Mahlzeit frei wählbar
+- **Wochenplan → Einkaufsliste:** Zutaten aller geplanten Rezepte einer Woche werden
+  auf die jeweils geplanten Portionen skaliert, zusammengeführt und gebündelt in eine
+  Liste übernommen
+- Geplante Mahlzeiten erscheinen als eigener Layer im Kalender
+
+### Listen
+- Einkaufs-, Pack-, Check- und Wunschlisten mit Quick-Add, Abhaken und „Aufräumen"
+- **Rezept → Einkaufsliste:** Zutaten eines Rezepts mit einem Klick übernehmen –
+  skaliert auf die gewünschte Portionszahl; gleichnamige Einträge mit gleicher
+  Einheit werden zusammengeführt statt doppelt angelegt (inkl. Synonymen wie
+  „g"/„Gramm"), abgehakte Treffer werden dabei reaktiviert
+- Einträge zeigen ihre Herkunft („aus Rezept")
+- **Einkauf → Ausgabe:** ein erledigter Einkauf lässt sich mit einem Klick als Ausgabe
+  buchen (Konto und Kategorie werden vorgeschlagen, der Betrag wird bestätigt)
 
 ### Finanzen
 - Open Banking (PSD2) via Enable Banking - automatischer Kontoabgleich
@@ -273,6 +381,8 @@ Orynthia/
 - Monatliche/jährliche Kostenübersicht
 - Anbietervergleich für Versicherungen und Energieanbieter (Check24, Verivox)
 - Kündigungsfristen und automatische Verlängerung im Blick
+- Erinnerung, sobald eine Kündigungsfrist in den nächsten 30 Tagen abläuft
+  (täglich 08:15, ein Hinweis je Vertrag und Frist)
 
 ### Sparen & Planung
 - Sparziele mit Fortschrittsbalken
@@ -291,7 +401,9 @@ Orynthia/
 
 ### KI-Assistent (Beta)
 - Chat-Oberfläche unter /assistant, beantwortet Fragen zu Konten, Ausgaben,
-  Budgets, Verträgen, Sparzielen anhand deiner echten Daten
+  Budgets, Verträgen, Sparzielen **sowie zu Terminen, offenen Aufgaben,
+  Essensplanung und Listen** anhand deiner echten Daten – und denkt dabei
+  über Modulgrenzen hinweg mit
 - Modell konfigurierbar via `ANTHROPIC_MODEL` (Default: Claude Opus 4.8),
   mit adaptive thinking + Prompt-Caching
 - Kostenkontrolle: Token-Usage wird pro Anfrage geloggt; optionales
@@ -317,16 +429,27 @@ Orynthia/
 - `/api/health` (Liveness) + `/api/ready` (DB-Probe, optional Redis) für
   Container-Healthchecks; Backend-Container läuft als non-root
 - DSGVO-konform (Self-Hosted, keine Daten an Dritte, Fonts self-hosted)
+- Modul-Verknüpfungen prüfen die Zugehörigkeit **beider** Enden gegen die
+  Datenbank; Finanz-Entitäten sind bewusst nicht verknüpfbar
 
 ### Technik
 - Responsive Light/Dark-Theme UI mit Mobile-Tabbar inkl. „Mehr“-Sheet
   (alle Bereiche mobil erreichbar)
-- **⌘K-Befehlspalette**: Seiten öffnen + Transaktionen durchsuchen von überall
+- **⌘K-Befehlspalette (Command Center)**: Seiten öffnen, modulübergreifend suchen
+  (Aufgaben, Termine, Rezepte, Listen – serverseitig aggregiert, debounced) und
+  Transaktionen durchsuchen – von überall
 - **Performance**: Route-basiertes Code-Splitting (Initial-JS ~330 kB statt
   892 kB; Charts laden nur auf Chart-Seiten), Fonts self-hosted
 - **PWA**: installierbar als Home-Screen-App (iOS/Android/Desktop); Service
   Worker lädt HTML network-first (deploy-sicher, keine veralteten Versionen)
   und cached nur unveränderliche Assets, /api bleibt live
+- **Offline lesbar**: der zuletzt geladene Stand der Alltags-Module (Aufgaben,
+  Kalender, Rezepte, Wochenplan, Listen, Notizen, Reisen, Gewohnheiten)
+  überlebt einen Reload und ist ohne Verbindung sichtbar – mit deutlichem
+  Offline-Banner. **Finanz-, Banking- und Dokumentdaten werden bewusst nicht
+  im Browser zwischengespeichert.** Schreibende Aktionen sind offline gesperrt,
+  damit keine Änderung im Nichts verschwindet; beim Abmelden wird der Cache
+  gelöscht
 - **Barrierefreiheit**: Fokus-Trap + Fokus-Rückgabe in allen Dialogen,
   Label-/Fehler-Verknüpfung an allen Formularfeldern (`aria-describedby`,
   `role="alert"`), Skip-Link, Tastaturnavigation in Menüs,
@@ -451,6 +574,75 @@ Orynthia/
 ### KI-Assistent
 - `GET /api/chat/status` - Aktiviert? (true/false)
 - `POST /api/chat/message` - Nachricht senden (history-aware, kontext-injiziert)
+
+### Aufgaben
+- `GET /api/tasks` - Liste (`?status=open|completed|all&taskListId=&dueBefore=`)
+- `GET /api/tasks/summary` - Offen/Heute/Überfällig (Home-Widget)
+- `POST /api/tasks` / `PATCH /api/tasks/:id` / `DELETE /api/tasks/:id`
+- `GET/POST /api/tasks/lists`, `PATCH/DELETE /api/tasks/lists/:id`
+
+### Kalender
+- `GET /api/calendar/calendars` - Kalender (legt beim ersten Zugriff „Privat" an)
+- `POST /api/calendar/calendars` / `PATCH|DELETE /api/calendar/calendars/:id`
+- `GET /api/calendar/events?from=&to=` - Termin-Instanzen (Serien expandiert)
+- `GET /api/calendar/events/upcoming?days=&limit=` - Nächste Termine (Home-Widget)
+- `POST /api/calendar/events` / `PATCH|DELETE /api/calendar/events/:id`
+- `GET /api/calendar/integrations` - Verbundene externe Kalender (+ googleConfigured)
+- `POST /api/calendar/integrations/ics` - ICS-Feed abonnieren (`{url, name?, color?}`)
+- `POST /api/calendar/integrations/google/connect` - OAuth-URL holen
+- `POST /api/calendar/integrations/google/callback` - OAuth-Code einlösen (`{code, state}`)
+- `POST /api/calendar/integrations/:id/sync` - Sofort synchronisieren
+- `DELETE /api/calendar/integrations/:id` - Verbindung trennen (inkl. Token-Revoke)
+
+### Rezepte
+- `GET /api/recipes` - Liste (`?search=&mealType=&dietary=&difficulty=&favorite=&maxTotalMinutes=`)
+- `GET /api/recipes/:id` - Rezept mit Zutaten
+- `POST /api/recipes` / `PATCH /api/recipes/:id` / `DELETE /api/recipes/:id`
+- `POST /api/recipes/:id/favorite` - Favorit umschalten
+
+### Listen
+- `GET /api/lists` / `GET /api/lists/:id`
+- `POST /api/lists` / `PATCH /api/lists/:id` / `DELETE /api/lists/:id`
+- `POST /api/lists/:id/items` - Eintrag hinzufügen
+- `POST /api/lists/:id/items/bulk` - Mehrere Einträge (mit Zusammenführung)
+- `POST /api/lists/:id/from-recipe` - Zutaten aus Rezept übernehmen (`{recipeId, servings?, ingredientIds?}`)
+- `DELETE /api/lists/:id/checked` - Abgehakte Einträge entfernen
+- `PATCH|DELETE /api/lists/items/:itemId`
+
+### Wochenplan
+- `GET /api/meal-plan?from=&to=` - Geplante Mahlzeiten eines Zeitraums
+- `POST /api/meal-plan` / `PATCH|DELETE /api/meal-plan/:id`
+- `POST /api/meal-plan/to-list` - Zutaten eines Zeitraums in eine Liste (`{listId, from, to}`)
+
+### Notizen
+- `GET /api/notes?search=&tag=` / `GET /api/notes/tags` / `GET /api/notes/:id`
+- `POST /api/notes` / `PATCH|DELETE /api/notes/:id` / `POST /api/notes/:id/pin`
+
+### Reisen
+- `GET /api/trips` / `GET /api/trips/:id` (inkl. aufgelöster Verknüpfungen)
+- `POST /api/trips` / `PATCH|DELETE /api/trips/:id`
+- `POST /api/trips/:id/links` - Termin, Liste, Notiz, Rezept oder Dokument verknüpfen (`{type, id}`)
+- `DELETE /api/trips/:id/links/:linkId` - Verknüpfung lösen
+- `POST /api/trips/:id/packing-list` - Packliste anlegen und verknüpfen
+
+### Dokumente
+- `GET /api/documents?search=&tag=` / `GET /api/documents/tags` / `GET /api/documents/:id`
+- `POST /api/documents` - Upload (`multipart/form-data`: `file`, optional `title`, `tags`, `notes`, `expiresAt`)
+- `GET /api/documents/:id/download` - Entschlüsselt, immer als Anhang
+- `PATCH /api/documents/:id` / `DELETE /api/documents/:id`
+
+### Gewohnheiten
+- `GET /api/habits?includeArchived=` - Liste inkl. Streak und 30-Tage-Historie
+- `GET /api/habits/summary` - Erledigt/Gesamt/beste Serie (Home-Widget)
+- `POST /api/habits` / `PATCH /api/habits/:id` / `DELETE /api/habits/:id`
+- `POST /api/habits/:id/toggle` - Tag abhaken bzw. Haken entfernen (`{date?}`)
+
+### Suche
+- `GET /api/search?q=…` - Modulübergreifende Suche (Aufgaben, Termine, Rezepte,
+  Listen, Notizen, Reisen, Dokumente)
+
+### Home-Layout
+- `GET /api/users/dashboard-layout` / `PATCH /api/users/dashboard-layout` - Widget-Sichtbarkeit/-Reihenfolge
 
 ## Automatischer Konten-Import (Enable Banking)
 

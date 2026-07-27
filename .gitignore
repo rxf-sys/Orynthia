@@ -27,3 +27,7 @@ Thumbs.db
 # Runtime
 *.pid
 *.seed
+
+# Verschlüsselte Dokumenten-Ablage (DOCUMENTS_PATH)
+data/documents/
+packages/backend/data/

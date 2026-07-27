@@ -1,0 +1,59 @@
+import { Controller, Get, Patch, Post, Delete, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UsersService } from './users.service';
+import { UpdateProfileDto, ChangePasswordDto, DeleteAccountDto, NotificationSettingsDto, DashboardLayoutDto } from './dto/user.dto';
+
+@ApiTags('Users')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('users')
+export class UsersController {
+  constructor(private usersService: UsersService) {}
+
+  @Get('profile')
+  async getProfile(@Req() req: Request) {
+    return this.usersService.findById(req.user!.id);
+  }
+
+  @Patch('profile')
+  async updateProfile(@Req() req: Request, @Body() dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(req.user!.id, dto);
+  }
+
+  @Get('dashboard-layout')
+  async getDashboardLayout(@Req() req: Request) {
+    return this.usersService.getDashboardLayout(req.user!.id);
+  }
+
+  @Patch('dashboard-layout')
+  async updateDashboardLayout(@Req() req: Request, @Body() dto: DashboardLayoutDto) {
+    return this.usersService.updateDashboardLayout(req.user!.id, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Passwort ändern' })
+  async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
+    return this.usersService.changePassword(req.user!.id, dto.currentPassword, dto.newPassword);
+  }
+
+  @Get('notification-settings')
+  @ApiOperation({ summary: 'Benachrichtigungs-Einstellungen abrufen' })
+  async getNotificationSettings(@Req() req: Request) {
+    return this.usersService.getNotificationSettings(req.user!.id);
+  }
+
+  @Patch('notification-settings')
+  @ApiOperation({ summary: 'Benachrichtigungs-Einstellungen speichern' })
+  async updateNotificationSettings(@Req() req: Request, @Body() dto: NotificationSettingsDto) {
+    return this.usersService.updateNotificationSettings(req.user!.id, { ...dto });
+  }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Konto endgültig löschen (erfordert Passwort-Bestätigung)' })
+  async deleteAccount(@Req() req: Request, @Body() dto: DeleteAccountDto) {
+    return this.usersService.deleteAccount(req.user!.id, dto.password);
+  }
+}

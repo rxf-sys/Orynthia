@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/features/auth/api', () => ({
   authApi: {
     login: vi.fn(),
     register: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import { authApi } from '@/lib/api';
+import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/stores/authStore';
 
 const mockedAuthApi = vi.mocked(authApi);

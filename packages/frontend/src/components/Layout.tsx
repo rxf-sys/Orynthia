@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileTabbar } from './MobileTabbar';
+import { OfflineBanner } from './OfflineBanner';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -19,6 +20,7 @@ export function Layout() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex min-w-0 flex-col">
+        <OfflineBanner />
         <Header onMenuClick={() => setSidebarOpen(true)} />
 
         <main

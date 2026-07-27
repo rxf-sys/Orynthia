@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -9,21 +9,40 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Route-basiertes Code-Splitting: jede Seite ist ein eigener Chunk, damit der
 // initiale Download klein bleibt (insb. Recharts lädt nur, wo Charts sind).
-const LoginPage = lazy(() => import('@/pages/Login').then((m) => ({ default: m.LoginPage })));
-const RegisterPage = lazy(() => import('@/pages/Register').then((m) => ({ default: m.RegisterPage })));
-const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })));
-const ResetPasswordPage = lazy(() => import('@/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })));
-const DashboardPage = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
-const TransactionsPage = lazy(() => import('@/pages/Transactions').then((m) => ({ default: m.TransactionsPage })));
-const BudgetsPage = lazy(() => import('@/pages/Budgets').then((m) => ({ default: m.BudgetsPage })));
-const AccountsPage = lazy(() => import('@/pages/Accounts').then((m) => ({ default: m.AccountsPage })));
-const RecurringPaymentsPage = lazy(() => import('@/pages/RecurringPayments').then((m) => ({ default: m.RecurringPaymentsPage })));
-const SavingsGoalsPage = lazy(() => import('@/pages/SavingsGoals').then((m) => ({ default: m.SavingsGoalsPage })));
-const ContractsPage = lazy(() => import('@/pages/Contracts').then((m) => ({ default: m.ContractsPage })));
-const SavingsPotentialPage = lazy(() => import('@/pages/SavingsPotential').then((m) => ({ default: m.SavingsPotentialPage })));
-const AssistantPage = lazy(() => import('@/pages/Assistant').then((m) => ({ default: m.AssistantPage })));
-const InvestmentsPage = lazy(() => import('@/pages/Investments').then((m) => ({ default: m.InvestmentsPage })));
-const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const LoginPage = lazy(() => import('@/features/auth/pages/Login').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('@/features/auth/pages/Register').then((m) => ({ default: m.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/ForgotPassword').then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('@/features/auth/pages/ResetPassword').then((m) => ({ default: m.ResetPasswordPage })));
+const DashboardPage = lazy(() => import('@/features/finance/pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
+const TransactionsPage = lazy(() => import('@/features/finance/pages/Transactions').then((m) => ({ default: m.TransactionsPage })));
+const BudgetsPage = lazy(() => import('@/features/finance/pages/Budgets').then((m) => ({ default: m.BudgetsPage })));
+const AccountsPage = lazy(() => import('@/features/finance/pages/Accounts').then((m) => ({ default: m.AccountsPage })));
+const RecurringPaymentsPage = lazy(() => import('@/features/finance/pages/RecurringPayments').then((m) => ({ default: m.RecurringPaymentsPage })));
+const SavingsGoalsPage = lazy(() => import('@/features/finance/pages/SavingsGoals').then((m) => ({ default: m.SavingsGoalsPage })));
+const ContractsPage = lazy(() => import('@/features/finance/pages/Contracts').then((m) => ({ default: m.ContractsPage })));
+const SavingsPotentialPage = lazy(() => import('@/features/finance/pages/SavingsPotential').then((m) => ({ default: m.SavingsPotentialPage })));
+const AssistantPage = lazy(() => import('@/features/assistant/pages/Assistant').then((m) => ({ default: m.AssistantPage })));
+const InvestmentsPage = lazy(() => import('@/features/finance/pages/Investments').then((m) => ({ default: m.InvestmentsPage })));
+const SettingsPage = lazy(() => import('@/features/settings/pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const HomePage = lazy(() => import('@/features/home/pages/Home').then((m) => ({ default: m.HomePage })));
+const TasksPage = lazy(() => import('@/features/tasks/pages/Tasks').then((m) => ({ default: m.TasksPage })));
+const CalendarPage = lazy(() => import('@/features/calendar/pages/Calendar').then((m) => ({ default: m.CalendarPage })));
+const RecipesPage = lazy(() => import('@/features/recipes/pages/Recipes').then((m) => ({ default: m.RecipesPage })));
+const RecipeDetailPage = lazy(() => import('@/features/recipes/pages/RecipeDetail').then((m) => ({ default: m.RecipeDetailPage })));
+const ListsPage = lazy(() => import('@/features/lists/pages/Lists').then((m) => ({ default: m.ListsPage })));
+const MealPlanPage = lazy(() => import('@/features/recipes/pages/MealPlan').then((m) => ({ default: m.MealPlanPage })));
+const NotesPage = lazy(() => import('@/features/notes/pages/Notes').then((m) => ({ default: m.NotesPage })));
+const TripsPage = lazy(() => import('@/features/trips/pages/Trips').then((m) => ({ default: m.TripsPage })));
+const TripDetailPage = lazy(() => import('@/features/trips/pages/TripDetail').then((m) => ({ default: m.TripDetailPage })));
+const DocumentsPage = lazy(() => import('@/features/documents/pages/Documents').then((m) => ({ default: m.DocumentsPage })));
+const HabitsPage = lazy(() => import('@/features/habits/pages/Habits').then((m) => ({ default: m.HabitsPage })));
+
+// Alte Finanz-Routen leben als Redirects weiter – inklusive Query-String,
+// damit z. B. der Enable-Banking-Callback (/accounts?code=…) weiter ankommt.
+function LegacyRedirect({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+}
 
 function FullscreenLoader() {
   return (
@@ -92,17 +111,51 @@ export default function App() {
 
             {/* Protected Routes */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<DashboardPage />} />
-              <Route path="transactions" element={<TransactionsPage />} />
-              <Route path="budgets" element={<BudgetsPage />} />
-              <Route path="accounts" element={<AccountsPage />} />
-              <Route path="recurring" element={<RecurringPaymentsPage />} />
-              <Route path="savings" element={<SavingsGoalsPage />} />
-              <Route path="contracts" element={<ContractsPage />} />
-              <Route path="savings-potential" element={<SavingsPotentialPage />} />
+              <Route index element={<HomePage />} />
+
+              {/* Modul: Finanzen */}
+              <Route path="finance" element={<DashboardPage />} />
+              <Route path="finance/transactions" element={<TransactionsPage />} />
+              <Route path="finance/budgets" element={<BudgetsPage />} />
+              <Route path="finance/accounts" element={<AccountsPage />} />
+              <Route path="finance/recurring" element={<RecurringPaymentsPage />} />
+              <Route path="finance/savings" element={<SavingsGoalsPage />} />
+              <Route path="finance/contracts" element={<ContractsPage />} />
+              <Route path="finance/savings-potential" element={<SavingsPotentialPage />} />
+              <Route path="finance/investments" element={<InvestmentsPage />} />
+
+              {/* Module: Kalender & Aufgaben */}
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+
+              {/* Module: Rezepte & Listen */}
+              <Route path="recipes" element={<RecipesPage />} />
+              <Route path="recipes/:id" element={<RecipeDetailPage />} />
+              <Route path="meal-plan" element={<MealPlanPage />} />
+              <Route path="lists" element={<ListsPage />} />
+              <Route path="lists/:id" element={<ListsPage />} />
+
+              {/* Module: Notizen & Reisen */}
+              <Route path="notes" element={<NotesPage />} />
+              <Route path="trips" element={<TripsPage />} />
+              <Route path="trips/:id" element={<TripDetailPage />} />
+
+              {/* Module: Dokumente & Gewohnheiten */}
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="habits" element={<HabitsPage />} />
+
               <Route path="assistant" element={<AssistantPage />} />
-              <Route path="investments" element={<InvestmentsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+
+              {/* Redirects der alten Finanz-Routen */}
+              <Route path="transactions" element={<LegacyRedirect to="/finance/transactions" />} />
+              <Route path="budgets" element={<LegacyRedirect to="/finance/budgets" />} />
+              <Route path="accounts" element={<LegacyRedirect to="/finance/accounts" />} />
+              <Route path="recurring" element={<LegacyRedirect to="/finance/recurring" />} />
+              <Route path="savings" element={<LegacyRedirect to="/finance/savings" />} />
+              <Route path="contracts" element={<LegacyRedirect to="/finance/contracts" />} />
+              <Route path="savings-potential" element={<LegacyRedirect to="/finance/savings-potential" />} />
+              <Route path="investments" element={<LegacyRedirect to="/finance/investments" />} />
             </Route>
 
             {/* Fallback: echte 404 statt stillem Redirect */}

@@ -67,9 +67,14 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       # Demo-User mit Test-Daten beim Boot anlegen (zerstört alte Demo-Daten!)
       SEED_DEMO_USER: ${SEED_DEMO_USER:-false}
+      # Ablage der verschlüsselten Dokumente (benanntes Volume, s. u.)
+      DOCUMENTS_PATH: /app/data/documents
     volumes:
       - ./packages/backend:/app
       - /app/node_modules
+      # Dokumente überleben Rebuilds – ohne dieses Volume wären hochgeladene
+      # Dateien nach dem nächsten `up --build` verloren.
+      - documents_data:/app/data/documents
     ports:
       - "3000:3000"
     healthcheck:
@@ -152,6 +157,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  documents_data:
     driver: local
 
 networks:

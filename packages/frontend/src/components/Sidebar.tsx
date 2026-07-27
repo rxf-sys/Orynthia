@@ -1,7 +1,17 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import {
-  LayoutDashboard,
+  Home,
+  Wallet,
+  Calendar,
+  CheckSquare,
+  ChefHat,
+  CalendarRange,
+  ClipboardList,
+  StickyNote,
+  Plane,
+  FolderLock,
+  Goal,
   ArrowLeftRight,
   Building2,
   Target,
@@ -14,6 +24,7 @@ import {
   Settings,
   MoreHorizontal,
   LogOut,
+  ChevronDown,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -24,31 +35,39 @@ import { Avatar } from './ui/Avatar';
 import { useConfirm } from './ui/useConfirm';
 
 interface NavItem {
-  section?: string;
-  to?: string;
-  icon?: LucideIcon;
-  label?: string;
+  to: string;
+  icon: LucideIcon;
+  label: string;
   end?: boolean;
   badge?: string;
 }
 
-const NAV: NavItem[] = [
-  { section: 'Übersicht' },
-  { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/transactions', icon: ArrowLeftRight, label: 'Transaktionen' },
-  { to: '/accounts', icon: Building2, label: 'Konten' },
-  { section: 'Planung' },
-  { to: '/budgets', icon: Target, label: 'Budgets' },
-  { to: '/savings', icon: PiggyBank, label: 'Sparziele' },
-  { to: '/investments', icon: LineChart, label: 'Depot' },
-  { to: '/recurring', icon: Repeat, label: 'Wiederkehrend' },
-  { section: 'Verträge' },
-  { to: '/contracts', icon: FileText, label: 'Verträge', badge: 'Neu' },
-  { to: '/savings-potential', icon: Sparkles, label: 'Sparpotenzial' },
-  { section: 'Assistent' },
+// Zweistufige Modul-Navigation: Top-Level = Lebensbereiche, das
+// Finanz-Modul trägt seine Unterseiten als aufklappbare Gruppe.
+const MODULES: NavItem[] = [
+  { to: '/', end: true, icon: Home, label: 'Home' },
+  { to: '/calendar', icon: Calendar, label: 'Kalender' },
+  { to: '/tasks', icon: CheckSquare, label: 'Aufgaben' },
+  { to: '/recipes', icon: ChefHat, label: 'Rezepte' },
+  { to: '/meal-plan', icon: CalendarRange, label: 'Wochenplan' },
+  { to: '/lists', icon: ClipboardList, label: 'Listen' },
+  { to: '/notes', icon: StickyNote, label: 'Notizen' },
+  { to: '/trips', icon: Plane, label: 'Reisen' },
+  { to: '/documents', icon: FolderLock, label: 'Dokumente', badge: 'Neu' },
+  { to: '/habits', icon: Goal, label: 'Gewohnheiten', badge: 'Neu' },
   { to: '/assistant', icon: Bot, label: 'KI-Assistent', badge: 'Beta' },
-  { section: 'Konto' },
-  { to: '/settings', icon: Settings, label: 'Einstellungen' },
+];
+
+const FINANCE_SUB: NavItem[] = [
+  { to: '/finance', end: true, icon: LineChart, label: 'Übersicht' },
+  { to: '/finance/transactions', icon: ArrowLeftRight, label: 'Transaktionen' },
+  { to: '/finance/accounts', icon: Building2, label: 'Konten' },
+  { to: '/finance/budgets', icon: Target, label: 'Budgets' },
+  { to: '/finance/savings', icon: PiggyBank, label: 'Sparziele' },
+  { to: '/finance/investments', icon: LineChart, label: 'Depot' },
+  { to: '/finance/recurring', icon: Repeat, label: 'Wiederkehrend' },
+  { to: '/finance/contracts', icon: FileText, label: 'Verträge' },
+  { to: '/finance/savings-potential', icon: Sparkles, label: 'Sparpotenzial' },
 ];
 
 interface SidebarProps {
@@ -56,13 +75,42 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+function SidebarLink({ item, onClose, compact }: { item: NavItem; onClose: () => void; compact?: boolean }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onClose}
+      className={({ isActive }) => cn('nav-item', compact && 'py-1.5 text-[0.85rem]', isActive && 'active')}
+    >
+      <span className="ico grid w-5 place-items-center text-ink-3">
+        <item.icon className={compact ? 'h-4 w-4' : 'h-[18px] w-[18px]'} />
+      </span>
+      <span className="flex-1">{item.label}</span>
+      {item.badge && (
+        <span className="ml-auto rounded-pill bg-peach px-1.5 py-0.5 text-[0.7rem] font-bold text-navy">
+          {item.badge}
+        </span>
+      )}
+    </NavLink>
+  );
+}
+
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const confirm = useConfirm();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const financeActive = pathname.startsWith('/finance');
+  // Aufgeklappt, solange man im Finanz-Modul unterwegs ist; manuell umschaltbar.
+  const [financeOpen, setFinanceOpen] = useState(financeActive);
+  useEffect(() => {
+    if (financeActive) setFinanceOpen(true);
+  }, [financeActive]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -155,33 +203,40 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Nav */}
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {NAV.map((item, i) =>
-            item.section ? (
-              <div key={`s-${i}`} className="nav-section">
-                {item.section}
-              </div>
-            ) : (
-              <NavLink
-                key={item.to}
-                to={item.to!}
-                end={item.end}
-                onClick={onClose}
-                className={({ isActive }) => cn('nav-item', isActive && 'active')}
-              >
-                {item.icon && (
-                  <span className="ico grid w-5 place-items-center text-ink-3">
-                    <item.icon className="h-[18px] w-[18px]" />
-                  </span>
-                )}
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className="ml-auto rounded-pill bg-peach px-1.5 py-0.5 text-[0.7rem] font-bold text-navy">
-                    {item.badge}
-                  </span>
-                )}
-              </NavLink>
-            ),
+          <div className="nav-section">Module</div>
+          <SidebarLink item={MODULES[0]} onClose={onClose} />
+
+          {/* Finanzen: aufklappbare Modul-Gruppe */}
+          <button
+            onClick={() => setFinanceOpen((v) => !v)}
+            aria-expanded={financeOpen}
+            className={cn('nav-item w-full text-left', financeActive && !financeOpen && 'active')}
+          >
+            <span className="ico grid w-5 place-items-center text-ink-3">
+              <Wallet className="h-[18px] w-[18px]" />
+            </span>
+            <span className="flex-1">Finanzen</span>
+            <ChevronDown
+              className={cn('h-4 w-4 text-ink-3 transition-transform', financeOpen && 'rotate-180')}
+            />
+          </button>
+          {financeOpen && (
+            <div className="ml-3 flex flex-col gap-0.5 border-l border-line pl-2">
+              {FINANCE_SUB.map((item) => (
+                <SidebarLink key={item.to} item={item} onClose={onClose} compact />
+              ))}
+            </div>
           )}
+
+          {MODULES.slice(1).map((item) => (
+            <SidebarLink key={item.to} item={item} onClose={onClose} />
+          ))}
+
+          <div className="nav-section">Konto</div>
+          <SidebarLink
+            item={{ to: '/settings', icon: Settings, label: 'Einstellungen' }}
+            onClose={onClose}
+          />
         </nav>
 
         {/* Footer promo */}
@@ -198,7 +253,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             size="sm"
             className="mt-2.5"
             onClick={() => {
-              navigate('/contracts');
+              navigate('/finance/contracts');
               onClose();
             }}
           >

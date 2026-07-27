@@ -7,7 +7,10 @@ services:
   backend:
     build:
       target: production
-    volumes: !reset []
+    # Die Bind-Mounts der Entwicklung fallen weg – das Dokumenten-Volume
+    # bleibt, sonst wären hochgeladene Dateien nach jedem Deploy weg.
+    volumes: !reset
+      - documents_data:/app/data/documents
     restart: always
 
   frontend:

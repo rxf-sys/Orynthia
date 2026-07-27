@@ -1,0 +1,168 @@
+import { api } from '@/platform/api/client';
+import type {
+  BankAccount,
+  Budget,
+  Category,
+  Contract,
+  CreateAccountData,
+  CreateBudgetData,
+  CreateContractData,
+  CreateInvestmentData,
+  CreateRecurringPaymentData,
+  CreateSavingsGoalData,
+  CreateTransactionData,
+  DashboardData,
+  DetectedContract,
+  InvestmentsResponse,
+  MonthlyOverview,
+  PaginatedResult,
+  ProviderComparison,
+  RecurringPayment,
+  SavingsGoal,
+  Transaction,
+  TransactionFilters,
+} from './types';
+
+export interface ForecastResponse {
+  horizonDays: number;
+  startBalance: number;
+  endBalance: number;
+  lowestBalance: number;
+  lowestDate: string;
+  totalIn: number;
+  totalOut: number;
+  medianDailySpend: number;
+  points: Array<{
+    date: string;
+    projectedBalance: number;
+    scheduledIn: number;
+    scheduledOut: number;
+    estimatedVariableSpend: number;
+    items: Array<{ name: string; amount: number; source: 'recurring' | 'contract' }>;
+  }>;
+}
+
+export interface SavingsPotentialResponse {
+  totalFixedMonthly: number;
+  totalFixedYearly: number;
+  breakdown: { recurringMonthly: number; contractMonthly: number };
+  subscriptions: {
+    total: number;
+    count: number;
+    items: Array<{
+      id: string;
+      kind: 'contract' | 'recurring';
+      name: string;
+      provider: string;
+      contractType: string;
+      monthlyCost: number;
+      lastChargeDate?: string | null;
+    }>;
+  };
+  providerSavings: {
+    totalMonthly: number;
+    totalYearly: number;
+    topCandidates: ProviderComparison[];
+  };
+  overspendingCategories: Array<{
+    category?: { id: string; name: string; icon?: string; color?: string };
+    median: number;
+    currentMonth: number;
+    overBy: number;
+    overByPercent: number;
+  }>;
+}
+
+export const dashboardApi = {
+  getData: () => api.get<DashboardData>('/dashboard'),
+  getForecast: (days = 30) => api.get<ForecastResponse>('/dashboard/forecast', { params: { days } }),
+  getSavingsPotential: () => api.get<SavingsPotentialResponse>('/dashboard/savings-potential'),
+};
+
+export const accountsApi = {
+  getAll: () => api.get<BankAccount[]>('/accounts'),
+  getBalance: () => api.get<{ totalBalance: number; currency: string; accountCount: number }>('/accounts/balance'),
+  create: (data: CreateAccountData) => api.post<BankAccount>('/accounts', data),
+  update: (id: string, data: Partial<CreateAccountData>) => api.patch<BankAccount>(`/accounts/${id}`, data),
+  remove: (id: string) => api.delete(`/accounts/${id}`),
+};
+
+export const transactionsApi = {
+  getAll: (params?: TransactionFilters) => api.get<PaginatedResult<Transaction>>('/transactions', { params }),
+  getById: (id: string) => api.get<Transaction>(`/transactions/${id}`),
+  create: (data: CreateTransactionData) => api.post<Transaction>('/transactions', data),
+  update: (id: string, data: Partial<CreateTransactionData>) => api.patch<Transaction>(`/transactions/${id}`, data),
+  remove: (id: string) => api.delete(`/transactions/${id}`),
+  getExpensesByCategory: (params?: { startDate?: string; endDate?: string }) =>
+    api.get('/transactions/expenses-by-category', { params }),
+  getMonthlyOverview: (months?: number) =>
+    api.get<MonthlyOverview[]>('/transactions/monthly-overview', { params: { months } }),
+  exportCsv: (params?: TransactionFilters) =>
+    api.get('/transactions/export/csv', { params, responseType: 'blob' }),
+};
+
+export const categoriesApi = {
+  getAll: () => api.get<Category[]>('/categories'),
+  create: (data: { name: string; icon?: string; color?: string; keywords?: string[] }) =>
+    api.post<Category>('/categories', data),
+  update: (id: string, data: { name?: string; icon?: string; color?: string; keywords?: string[] }) =>
+    api.patch<Category>(`/categories/${id}`, data),
+  remove: (id: string) => api.delete(`/categories/${id}`),
+};
+
+export const bankingApi = {
+  getInstitutions: (country: string = 'DE') => api.get<{ id: string; name: string; bic?: string; logo?: string }[]>(`/banking/institutions?country=${country}`),
+  connectBank: (institutionId: string) => api.post<{ connectionId: string; authUrl: string }>('/banking/connect', { institutionId }),
+  handleCallback: (connectionId: string, code?: string) => api.post(`/banking/callback/${connectionId}`, { code }),
+  syncAccount: (accountId: string, dateFrom?: string) => api.post(`/banking/sync/${accountId}`, { dateFrom }),
+  syncAll: () => api.post('/banking/sync-all'),
+  getConnections: () => api.get('/banking/connections'),
+  removeConnection: (connectionId: string) => api.delete(`/banking/connections/${connectionId}`),
+};
+
+export const budgetsApi = {
+  getAll: () => api.get<Budget[]>('/budgets'),
+  create: (data: CreateBudgetData) => api.post<Budget>('/budgets', data),
+  update: (id: string, data: Partial<CreateBudgetData>) => api.patch<Budget>(`/budgets/${id}`, data),
+  remove: (id: string) => api.delete(`/budgets/${id}`),
+};
+
+export const recurringPaymentsApi = {
+  getAll: () => api.get<{ payments: RecurringPayment[]; monthlyTotal: number; yearlyTotal: number }>('/recurring-payments'),
+  create: (data: CreateRecurringPaymentData) => api.post<RecurringPayment>('/recurring-payments', data),
+  update: (id: string, data: Partial<CreateRecurringPaymentData & { isActive?: boolean }>) =>
+    api.patch<RecurringPayment>(`/recurring-payments/${id}`, data),
+  remove: (id: string) => api.delete(`/recurring-payments/${id}`),
+};
+
+export const savingsGoalsApi = {
+  getAll: () => api.get<SavingsGoal[]>('/savings-goals'),
+  create: (data: CreateSavingsGoalData) => api.post<SavingsGoal>('/savings-goals', data),
+  update: (id: string, data: Partial<CreateSavingsGoalData>) => api.patch<SavingsGoal>(`/savings-goals/${id}`, data),
+  addAmount: (id: string, amount: number) => api.post<SavingsGoal>(`/savings-goals/${id}/add`, { amount }),
+  remove: (id: string) => api.delete(`/savings-goals/${id}`),
+};
+
+export const contractsApi = {
+  getAll: () => api.get<{ contracts: Contract[]; totalMonthly: number; totalYearly: number }>('/contracts'),
+  create: (data: CreateContractData) => api.post<Contract>('/contracts', data),
+  update: (id: string, data: Partial<CreateContractData & { isActive?: boolean }>) =>
+    api.patch<Contract>(`/contracts/${id}`, data),
+  remove: (id: string) => api.delete(`/contracts/${id}`),
+  detect: () => api.get<DetectedContract[]>('/contracts/detect'),
+  createFromDetection: (data: {
+    counterpartName: string; counterpartIban?: string; avgAmount: number;
+    frequency: string; contractType: string; name?: string; provider?: string;
+  }) => api.post<Contract>('/contracts/from-detection', data),
+  compare: () => api.get<{ comparisons: ProviderComparison[]; totalSavingsMonthly: number; totalSavingsYearly: number }>('/contracts/compare'),
+};
+
+export const investmentsApi = {
+  getAll: () => api.get<InvestmentsResponse>('/investments'),
+  create: (data: CreateInvestmentData) => api.post<InvestmentsResponse['positions'][number]>('/investments', data),
+  update: (id: string, data: Partial<CreateInvestmentData>) =>
+    api.patch<InvestmentsResponse['positions'][number]>(`/investments/${id}`, data),
+  updatePrice: (id: string, currentPrice: number) =>
+    api.post<InvestmentsResponse['positions'][number]>(`/investments/${id}/price`, { currentPrice }),
+  remove: (id: string) => api.delete(`/investments/${id}`),
+};

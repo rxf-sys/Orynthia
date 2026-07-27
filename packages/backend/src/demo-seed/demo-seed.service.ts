@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../platform/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 const DEMO_EMAIL = 'demo@orynthia.local';
@@ -193,6 +193,8 @@ export class DemoSeedService implements OnModuleInit {
           billingCycle: 'MONTHLY',
           autoRenewal: true,
           startDate: addMonths(new Date(), -22),
+          cancellationDate: addDays(new Date(), 21),
+          noticePeriod: '3 Monate',
           counterpartName: 'Telekom Deutschland',
         },
       ],
@@ -239,9 +241,335 @@ export class DemoSeedService implements OnModuleInit {
       ],
     });
 
+    // ---------- Aufgaben ----------
+    const errandsList = await this.prisma.taskList.create({
+      data: { userId: user.id, name: 'Haushalt', color: '#1f8a5b' },
+    });
+    await this.prisma.task.createMany({
+      data: [
+        {
+          userId: user.id,
+          title: 'Stromzähler ablesen',
+          priority: 'MEDIUM',
+          taskListId: errandsList.id,
+          dueAt: addDays(new Date(), 2),
+        },
+        {
+          userId: user.id,
+          title: 'Steuererklärung vorbereiten',
+          notes: 'Belege aus dem Ordner „Finanzen 2025“ heraussuchen',
+          priority: 'HIGH',
+          dueAt: addDays(new Date(), 7),
+        },
+        {
+          userId: user.id,
+          title: 'Miete überweisen',
+          priority: 'HIGH',
+          recurrence: 'MONTHLY',
+          dueAt: nextMonthStart(),
+        },
+        {
+          userId: user.id,
+          title: 'Altglas wegbringen',
+          priority: 'LOW',
+          taskListId: errandsList.id,
+        },
+        {
+          userId: user.id,
+          title: 'Versicherungsvergleich prüfen',
+          completedAt: addDays(new Date(), -1),
+          dueAt: addDays(new Date(), -1),
+        },
+      ],
+    });
+
+    // ---------- Kalender ----------
+    const privateCal = await this.prisma.calendar.create({
+      data: { userId: user.id, name: 'Privat', color: '#5b8def', isDefault: true },
+    });
+    const workCal = await this.prisma.calendar.create({
+      data: { userId: user.id, name: 'Arbeit', color: '#fda481' },
+    });
+    const at = (daysFromNow: number, hour: number, minutes = 0) => {
+      const d = addDays(new Date(), daysFromNow);
+      d.setHours(hour, minutes, 0, 0);
+      return d;
+    };
+    await this.prisma.calendarEvent.createMany({
+      data: [
+        {
+          calendarId: privateCal.id,
+          title: 'Zahnarzt',
+          location: 'Praxis Dr. Sommer',
+          startsAt: at(1, 9, 30),
+          endsAt: at(1, 10, 15),
+          reminderMinutes: 60,
+        },
+        {
+          calendarId: workCal.id,
+          title: 'Team-Meeting',
+          startsAt: at(2, 10, 0),
+          endsAt: at(2, 11, 0),
+          recurrence: 'WEEKLY',
+          reminderMinutes: 15,
+        },
+        {
+          calendarId: privateCal.id,
+          title: 'Geburtstag Lena',
+          startsAt: at(5, 0, 0),
+          endsAt: at(5, 23, 59),
+          isAllDay: true,
+          recurrence: 'YEARLY',
+        },
+        {
+          calendarId: privateCal.id,
+          title: 'Sport',
+          startsAt: at(3, 18, 30),
+          endsAt: at(3, 20, 0),
+          recurrence: 'WEEKLY',
+        },
+      ],
+    });
+
+    // ---------- Rezepte ----------
+    const bolognese = await this.prisma.recipe.create({
+      data: {
+        userId: user.id,
+        title: 'Spaghetti Bolognese',
+        description: 'Klassiker für die ganze Familie – schmeckt aufgewärmt fast noch besser.',
+        prepMinutes: 15,
+        cookMinutes: 45,
+        servings: 4,
+        difficulty: 'EASY',
+        mealTypes: ['dinner'],
+        tags: ['klassiker', 'familienessen'],
+        instructions: [
+          'Zwiebeln und Knoblauch fein würfeln und in Olivenöl glasig dünsten.',
+          'Hackfleisch zugeben und krümelig anbraten.',
+          'Tomaten zugeben, salzen, pfeffern und 30 Minuten köcheln lassen.',
+          'Spaghetti nach Packungsangabe kochen und mit der Sauce servieren.',
+        ],
+        isFavorite: true,
+        ingredients: {
+          create: [
+            { name: 'Hackfleisch', amount: 500, unit: 'g', sortOrder: 0 },
+            { name: 'Passierte Tomaten', amount: 800, unit: 'g', sortOrder: 1 },
+            { name: 'Zwiebeln', amount: 2, unit: 'Stück', sortOrder: 2 },
+            { name: 'Knoblauchzehen', amount: 2, unit: 'Stück', sortOrder: 3 },
+            { name: 'Spaghetti', amount: 500, unit: 'g', sortOrder: 4 },
+            { name: 'Olivenöl', sortOrder: 5 },
+          ],
+        },
+      },
+    });
+    const porridge = await this.prisma.recipe.create({
+      data: {
+        userId: user.id,
+        title: 'Porridge mit Beeren',
+        description: 'Schnelles Frühstück, das lange satt hält.',
+        prepMinutes: 5,
+        cookMinutes: 10,
+        servings: 2,
+        difficulty: 'EASY',
+        mealTypes: ['breakfast'],
+        dietary: ['vegetarian'],
+        tags: ['schnell'],
+        instructions: [
+          'Haferflocken mit Milch aufkochen und 5 Minuten quellen lassen.',
+          'Mit Beeren und Honig anrichten.',
+        ],
+        ingredients: {
+          create: [
+            { name: 'Haferflocken', amount: 100, unit: 'g', sortOrder: 0 },
+            { name: 'Milch', amount: 400, unit: 'ml', sortOrder: 1 },
+            { name: 'Beerenmischung', amount: 150, unit: 'g', sortOrder: 2 },
+            { name: 'Honig', amount: 2, unit: 'EL', sortOrder: 3 },
+          ],
+        },
+      },
+    });
+
+    // ---------- Listen (inkl. Herkunft aus Rezept) ----------
+    await this.prisma.list.create({
+      data: {
+        userId: user.id,
+        name: 'Wocheneinkauf',
+        type: 'SHOPPING',
+        items: {
+          create: [
+            { name: 'Hackfleisch', amount: 500, unit: 'g', sortOrder: 0, recipeId: bolognese.id },
+            { name: 'Passierte Tomaten', amount: 800, unit: 'g', sortOrder: 1, recipeId: bolognese.id },
+            { name: 'Spaghetti', amount: 500, unit: 'g', sortOrder: 2, recipeId: bolognese.id },
+            { name: 'Kaffeebohnen', amount: 1, unit: 'kg', sortOrder: 3 },
+            { name: 'Spülmittel', sortOrder: 4, checked: true },
+          ],
+        },
+      },
+    });
+    await this.prisma.list.create({
+      data: {
+        userId: user.id,
+        name: 'Packliste Urlaub',
+        type: 'PACKING',
+        items: {
+          create: [
+            { name: 'Reisepass', sortOrder: 0 },
+            { name: 'Ladekabel', sortOrder: 1 },
+            { name: 'Sonnencreme', sortOrder: 2 },
+          ],
+        },
+      },
+    });
+
+    // ---------- Wochenplan (Rezepte ↔ Kalender/Einkauf) ----------
+    const planDay = (offset: number) => {
+      const d = addDays(new Date(), offset);
+      return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    };
+    await this.prisma.mealPlanEntry.createMany({
+      data: [
+        { userId: user.id, recipeId: bolognese.id, date: planDay(1), slot: 'DINNER', servings: 4 },
+        { userId: user.id, recipeId: porridge.id, date: planDay(1), slot: 'BREAKFAST', servings: 2 },
+        { userId: user.id, recipeId: porridge.id, date: planDay(3), slot: 'BREAKFAST', servings: 2 },
+        { userId: user.id, title: 'Essen gehen', date: planDay(5), slot: 'DINNER', servings: 2 },
+      ],
+    });
+
+    // ---------- Notizen ----------
+    await this.prisma.note.createMany({
+      data: [
+        {
+          userId: user.id,
+          title: 'WLAN Ferienwohnung',
+          content: 'Netz: Gardasee-Gast\nPasswort: siehe Ordner im Flur',
+          tags: ['urlaub'],
+          color: '#5b8def',
+          pinned: true,
+        },
+        {
+          userId: user.id,
+          title: 'Ideen fürs Wohnzimmer',
+          content: 'Regal umstellen, Pflanze für die Ecke, Lampe warmweiß tauschen',
+          tags: ['wohnen', 'ideen'],
+        },
+        {
+          userId: user.id,
+          content: 'Autoschlüssel-Ersatz liegt bei den Nachbarn.',
+          tags: ['wichtig'],
+        },
+      ],
+    });
+
+    // ---------- Gewohnheiten (mit Historie, damit Streaks sichtbar sind) ----------
+    const utcToday = (() => {
+      const now = new Date();
+      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    })();
+    const dayBefore = (offset: number) => new Date(utcToday - offset * 86_400_000);
+
+    const lesen = await this.prisma.habit.create({
+      data: {
+        userId: user.id,
+        title: '30 Minuten lesen',
+        notes: 'Abends statt Handy.',
+        frequency: 'DAILY',
+        color: '#5b8def',
+      },
+    });
+    const sport = await this.prisma.habit.create({
+      data: {
+        userId: user.id,
+        title: 'Sport',
+        frequency: 'WEEKLY',
+        targetPerPeriod: 3,
+        color: '#1f8a5b',
+      },
+    });
+    const wasser = await this.prisma.habit.create({
+      data: { userId: user.id, title: '2 Liter Wasser', frequency: 'DAILY', color: '#3aa3a5' },
+    });
+
+    await this.prisma.habitEntry.createMany({
+      data: [
+        // Lesen: lückenlose Serie seit gestern, heute noch offen
+        ...[1, 2, 3, 4, 5, 6].map((d) => ({ habitId: lesen.id, date: dayBefore(d) })),
+        // Sport: verteilt über die letzten drei Wochen
+        ...[1, 4, 6, 8, 11, 15, 18].map((d) => ({ habitId: sport.id, date: dayBefore(d) })),
+        // Wasser: heute bereits erledigt
+        ...[0, 1, 2, 4, 5].map((d) => ({ habitId: wasser.id, date: dayBefore(d) })),
+      ],
+    });
+
+    // ---------- Reise (Showcase: Termin + Packliste + Notiz) ----------
+    const tripStart = addDays(new Date(), 30);
+    const tripEnd = addDays(new Date(), 40);
+    const trip = await this.prisma.trip.create({
+      data: {
+        userId: user.id,
+        title: 'Sommerurlaub Italien',
+        destination: 'Gardasee',
+        startDate: new Date(Date.UTC(tripStart.getFullYear(), tripStart.getMonth(), tripStart.getDate())),
+        endDate: new Date(Date.UTC(tripEnd.getFullYear(), tripEnd.getMonth(), tripEnd.getDate())),
+        budgetAmount: 1800,
+        notes: 'Fähre nach Limone vorab buchen. Vignette für Österreich nicht vergessen.',
+      },
+    });
+    const packingList = await this.prisma.list.findFirst({
+      where: { userId: user.id, name: 'Packliste Urlaub' },
+    });
+    const wlanNote = await this.prisma.note.findFirst({
+      where: { userId: user.id, title: 'WLAN Ferienwohnung' },
+    });
+    const tripEvent = await this.prisma.calendarEvent.create({
+      data: {
+        calendarId: privateCal.id,
+        title: 'Abfahrt Italien',
+        startsAt: new Date(tripStart.setHours(6, 0, 0, 0)),
+        endsAt: new Date(new Date(tripStart).setHours(14, 0, 0, 0)),
+        reminderMinutes: 1440,
+      },
+    });
+    await this.prisma.entityLink.createMany({
+      data: [
+        ...(packingList
+          ? [
+              {
+                userId: user.id,
+                sourceType: 'TRIP' as const,
+                sourceId: trip.id,
+                targetType: 'LIST' as const,
+                targetId: packingList.id,
+              },
+            ]
+          : []),
+        ...(wlanNote
+          ? [
+              {
+                userId: user.id,
+                sourceType: 'TRIP' as const,
+                sourceId: trip.id,
+                targetType: 'NOTE' as const,
+                targetId: wlanNote.id,
+              },
+            ]
+          : []),
+        {
+          userId: user.id,
+          sourceType: 'TRIP' as const,
+          sourceId: trip.id,
+          targetType: 'CALENDAR_EVENT' as const,
+          targetId: tripEvent.id,
+        },
+      ],
+    });
+
     this.logger.log(
       `Demo-Daten angelegt: ${DEMO_EMAIL} / ${DEMO_PASSWORD} – ` +
-        `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, 4 wiederkehrende Zahlungen.`,
+        `3 Konten, ${txInputs.length} Transaktionen, ${budgets.length} Budgets, 3 Sparziele, 4 Verträge, ` +
+        `4 wiederkehrende Zahlungen, 5 Aufgaben, 2 Kalender mit 5 Terminen, 2 Rezepte, 2 Listen, ` +
+        `4 Wochenplan-Einträge, 3 Notizen, 3 Gewohnheiten mit Historie, ` +
+        `1 Reise mit 3 Verknüpfungen. Dokumente werden bewusst nicht geseedet – ` +
+        `sie liegen als verschlüsselte Dateien außerhalb der Datenbank.`,
     );
   }
 

@@ -1,0 +1,120 @@
+import * as crypto from 'crypto';
+import { Logger } from '@nestjs/common';
+
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 12;
+const TAG_LENGTH = 16;
+const KEY_BYTES = 32;
+
+let cachedKey: Buffer | null = null;
+
+function loadKey(): Buffer {
+  if (cachedKey) return cachedKey;
+
+  const raw = process.env.ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error(
+      'ENCRYPTION_KEY ist nicht gesetzt. Bitte 64 Hex-Zeichen (256 Bit) in der .env hinterlegen.',
+    );
+  }
+
+  let key: Buffer;
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+    // Optimal: 64 Hex-Zeichen = 32 Byte AES-256-Key
+    key = Buffer.from(raw, 'hex');
+  } else if (raw.length === KEY_BYTES) {
+    // Akzeptiert: 32 ASCII-Zeichen werden als UTF-8-Bytes interpretiert.
+    key = Buffer.from(raw, 'utf8');
+  } else {
+    // Fallback für nicht-konforme Längen: SHA-256-Hash des Inputs als 32-Byte-Key.
+    // Sicherheit ist nur so gut wie die Entropie des Original-Strings — bitte
+    // mit `openssl rand -hex 32` einen korrekten Key generieren.
+    new Logger('Encryption').warn(
+      `ENCRYPTION_KEY hat ungewöhnliche Länge (${raw.length}). ` +
+        'Fallback: SHA-256-Hash des Inputs wird als Key verwendet. ' +
+        'Empfohlen: `openssl rand -hex 32` in .env eintragen.',
+    );
+    key = crypto.createHash('sha256').update(raw, 'utf8').digest();
+  }
+
+  if (key.length !== KEY_BYTES) {
+    throw new Error(`ENCRYPTION_KEY muss exakt ${KEY_BYTES} Bytes ergeben.`);
+  }
+
+  cachedKey = key;
+  return key;
+}
+
+/** Verschlüsselt einen String. Ausgabeformat: base64(iv | tag | ciphertext). */
+export function encrypt(plaintext: string): string {
+  if (plaintext === '' || plaintext == null) {
+    throw new Error('encrypt(): plaintext darf nicht leer sein.');
+  }
+  const key = loadKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, ciphertext]).toString('base64');
+}
+
+/** Entschlüsselt einen vorher per `encrypt()` erzeugten Wert. */
+export function decrypt(payload: string): string {
+  if (!payload) {
+    throw new Error('decrypt(): payload darf nicht leer sein.');
+  }
+  const key = loadKey();
+  const buf = Buffer.from(payload, 'base64');
+  if (buf.length < IV_LENGTH + TAG_LENGTH + 1) {
+    throw new Error('decrypt(): payload zu kurz oder beschädigt.');
+  }
+  const iv = buf.subarray(0, IV_LENGTH);
+  const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const ciphertext = buf.subarray(IV_LENGTH + TAG_LENGTH);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+}
+
+/**
+ * Verschlüsselt beliebige Binärdaten (z. B. hochgeladene Dokumente).
+ * Ausgabeformat identisch zu `encrypt()`: iv | tag | ciphertext – hier
+ * aber als Buffer, damit große Dateien nicht durch base64 aufgebläht werden.
+ */
+export function encryptBuffer(plaintext: Buffer): Buffer {
+  const key = loadKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]);
+}
+
+/** Gegenstück zu `encryptBuffer()`; wirft bei manipulierten Daten (GCM-Tag). */
+export function decryptBuffer(payload: Buffer): Buffer {
+  if (payload.length < IV_LENGTH + TAG_LENGTH) {
+    throw new Error('decryptBuffer(): payload zu kurz oder beschädigt.');
+  }
+  const key = loadKey();
+  const iv = payload.subarray(0, IV_LENGTH);
+  const tag = payload.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const ciphertext = payload.subarray(IV_LENGTH + TAG_LENGTH);
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
+
+/** True, wenn der Wert wie ein per encrypt() produzierter base64-Blob aussieht (>= 29 Bytes nach base64-Decode). */
+export function isEncrypted(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const buf = Buffer.from(value, 'base64');
+    return buf.length >= IV_LENGTH + TAG_LENGTH + 1 && /^[A-Za-z0-9+/=]+$/.test(value);
+  } catch {
+    return false;
+  }
+}
+
+/** Test-Hook — nur in Tests verwenden. */
+export function __resetKeyCacheForTests() {
+  cachedKey = null;
+}

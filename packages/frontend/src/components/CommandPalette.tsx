@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
+  Home,
+  Wallet,
+  Calendar,
+  CheckSquare,
+  ChefHat,
+  ClipboardList,
+  StickyNote,
+  Plane,
+  FolderLock,
+  Goal,
+  Loader2,
   LayoutDashboard,
   ArrowLeftRight,
   Building2,
@@ -17,6 +29,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { searchApi, type SearchHit } from '@/platform/api/search';
 
 interface Command {
   id: string;
@@ -27,18 +40,39 @@ interface Command {
 }
 
 const NAV_COMMANDS: Command[] = [
-  { id: 'nav-dashboard', label: 'Dashboard', icon: LayoutDashboard, run: (n) => n('/') },
-  { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/transactions') },
-  { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/accounts') },
-  { id: 'nav-budgets', label: 'Budgets', icon: Target, run: (n) => n('/budgets') },
-  { id: 'nav-savings', label: 'Sparziele', icon: PiggyBank, run: (n) => n('/savings') },
-  { id: 'nav-investments', label: 'Depot', icon: LineChart, run: (n) => n('/investments') },
-  { id: 'nav-recurring', label: 'Wiederkehrende Zahlungen', icon: Repeat, run: (n) => n('/recurring') },
-  { id: 'nav-contracts', label: 'Verträge', icon: FileText, run: (n) => n('/contracts') },
-  { id: 'nav-savings-potential', label: 'Sparpotenzial', icon: Sparkles, run: (n) => n('/savings-potential') },
+  { id: 'nav-home', label: 'Home', icon: Home, run: (n) => n('/') },
+  { id: 'nav-finance', label: 'Finanzen', icon: Wallet, run: (n) => n('/finance') },
+  { id: 'nav-calendar', label: 'Kalender', icon: Calendar, run: (n) => n('/calendar') },
+  { id: 'nav-tasks', label: 'Aufgaben', icon: CheckSquare, run: (n) => n('/tasks') },
+  { id: 'nav-recipes', label: 'Rezepte', icon: ChefHat, run: (n) => n('/recipes') },
+  { id: 'nav-meal-plan', label: 'Wochenplan', icon: ChefHat, run: (n) => n('/meal-plan') },
+  { id: 'nav-lists', label: 'Listen', icon: ClipboardList, run: (n) => n('/lists') },
+  { id: 'nav-notes', label: 'Notizen', icon: StickyNote, run: (n) => n('/notes') },
+  { id: 'nav-trips', label: 'Reisen', icon: Plane, run: (n) => n('/trips') },
+  { id: 'nav-documents', label: 'Dokumente', icon: FolderLock, run: (n) => n('/documents') },
+  { id: 'nav-habits', label: 'Gewohnheiten', icon: Goal, run: (n) => n('/habits') },
+  { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
+  { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },
+  { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/finance/accounts') },
+  { id: 'nav-budgets', label: 'Budgets', icon: Target, run: (n) => n('/finance/budgets') },
+  { id: 'nav-savings', label: 'Sparziele', icon: PiggyBank, run: (n) => n('/finance/savings') },
+  { id: 'nav-investments', label: 'Depot', icon: LineChart, run: (n) => n('/finance/investments') },
+  { id: 'nav-recurring', label: 'Wiederkehrende Zahlungen', icon: Repeat, run: (n) => n('/finance/recurring') },
+  { id: 'nav-contracts', label: 'Verträge', icon: FileText, run: (n) => n('/finance/contracts') },
+  { id: 'nav-savings-potential', label: 'Sparpotenzial', icon: Sparkles, run: (n) => n('/finance/savings-potential') },
   { id: 'nav-assistant', label: 'KI-Assistent', icon: Bot, run: (n) => n('/assistant') },
   { id: 'nav-settings', label: 'Einstellungen', icon: Settings, run: (n) => n('/settings') },
 ];
+
+const MODULE_ICON: Record<SearchHit['module'], LucideIcon> = {
+  tasks: CheckSquare,
+  calendar: Calendar,
+  recipes: ChefHat,
+  lists: ClipboardList,
+  notes: StickyNote,
+  trips: Plane,
+  documents: FolderLock,
+};
 
 interface CommandPaletteProps {
   open: boolean;
@@ -52,22 +86,47 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // Tippen entkoppeln: erst nach kurzer Pause suchen, damit nicht jede
+  // Eingabe sofort einen Request auslöst.
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 200);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: hits, isFetching } = useQuery({
+    queryKey: ['global-search', debounced],
+    queryFn: () => searchApi.query(debounced).then((r) => r.data),
+    enabled: open && debounced.length >= 2,
+    staleTime: 30_000,
+  });
+
   const commands = useMemo(() => {
     const q = query.trim().toLowerCase();
     const nav = q
       ? NAV_COMMANDS.filter((c) => c.label.toLowerCase().includes(q))
       : NAV_COMMANDS;
     if (!q) return nav;
+
+    // Modulübergreifende Treffer (Aufgaben, Termine, Rezepte, Listen)
+    const moduleHits: Command[] = (hits ?? []).map((hit) => ({
+      id: `hit-${hit.module}-${hit.id}`,
+      label: hit.title,
+      hint: hit.subtitle,
+      icon: MODULE_ICON[hit.module],
+      run: (n) => n(hit.to),
+    }));
+
     // Freitext zusätzlich als Transaktionssuche anbieten
     const txSearch: Command = {
       id: 'tx-search',
       label: `Transaktionen durchsuchen: „${query.trim()}“`,
       hint: 'Enter',
       icon: Search,
-      run: (n) => n(`/transactions?search=${encodeURIComponent(query.trim())}`),
+      run: (n) => n(`/finance/transactions?search=${encodeURIComponent(query.trim())}`),
     };
-    return [txSearch, ...nav];
-  }, [query]);
+    return [...moduleHits, txSearch, ...nav];
+  }, [query, hits]);
 
   const runCommand = useCallback(
     (cmd: Command) => {
@@ -138,13 +197,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Seite öffnen oder Transaktionen durchsuchen…"
+            placeholder="Suchen: Aufgaben, Termine, Rezepte, Listen…"
             className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-4"
             role="combobox"
             aria-expanded="true"
             aria-controls="command-palette-list"
             aria-activedescendant={commands[activeIndex] ? `cmd-${commands[activeIndex].id}` : undefined}
           />
+          {isFetching && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-ink-3" />}
           <kbd className="rounded border border-line px-1.5 py-0.5 text-[0.7rem] text-ink-3">Esc</kbd>
         </div>
         <ul

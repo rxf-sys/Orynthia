@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Home,
+  Wallet,
+  Calendar,
+  CheckSquare,
+  ChefHat,
+  ClipboardList,
+  StickyNote,
+  Plane,
+  FolderLock,
+  Goal,
   ArrowLeftRight,
   Target,
   PiggyBank,
@@ -27,18 +36,28 @@ interface Tab {
 
 const TABS: Tab[] = [
   { to: '/', label: 'Home', icon: Home, end: true },
-  { to: '/transactions', label: 'Tx', icon: ArrowLeftRight },
-  { to: '/budgets', label: 'Budget', icon: Target },
-  { to: '/savings', label: 'Sparen', icon: PiggyBank },
+  { to: '/finance', label: 'Finanzen', icon: Wallet },
+  { to: '/calendar', label: 'Kalender', icon: Calendar },
+  { to: '/tasks', label: 'Aufgaben', icon: CheckSquare },
 ];
 
 // Bereiche, die keinen eigenen Tab haben — erreichbar über das "Mehr"-Sheet.
 const MORE_ITEMS: Tab[] = [
-  { to: '/accounts', label: 'Konten', icon: Building2 },
-  { to: '/investments', label: 'Depot', icon: LineChart },
-  { to: '/recurring', label: 'Wiederkehrend', icon: Repeat },
-  { to: '/contracts', label: 'Verträge', icon: FileText },
-  { to: '/savings-potential', label: 'Sparpotenzial', icon: Sparkles },
+  { to: '/recipes', label: 'Rezepte', icon: ChefHat },
+  { to: '/meal-plan', label: 'Wochenplan', icon: ChefHat },
+  { to: '/lists', label: 'Listen', icon: ClipboardList },
+  { to: '/notes', label: 'Notizen', icon: StickyNote },
+  { to: '/trips', label: 'Reisen', icon: Plane },
+  { to: '/documents', label: 'Dokumente', icon: FolderLock },
+  { to: '/habits', label: 'Gewohnheiten', icon: Goal },
+  { to: '/finance/transactions', label: 'Transaktionen', icon: ArrowLeftRight },
+  { to: '/finance/accounts', label: 'Konten', icon: Building2 },
+  { to: '/finance/budgets', label: 'Budgets', icon: Target },
+  { to: '/finance/savings', label: 'Sparziele', icon: PiggyBank },
+  { to: '/finance/investments', label: 'Depot', icon: LineChart },
+  { to: '/finance/recurring', label: 'Wiederkehrend', icon: Repeat },
+  { to: '/finance/contracts', label: 'Verträge', icon: FileText },
+  { to: '/finance/savings-potential', label: 'Sparpotenzial', icon: Sparkles },
   { to: '/assistant', label: 'KI-Assistent', icon: Bot },
   { to: '/settings', label: 'Einstellungen', icon: Settings },
 ];
