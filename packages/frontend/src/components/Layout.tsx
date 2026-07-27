@@ -23,9 +23,11 @@ export function Layout() {
         <OfflineBanner />
         <Header onMenuClick={() => setSidebarOpen(true)} />
 
+        {/* Volle Breite: der Inhalt nutzt den ganzen Bildschirm, nur die
+            Innenabstände wachsen auf großen Displays mit. */}
         <main
           id="main-content"
-          className="mx-auto w-full max-w-[1480px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7"
+          className="w-full min-w-0 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7 2xl:px-12"
         >
           <Outlet />
         </main>

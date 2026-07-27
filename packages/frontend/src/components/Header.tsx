@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { Menu, Search, HelpCircle, Plus, Sun, Moon } from 'lucide-react';
+import { Menu, Search, HelpCircle, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useThemeStore } from '@/stores/themeStore';
 import { cn } from '@/lib/utils';
-import { Btn, IconBtn } from './ui/Btn';
+import { IconBtn } from './ui/Btn';
 import { NotificationBell } from './NotificationBell';
 import { CommandPalette } from './CommandPalette';
 import { useCommandPalette } from './useCommandPalette';
@@ -26,6 +26,8 @@ const TITLE_MAP: Record<string, string> = {
   '/lists': 'Listen',
   '/notes': 'Notizen',
   '/trips': 'Reisen',
+  '/documents': 'Dokumente',
+  '/habits': 'Gewohnheiten',
   '/assistant': 'KI-Assistent',
   '/settings': 'Einstellungen',
 };
@@ -108,16 +110,6 @@ export function Header({ onMenuClick }: HeaderProps) {
         onClick={() => navigate('/assistant')}
       />
       <NotificationBell />
-
-      <Btn
-        variant="grad"
-        size="sm"
-        icon={Plus}
-        onClick={() => navigate('/transactions')}
-        className="hidden sm:inline-flex"
-      >
-        Neu
-      </Btn>
 
       <CommandPalette open={open} onClose={closePalette} />
     </header>

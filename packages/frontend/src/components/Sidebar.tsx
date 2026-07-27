@@ -30,7 +30,6 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
-import { Btn } from './ui/Btn';
 import { Avatar } from './ui/Avatar';
 import { useConfirm } from './ui/useConfirm';
 
@@ -238,28 +237,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             onClose={onClose}
           />
         </nav>
-
-        {/* Footer promo */}
-        <div
-          className="mt-3 overflow-hidden rounded-lg border border-line p-3.5"
-          style={{ background: 'var(--grad-soft)' }}
-        >
-          <div className="text-sm font-bold text-ink">Sparpotential entdecken</div>
-          <div className="mt-1 text-xs leading-snug text-ink-3">
-            Wir helfen dir, bei Verträgen und Abos zu sparen.
-          </div>
-          <Btn
-            variant="grad"
-            size="sm"
-            className="mt-2.5"
-            onClick={() => {
-              navigate('/finance/contracts');
-              onClose();
-            }}
-          >
-            Ansehen
-          </Btn>
-        </div>
 
         {/* User row */}
         <div ref={menuRef} className="relative mt-3">
