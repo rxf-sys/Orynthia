@@ -355,10 +355,15 @@ function TripsWidget() {
     queryFn: () => tripsApi.getAll().then((r) => r.data),
   });
 
-  // Nur bevorstehende bzw. laufende Reisen sind auf dem Home relevant
+  // Nur bevorstehende bzw. laufende Reisen sind auf dem Home relevant –
+  // und zwar die nächste zuerst. Die Liste selbst sortiert absteigend,
+  // weil dort auch vergangene Reisen stehen.
   const upcoming = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return (trips ?? []).filter((t) => t.endDate.slice(0, 10) >= today).slice(0, 3);
+    return (trips ?? [])
+      .filter((t) => t.endDate.slice(0, 10) >= today)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .slice(0, 3);
   }, [trips]);
 
   return (
