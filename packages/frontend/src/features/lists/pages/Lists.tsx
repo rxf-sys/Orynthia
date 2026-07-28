@@ -199,13 +199,17 @@ export function ListsPage() {
             </Btn>
           </form>
 
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+          {/* Umbruchfähig: auf schmalen Displays rutschen die Aktionen in
+              die nächste Zeile, statt die Seite breiter zu machen. */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex min-w-0 items-center gap-2 text-sm font-bold text-ink">
               <span aria-hidden>{list.icon ?? LIST_TYPE_ICON[list.type]}</span>
-              {list.name}
-              <span className="text-xs font-medium text-ink-3">{LIST_TYPE_LABEL[list.type]}</span>
+              <span className="truncate">{list.name}</span>
+              <span className="shrink-0 text-xs font-medium text-ink-3">
+                {LIST_TYPE_LABEL[list.type]}
+              </span>
             </h2>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {checked.length > 0 && list.type === 'SHOPPING' && (
                 <Btn variant="ghost" size="sm" icon={Receipt} onClick={() => setExpenseOpen(true)}>
                   Als Ausgabe erfassen

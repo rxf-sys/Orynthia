@@ -91,6 +91,18 @@
     margin: 0;
     padding: 0;
   }
+  /*
+   * Grid-Items haben per Default min-width:auto und schrumpfen damit nie
+   * unter ihre min-content-Breite. Ein einziges langes Wort in einer Karte
+   * sprengt so die Spalte und mit ihr die Seite – auf schmalen Displays
+   * entsteht horizontales Scrollen. min-width:0 erlaubt das Schrumpfen; wo
+   * eine Mindestbreite gewollt ist, wird sie per Utility gesetzt und
+   * gewinnt gegen diese Regel (gleiche Spezifität, später im Stylesheet).
+   */
+  .grid > * {
+    min-width: 0;
+  }
+
   body {
     background: var(--bg);
     color: var(--text);
