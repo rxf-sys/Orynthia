@@ -8,6 +8,8 @@ import { LinksModule } from '../../platform/links/links.module';
   imports: [LinksModule],
   controllers: [DocumentsController],
   providers: [DocumentsService, DocumentStorageService],
-  exports: [DocumentsService],
+  // Der Storage wird zusätzlich vom Demo-Seed genutzt, damit auch
+  // Demo-Dokumente denselben Verschlüsselungsweg nehmen.
+  exports: [DocumentsService, DocumentStorageService],
 })
 export class DocumentsModule {}
