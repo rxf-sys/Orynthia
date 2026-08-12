@@ -2,8 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Farbsystem mit drei strikt getrennten Achsen:
+ *   1. Status   – aus dem Datenwert abgeleitet, sitzt auf Fläche + Icon
+ *   2. Kategorial – wertfrei, nur zur Unterscheidung (kein Grün, kein Rot)
+ *   3. Nutzerfarbe – ausschließlich auf einer Kante oder einem Punkt
+ * Details und Ableitungsregeln: src/lib/status.ts
+ */
 :root {
-  /* Brand */
+  /* Marke: Peach bleibt im Set, aber nur noch für „Neu“/„Beta“-Badges
+     und die Streak-Flamme – nicht mehr als Flächen- oder Gradient-Akzent. */
   --indigo: #37415c;
   --navy: #181a2f;
   --peach: #fda481;
@@ -11,78 +19,111 @@
   --peach-press: #fc8b60;
   --indigo-soft: #5e6a8c;
 
-  /* Semantic — LIGHT (warmes Off-White wie das RMM-Light-Theme) */
-  --bg: #f4f1ee;
+  /* Primärakzent: Violett → Azur */
+  --violet: #6a48f5;
+  --azure: #1e6ef0;
+
+  /* Semantic — LIGHT. Neutrales Off-White statt des warmen #f4f1ee:
+     gegen die kühlen Akzente wirkt ein Warmton schmutzig. */
+  --bg: #f3f4f8;
   --bg-elev: #ffffff;
-  --bg-sunken: #eae6e1;
-  --bg-soft: #f9f7f4;
-  --line: #e4e0da;
-  --line-2: #efece6;
-  --text: #1d2438;
+  --bg-sunken: #e7e9f0;
+  --bg-soft: #f6f7fb;
+  --line: #e3e5ec;
+  --line-2: #edeef4;
+  --text: #171a24;
   --text-2: #414b68;
-  --text-3: #808aa5;
-  --text-4: #adb3c6;
-  --primary: var(--indigo);
-  --primary-2: var(--navy);
-  --accent: var(--peach);
-  --accent-press: var(--peach-press);
+  --text-3: #737d99;
+  --text-4: #9aa0b4;
+  --primary: var(--violet);
+  --primary-2: var(--azure);
+  --accent: var(--violet);
+  --accent-press: #5a3ae0;
 
-  /* Status (neg = Crimson #b4182d aus der Uxintace-sunset-Palette) */
-  --pos: #1f8a5b;
-  --pos-bg: #e3f3ec;
-  --neg: #b4182d;
-  --neg-bg: #f9e4e6;
-  --warn: #b5780f;
-  --warn-bg: #fcf1d8;
+  /* Status */
+  --pos: #12855c;
+  --neg: #c01a2f;
+  --warn: #a86c0c;
   --info: #2a6fdb;
-  --info-bg: #e2ecfb;
+  --idle: #9aa0b4;
 
-  /* Category swatches */
-  --cat-1: #37415c;
-  --cat-2: #fda481;
-  --cat-3: #5b8def;
-  --cat-4: #1f8a5b;
+  /* Category swatches – wertfrei, gespiegelt aus lib/categoryColors.ts */
+  --cat-1: #7c5cff;
+  --cat-2: #2f7dff;
+  --cat-3: #3aa3a5;
+  --cat-4: #8a92ab;
   --cat-5: #b97aff;
-  --cat-6: #e76b8d;
-  --cat-7: #3aa3a5;
-  --cat-8: #d99a2b;
+  --cat-6: #4d6bd8;
+  --cat-7: #5f7f9c;
+  --cat-8: #6f5aa8;
 
   /* Gradients */
-  --grad-brand: linear-gradient(135deg, var(--indigo), var(--peach));
-  --grad-brand-90: linear-gradient(90deg, var(--indigo), var(--peach));
-  --grad-hero: linear-gradient(135deg, var(--navy) 0%, var(--indigo) 65%, var(--peach) 110%);
-  --grad-soft: linear-gradient(135deg, #efeef6 0%, #fdebdf 100%);
+  --grad-brand: linear-gradient(135deg, #7c5cff, #2f7dff);
+  --grad-brand-90: linear-gradient(90deg, #7c5cff, #2f7dff);
+  --grad-hero: linear-gradient(135deg, #171a24 0%, #4733c9 62%, #2f7dff 110%);
+  --grad-soft: linear-gradient(135deg, #eef0fb 0%, #e6f0ff 100%);
 
   /* Shadow */
-  --shadow-1: 0 1px 0 rgba(24, 26, 47, 0.04), 0 6px 18px rgba(24, 26, 47, 0.06);
-  --shadow-2: 0 1px 0 rgba(24, 26, 47, 0.04), 0 14px 32px rgba(24, 26, 47, 0.1);
-  --shadow-btn: 0 4px 12px rgba(55, 65, 92, 0.18);
+  --shadow-1: 0 1px 0 rgba(23, 26, 36, 0.04), 0 6px 18px rgba(23, 26, 36, 0.06);
+  --shadow-2: 0 1px 0 rgba(23, 26, 36, 0.04), 0 14px 32px rgba(23, 26, 36, 0.1);
+  --shadow-btn: 0 4px 14px rgba(124, 92, 255, 0.35);
+  --shadow-overlay: 0 30px 80px rgba(0, 0, 0, 0.25);
+  --shadow-tooltip: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 [data-theme='dark'] {
-  --bg: #121424;
-  --bg-elev: #1b1f33;
-  --bg-sunken: #0d0f1c;
-  --bg-soft: #222840;
-  --line: #2e3450;
-  --line-2: #262c44;
+  --violet: #7c5cff;
+  --azure: #2f7dff;
+
+  --bg: #0f1118;
+  --bg-elev: #171a24;
+  --bg-sunken: #08090d;
+  --bg-soft: #1e2231;
+  --line: #272c3c;
+  --line-2: #20242f;
   --text: #eef0f6;
   --text-2: #c4cadc;
   --text-3: #8a92ab;
   --text-4: #5c6480;
+  --accent-press: #6b4bea;
+  /* Ohne eigene Dark-Variante bliebe hier die helle Fläche stehen und
+     der Text darauf wäre unlesbar. */
+  --grad-soft: linear-gradient(135deg, #1d2133 0%, #1a2438 100%);
+  --grad-hero: linear-gradient(135deg, #10121a 0%, #3a2da8 62%, #1f5fd0 110%);
 
   /* Statusfarben heller als im Light-Theme, sonst saufen sie auf dunklem Grund ab */
-  --pos: #34b27d;
-  --pos-bg: #143226;
-  --neg: #e05a6b;
-  --neg-bg: #331520;
-  --warn: #e0a13d;
-  --warn-bg: #332617;
+  --pos: #22c58a;
+  --neg: #f2596b;
+  --warn: #f0a93a;
   --info: #5d96ef;
-  --info-bg: #152744;
+  --idle: #5c6480;
 
   --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 2px 0 rgba(0, 0, 0, 0.4), 0 14px 32px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 30px 80px rgba(0, 0, 0, 0.6);
+  --shadow-tooltip: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * Status-Tints nach einer Formel statt als handgepflegte Hex-Paare: so
+ * bleiben Fläche und Rahmen automatisch zur Statusfarbe passend, in
+ * beiden Themes und auch wenn eine Statusfarbe später nachjustiert wird.
+ */
+:root,
+[data-theme='dark'] {
+  --pos-bg: color-mix(in oklab, var(--pos) 16%, transparent);
+  --neg-bg: color-mix(in oklab, var(--neg) 16%, transparent);
+  --warn-bg: color-mix(in oklab, var(--warn) 16%, transparent);
+  --info-bg: color-mix(in oklab, var(--info) 16%, transparent);
+  --idle-bg: color-mix(in oklab, var(--idle) 16%, transparent);
+  --violet-bg: color-mix(in oklab, var(--violet) 16%, transparent);
+
+  --pos-line: color-mix(in oklab, var(--pos) 38%, transparent);
+  --neg-line: color-mix(in oklab, var(--neg) 38%, transparent);
+  --warn-line: color-mix(in oklab, var(--warn) 38%, transparent);
+  --info-line: color-mix(in oklab, var(--info) 38%, transparent);
+  --idle-line: color-mix(in oklab, var(--idle) 38%, transparent);
+  --violet-line: color-mix(in oklab, var(--violet) 38%, transparent);
 }
 
 @layer base {
@@ -245,8 +286,8 @@
   }
   .input:focus,
   .select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(253, 164, 129, 0.25);
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--violet) 25%, transparent);
   }
   .label {
     @apply text-[0.78rem] font-semibold text-ink-2;
@@ -332,12 +373,41 @@
   .tnum {
     font-variant-numeric: tabular-nums;
   }
+  /*
+   * Statusfläche: Tint + passender Rahmen aus einer Variablen. Aufrufer
+   * setzen nur --s (die Statusfarbe), damit Fläche, Rahmen und Text
+   * garantiert zusammenpassen und nicht einzeln auseinanderlaufen.
+   */
+  .status-surface {
+    background: color-mix(in oklab, var(--s) 16%, transparent);
+    border-color: color-mix(in oklab, var(--s) 38%, transparent);
+    color: var(--s);
+  }
+  /* Überzogene Balken tragen zusätzlich eine Schraffur – nie nur Farbe. */
+  .hatched {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--s) 0 6px,
+      color-mix(in oklab, var(--s) 55%, #000) 6px 12px
+    );
+  }
   .h-display {
     font-family: 'Instrument Serif', Georgia, serif;
     font-style: italic;
     font-weight: 400;
     letter-spacing: -0.02em;
   }
+}
+
+/*
+ * Sichtbarer Fokusring auf allem, was per Tastatur erreichbar ist. Der
+ * Prototyp lässt das offen; ohne ihn ist die App per Tastatur unbedienbar,
+ * weil man nicht sieht, wo man steht.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+  border-radius: inherit;
 }
 
 /* Nutzerpräferenz "reduzierte Bewegung" respektieren */

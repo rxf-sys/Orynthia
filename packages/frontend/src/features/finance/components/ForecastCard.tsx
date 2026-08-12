@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -8,13 +8,17 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  ReferenceArea,
+  ReferenceDot,
   ReferenceLine,
 } from 'recharts';
 import { TrendingDown, TrendingUp, Loader2, CalendarClock, RefreshCw } from 'lucide-react';
 import { dashboardApi } from '../api';
 import { formatCurrency } from '@/lib/utils';
+import { FORECAST_BUFFER, forecastStatus, statusColor } from '@/lib/status';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 
 const RANGES: { id: number; label: string }[] = [
   { id: 30, label: '30 Tage' },
@@ -30,6 +34,17 @@ export function ForecastCard() {
     queryFn: () => dashboardApi.getForecast(days).then((r) => r.data),
     staleTime: 5 * 60_000,
   });
+
+  // Abgeleitet, nicht im Render gerechnet: Untergrenze des Risikobands und
+  // die Anzahl der Tage, an denen der Saldo unter den Puffer fällt.
+  const { riskFloor, riskDays } = useMemo(() => {
+    const points = data?.points ?? [];
+    const lowest = Math.min(0, ...points.map((p) => p.projectedBalance));
+    return {
+      riskFloor: lowest * 1.1 - 100,
+      riskDays: points.filter((p) => p.projectedBalance < FORECAST_BUFFER).length,
+    };
+  }, [data]);
 
   return (
     <Card>
@@ -84,25 +99,41 @@ export function ForecastCard() {
             <Tile label="Tagesdurchschnitt" value={data.medianDailySpend} suffix="/Tag" />
           </div>
 
-          <div className="mt-4 h-[200px]">
+          {riskDays > 0 && (
+            <div className="mt-4 flex items-center gap-2">
+              <StatusBadge
+                kind={forecastStatus(data.lowestBalance)}
+                label={`${riskDays} Risikotag${riskDays === 1 ? '' : 'e'}`}
+                size="sm"
+              />
+              <span className="text-[0.72rem] text-ink-3">
+                Tage unter der Puffergrenze von {formatCurrency(FORECAST_BUFFER)}
+              </span>
+            </div>
+          )}
+
+          <div className="mt-3 h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.points} margin={{ top: 8, right: 0, bottom: 0, left: -16 }}>
                 <defs>
                   <linearGradient id="forecastFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--indigo)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--indigo)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--violet)" stopOpacity={0.42} />
+                    <stop offset="100%" stopColor="var(--violet)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
+                {/* Achsenfarbe: das Token heißt --text-3. Vorher stand hier
+                    --ink-3 (der Tailwind-Name, keine CSS-Variable), womit die
+                    Ticks still auf die Default-Farbe zurückfielen. */}
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: 'var(--ink-3)', fontSize: 11 }}
+                  tick={{ fill: 'var(--text-3)', fontSize: 11 }}
                   tickFormatter={(d) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
                   interval="preserveStartEnd"
                   minTickGap={32}
                 />
                 <YAxis
-                  tick={{ fill: 'var(--ink-3)', fontSize: 11 }}
+                  tick={{ fill: 'var(--text-3)', fontSize: 11 }}
                   tickFormatter={(v) => `${Math.round(v / 100) / 10}k`}
                   width={48}
                 />
@@ -116,17 +147,95 @@ export function ForecastCard() {
                   labelFormatter={(d) => new Date(d).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}
                   formatter={(value: number) => [formatCurrency(value), 'Prognose']}
                 />
-                <ReferenceLine y={0} stroke="var(--neg)" strokeDasharray="3 3" />
+                {/* Risikoband: alles unterhalb der Puffergrenze. Als Fläche,
+                    damit die gefährdete Zone auch ohne Achsenlesen auffällt. */}
+                <ReferenceArea
+                  y1={riskFloor}
+                  y2={FORECAST_BUFFER}
+                  fill="var(--neg)"
+                  fillOpacity={0.16}
+                  ifOverflow="hidden"
+                />
+                {/* Puffergrenze gestrichelt, Nulllinie durchgezogen: zwei
+                    verschiedene Schwellen dürfen nicht gleich aussehen. */}
+                <ReferenceLine
+                  y={FORECAST_BUFFER}
+                  stroke="var(--warn)"
+                  strokeDasharray="5 5"
+                  label={{
+                    value: `Puffer ${formatCurrency(FORECAST_BUFFER)}`,
+                    // Links, damit das Label nicht auf der letzten
+                    // X-Achsen-Beschriftung liegt.
+                    position: 'insideBottomLeft',
+                    fill: 'var(--warn)',
+                    fontSize: 10,
+                  }}
+                />
+                <ReferenceLine y={0} stroke="var(--neg)" strokeWidth={1} />
                 <Area
                   type="monotone"
                   dataKey="projectedBalance"
-                  stroke="var(--indigo)"
-                  strokeWidth={2}
+                  stroke="var(--violet)"
+                  strokeWidth={2.5}
+                  // Prognostizierte Werte sind gestrichelt – sie sind
+                  // gerechnet, nicht gemessen.
+                  strokeDasharray="6 4"
                   fill="url(#forecastFill)"
+                />
+                {/* Nur der Punkt – benannt wird der Tiefstwert unter dem
+                    Chart, sonst wird das Label am rechten Rand abgeschnitten,
+                    wenn das Minimum ans Ende der Prognose fällt. */}
+                <ReferenceDot
+                  x={data.lowestDate}
+                  y={data.lowestBalance}
+                  r={4.5}
+                  fill={statusColor(forecastStatus(data.lowestBalance))}
+                  stroke="var(--bg-elev)"
+                  strokeWidth={2.5}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          {/* Legende: ohne sie sind gestrichelt/durchgezogen/Fläche nicht zu unterscheiden. */}
+          <div className="mt-2 flex flex-wrap items-center gap-4 text-[0.72rem] text-ink-3">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-4" style={{ background: 'var(--neg)' }} />
+              Nulllinie
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-4"
+                style={{ borderTop: '2px dashed var(--warn)' }}
+              />
+              Puffer {formatCurrency(FORECAST_BUFFER)}
+            </span>
+            {/* Nur zeigen, was auch gezeichnet ist. */}
+            {riskDays > 0 && (
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-4 rounded-sm"
+                  style={{ background: 'var(--neg-bg)', border: '1px solid var(--neg-line)' }}
+                />
+                Risikozone
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-4"
+                style={{ borderTop: '2.5px dashed var(--violet)' }}
+              />
+              Prognose
+            </span>
+          </div>
+
+          <p className="mt-1.5 text-xs text-ink-2 tnum">
+            Tiefstwert{' '}
+            <strong style={{ color: statusColor(forecastStatus(data.lowestBalance)) }}>
+              {formatCurrency(data.lowestBalance)}
+            </strong>{' '}
+            am {new Date(data.lowestDate).toLocaleDateString('de-DE')}
+          </p>
+
           {data.lowestBalance < 0 && (
             <p className="mt-3 rounded-md border border-neg/30 bg-soft p-3 text-xs text-ink-2">
               Achtung: Im prognostizierten Zeitraum wird dein Saldo am{' '}

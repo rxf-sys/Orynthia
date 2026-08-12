@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { investmentsApi } from '@/features/finance/api';
-import { formatCurrency, parseDecimal } from '@/lib/utils';
+import { formatCurrency, formatPercent, parseDecimal } from '@/lib/utils';
+import { positionStatus, statusColor } from '@/lib/status';
+import { pickCategoryColor } from '@/lib/categoryColors';
 import type { CreateInvestmentData, InvestmentPosition, InvestmentType } from '@/features/finance/types';
 import { Card, Btn, Field, PageHead, EmptyState, Modal, useConfirm } from '@/components/ui';
 
@@ -127,17 +129,17 @@ export function InvestmentsPage() {
           </div>
           <div
             className="tnum mt-2 text-[1.85rem] font-bold"
-            style={{ color: summary.totalGainLoss >= 0 ? 'var(--pos)' : 'var(--neg)' }}
+            style={{ color: statusColor(positionStatus(summary.totalGainLoss)) }}
           >
             {summary.totalGainLoss >= 0 ? '+' : ''}
             {formatCurrency(summary.totalGainLoss)}
           </div>
           <div
             className="mt-1 text-xs tnum"
-            style={{ color: summary.totalGainLoss >= 0 ? 'var(--pos)' : 'var(--neg)' }}
+            style={{ color: statusColor(positionStatus(summary.totalGainLoss)) }}
           >
             {summary.totalGainLossPercent >= 0 ? '+' : ''}
-            {summary.totalGainLossPercent}%
+            {formatPercent(summary.totalGainLossPercent, 2)}
           </div>
         </Card>
         <Card>
@@ -151,7 +153,7 @@ export function InvestmentsPage() {
               {allocation.slice(0, 4).map((a) => (
                 <div key={a.type} className="flex items-center justify-between text-xs">
                   <span className="text-ink-2">{TYPE_LABELS[a.type]}</span>
-                  <span className="tnum font-semibold text-ink">{a.percent}%</span>
+                  <span className="tnum font-semibold text-ink">{formatPercent(a.percent, 2)}</span>
                 </div>
               ))}
             </div>
@@ -300,8 +302,17 @@ function PositionRow({
 }) {
   const gain = pos.gainLoss;
   const positive = gain >= 0;
+  // Status je Position aus ihrem eigenen Ergebnis – nicht aus der Zeile
+  // oder einer Serienfarbe.
+  const status = positionStatus(gain);
   return (
     <div className="group flex flex-wrap items-center gap-3 border-b border-line px-4 py-3 last:border-0 hover:bg-soft sm:flex-nowrap sm:px-5">
+      {/* Kategoriefarbe sitzt als Kante an der Zeile, nie als Fläche. */}
+      <span
+        aria-hidden
+        className="hidden h-7 w-2 shrink-0 rounded-pill sm:block"
+        style={{ background: pickCategoryColor(pos.symbol) }}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="rounded-md border border-line bg-elev px-2 py-0.5 text-[0.7rem] font-bold text-ink-2 tnum">
@@ -316,16 +327,16 @@ function PositionRow({
             ` · Stand ${new Date(pos.lastPriceUpdate).toLocaleDateString('de-DE')}`}
         </div>
       </div>
-      <div className="w-32 text-right">
+      <div className="w-40 shrink-0 text-right">
         <div className="tnum text-sm font-bold text-ink">{formatCurrency(pos.currentValue)}</div>
         <div
           className="mt-0.5 flex items-center justify-end gap-0.5 text-[0.72rem] tnum"
-          style={{ color: positive ? 'var(--pos)' : 'var(--neg)' }}
+          style={{ color: statusColor(status) }}
         >
           {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
           {positive ? '+' : ''}
           {formatCurrency(gain)} ({positive ? '+' : ''}
-          {pos.gainLossPercent}%)
+          {formatPercent(pos.gainLossPercent, 2)})
         </div>
       </div>
       <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">

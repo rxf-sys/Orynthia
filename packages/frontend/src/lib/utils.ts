@@ -71,3 +71,12 @@ export function parseApiError(err: unknown, fallback = 'Unbekannter Fehler'): st
   const msg = Array.isArray(data?.message) ? data.message.join(', ') : data?.message;
   return msg || data?.error || e?.message || fallback;
 }
+
+/**
+ * Prozentangabe im de-DE-Satz: schmales, **geschütztes** Leerzeichen vor
+ * dem Zeichen (U+202F). Ein normales Leerzeichen würde umbrechen und die
+ * Zahl von ihrer Einheit trennen.
+ */
+export function formatPercent(value: number, digits = 0): string {
+  return `${value.toFixed(digits).replace('.', ',')} %`;
+}

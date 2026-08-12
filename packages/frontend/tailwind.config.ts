@@ -1,3 +1,12 @@
+import { CATEGORY_PALETTE } from './src/lib/categoryColors';
+
+// Eine Quelle für die kategoriale Skala: die Utilities cat-1…8 entstehen
+// aus derselben Liste, die auch pickCategoryColor() benutzt. Vorher lagen
+// die Hex-Werte doppelt vor und liefen auseinander.
+const categoryColors = Object.fromEntries(
+  CATEGORY_PALETTE.map((hex, i) => [`cat-${i + 1}`, hex]),
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
@@ -9,6 +18,10 @@ export default {
         indigo: { DEFAULT: '#37415c', soft: '#5e6a8c' },
         navy: '#181a2f',
         peach: { DEFAULT: '#fda481', light: '#fec9b2', press: '#fc8b60' },
+
+        // Primärakzent
+        violet: 'var(--violet)',
+        azure: 'var(--azure)',
 
         // Semantic surfaces (CSS-var-driven for dark mode)
         bg: 'var(--bg)',
@@ -33,22 +46,17 @@ export default {
         'warn-bg': 'var(--warn-bg)',
         info: 'var(--info)',
         'info-bg': 'var(--info-bg)',
+        idle: 'var(--idle)',
+        'idle-bg': 'var(--idle-bg)',
 
-        // Category swatches
-        'cat-1': '#37415c',
-        'cat-2': '#fda481',
-        'cat-3': '#5b8def',
-        'cat-4': '#1f8a5b',
-        'cat-5': '#b97aff',
-        'cat-6': '#e76b8d',
-        'cat-7': '#3aa3a5',
-        'cat-8': '#d99a2b',
+        // Kategoriale Skala (aus lib/categoryColors.ts)
+        ...categoryColors,
       },
       backgroundImage: {
-        'grad-brand': 'linear-gradient(135deg, #37415c, #fda481)',
-        'grad-brand-90': 'linear-gradient(90deg,  #37415c, #fda481)',
-        'grad-hero': 'linear-gradient(135deg, #181a2f 0%, #37415c 65%, #fda481 110%)',
-        'grad-soft': 'linear-gradient(135deg, #f3f0fb 0%, #fff1e3 100%)',
+        'grad-brand': 'var(--grad-brand)',
+        'grad-brand-90': 'var(--grad-brand-90)',
+        'grad-hero': 'var(--grad-hero)',
+        'grad-soft': 'var(--grad-soft)',
       },
       fontFamily: {
         sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
@@ -62,16 +70,29 @@ export default {
         pill: '999px',
       },
       boxShadow: {
-        sm: '0 1px 0 rgba(24,26,47,.04), 0 6px 18px rgba(24,26,47,.06)',
-        md: '0 1px 0 rgba(24,26,47,.04), 0 14px 32px rgba(24,26,47,.10)',
-        btn: '0 4px 12px rgba(55,65,92,.18)',
+        sm: 'var(--shadow-1)',
+        md: 'var(--shadow-2)',
+        btn: 'var(--shadow-btn)',
+        overlay: 'var(--shadow-overlay)',
+        tooltip: 'var(--shadow-tooltip)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-in-right': 'slideInRight 0.3s ease-out',
+        // Overlays (Palette, Inbox) und der blinkende Eingabecursor
+        'o-fade': 'oFade 190ms ease-out',
+        'o-pulse': 'oPulse 1.2s ease-in-out infinite',
       },
       keyframes: {
+        oFade: {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        oPulse: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '.45' },
+        },
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },

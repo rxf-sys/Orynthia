@@ -1,6 +1,7 @@
 export { Card } from './Card';
 export { Btn, IconBtn } from './Btn';
 export { Tag } from './Tag';
+export { StatusBadge } from './StatusBadge';
 export { Avatar } from './Avatar';
 export { Progress } from './Progress';
 export { Field } from './Field';
