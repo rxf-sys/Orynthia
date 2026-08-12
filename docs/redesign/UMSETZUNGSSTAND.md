@@ -50,25 +50,47 @@ schmalem **geschütztem** Leerzeichen, damit Zahl und `%` nicht umbrechen.
 Zusicherung, dass die kategoriale Skala kein Grün und kein Rot enthält und
 jeder Status Farbe, Icon und Label trägt.
 
+**3. Shell** — `components/navigation.ts`, `Sidebar/Header/MobileTabbar/CommandPalette/OfflineBanner`
+
+Icon-Rail (64 px) wählt den Bereich, Modul-Panel (214 px) das Modul. Das Panel
+klappt manuell zu und automatisch, wenn die Gruppe nur ein Modul hat. Die
+Navigation liegt jetzt in **einer** Registry statt in drei Listen, die schon
+einmal auseinandergelaufen sind; auch der Seitentitel kommt von dort.
+
+**4. Home** — `features/home/`
+
+Begrüßung, Hero (Nettovermögen, Veränderung gegenüber dem Vormonat,
+Kennzahlenleiste, Liquiditätsverlauf als eigenes SVG statt Recharts, damit der
+Startbildschirm die Chart-Bibliothek nicht lädt), datengetriebenes Fokus-Band
+und die drei Abschnitte Geld / Dein Tag / Haushalt.
+
+Das Fokus-Band zeigt die drei dringendsten offenen Meldungen, gewichtet aus
+Budgets, Aufgaben, Liquidität, Kündigungsfristen und ablaufenden Dokumenten —
+keine festen Karten. Ist nichts offen, verschwindet es. Die Budget-Ringe tragen
+den Verbrauch außen und den erwarteten Monatsverlauf als dünnen Innenring.
+
+Die Widget-Anpassung bleibt erhalten und ist den Abschnitten zugeordnet. Das
+frühere „Finanzen"-Widget entfällt: seine Zahlen stehen jetzt im Hero; an seine
+Stelle tritt die im Handoff vorgesehene Sparziele-Karte.
+
 ## Offen
 
-**3. Shell** — Icon-Rail (64 px) + klappbares Modul-Panel (214 px) statt der
-heutigen einspaltigen Sidebar, Header nach 3.3, Tabbar nach 3.4, Palette nach
-3.5. Der größte strukturelle Eingriff.
-
-**4. Home** — Begrüßung, Hero mit Nettovermögen und Liquiditätschart,
-Fokus-Band „Was heute zählt", Abschnitte Geld/Dein Tag/Haushalt (HANDOFF 4).
-
 **7. Übrige Modulseiten** nach dem Muster aus 5 — Kennzahlenreihe,
-Filterpillen, Listencontainer.
+Filterpillen, Listencontainer. Die Finanzmodule tragen das Farbsystem bereits,
+die Zeit- und Haushaltsmodule noch nicht.
 
 **8. Kette Wochenplan → Liste → Ausgabe** als echter Zustand (HANDOFF 6).
 
 **9. Rand- und Leerzustände** aus 6 durchgehen, Tastaturbedienung der Palette.
 
-## Bekannte Abweichung
+## Bewusste Abweichungen
 
-`CategoryIcon` nutzt weiterhin die in der Datenbank gespeicherte
+**Kein Primärbutton „Neu erfassen" im Header (Handoff 3.3).** Ein solcher
+Button stand dort, zeigte auf die alte Finanz-Route und wurde auf
+ausdrücklichen Wunsch entfernt. Als modulabhängige Aktion wäre er sinnvoll —
+das ist aber eine Produktentscheidung und braucht eine Ansage.
+
+**`CategoryIcon`** nutzt weiterhin die in der Datenbank gespeicherte
 Kategoriefarbe. Die System-Kategorien tragen dort Grün und Rot. Für den Donut
 ist das umgangen (siehe oben), auf dem Icon steht die Farbe aber neben einer
 Statuspille. Sauber wäre, die Seed-Farben der System-Kategorien im Backend auf

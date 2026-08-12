@@ -9,7 +9,9 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-bg lg:grid lg:grid-cols-[260px_1fr]">
+    // Flex statt fester Rasterbreite: die Navigation ist je nach Zustand
+    // 64 px (nur Rail) oder 278 px (Rail + Panel) breit.
+    <div className="min-h-screen bg-bg">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-elev focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink focus:shadow-lg"
@@ -17,20 +19,24 @@ export function Layout() {
         Zum Hauptinhalt springen
       </a>
 
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {/* Über allem, damit der Offline-Hinweis auch die Navigation überspannt */}
+      <OfflineBanner />
 
-      <div className="flex min-w-0 flex-col">
-        <OfflineBanner />
-        <Header onMenuClick={() => setSidebarOpen(true)} />
+      <div className="flex">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        {/* Volle Breite: der Inhalt nutzt den ganzen Bildschirm, nur die
-            Innenabstände wachsen auf großen Displays mit. */}
-        <main
-          id="main-content"
-          className="w-full min-w-0 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-7 2xl:px-12"
-        >
-          <Outlet />
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header onMenuClick={() => setSidebarOpen(true)} />
+
+          {/* Volle Breite: der Inhalt nutzt den ganzen Bildschirm, nur die
+              Innenabstände wachsen auf großen Displays mit. */}
+          <main
+            id="main-content"
+            className="w-full min-w-0 px-3 pb-24 pt-3.5 sm:px-6 lg:px-9 lg:pb-14 lg:pt-[30px] 2xl:px-12"
+          >
+            <Outlet />
+          </main>
+        </div>
       </div>
 
       <MobileTabbar />

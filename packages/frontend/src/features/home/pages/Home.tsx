@@ -16,13 +16,12 @@ import {
   Flame,
   Goal,
   Plus,
+  PiggyBank,
   Settings2,
-  TrendingDown,
-  TrendingUp,
   Wallet,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import { dashboardApi, contractsApi } from '@/features/finance/api';
+import { contractsApi, savingsGoalsApi } from '@/features/finance/api';
 import { calendarApi } from '@/features/calendar/api';
 import { tasksApi } from '@/features/tasks/api';
 import { listsApi } from '@/features/lists/api';
@@ -30,8 +29,11 @@ import { tripsApi } from '@/features/trips/api';
 import { habitsApi } from '@/features/habits/api';
 import { LIST_TYPE_ICON } from '@/features/lists/types';
 import { homeApi } from '@/features/home/api';
-import { cn, formatCurrency } from '@/lib/utils';
-import { Btn, Card } from '@/components/ui';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
+import { Btn, Card, Progress } from '@/components/ui';
+import { HeroCard } from '@/features/home/components/HeroCard';
+import { FocusBand, SectionHead } from '@/features/home/components/FocusBand';
+import { BudgetRings } from '@/features/home/components/BudgetRings';
 
 /**
  * Widget-Registry des Home-Dashboards: Jedes Modul steuert genau ein
@@ -40,16 +42,25 @@ import { Btn, Card } from '@/components/ui';
  * dem serverseitig gespeicherten Layout (User.dashboardLayout).
  */
 const WIDGETS = [
-  { id: 'finance', title: 'Finanzen' },
-  { id: 'today', title: 'Heute & demnächst' },
-  { id: 'tasks', title: 'Aufgaben' },
-  { id: 'lists', title: 'Listen' },
-  { id: 'trips', title: 'Reisen' },
-  { id: 'habits', title: 'Gewohnheiten' },
-  { id: 'contracts', title: 'Verträge & Abos' },
+  { id: 'savings', title: 'Sparziele', section: 'money' },
+  { id: 'contracts', title: 'Verträge & Abos', section: 'money' },
+  { id: 'today', title: 'Heute & demnächst', section: 'day' },
+  { id: 'tasks', title: 'Aufgaben', section: 'day' },
+  { id: 'habits', title: 'Gewohnheiten', section: 'day' },
+  { id: 'lists', title: 'Listen', section: 'house' },
+  { id: 'trips', title: 'Reisen', section: 'house' },
 ] as const;
 
 type WidgetId = (typeof WIDGETS)[number]['id'];
+type SectionId = (typeof WIDGETS)[number]['section'];
+
+// Die drei Abschnitte des Home-Screens; ein Abschnitt ohne sichtbares
+// Widget verschwindet samt Überschrift, statt leer dazustehen.
+const SECTIONS: { id: SectionId; title: string; link?: { to: string; label: string } }[] = [
+  { id: 'money', title: 'Geld', link: { to: '/finance', label: 'Finanzen öffnen' } },
+  { id: 'day', title: 'Dein Tag', link: { to: '/calendar', label: 'Kalender öffnen' } },
+  { id: 'house', title: 'Haushalt', link: { to: '/lists', label: 'Listen öffnen' } },
+];
 
 export function HomePage() {
   const user = useAuthStore((s) => s.user);
@@ -90,26 +101,45 @@ export function HomePage() {
   const firstName = user?.firstName || user?.email?.split('@')[0] || '';
   const visibleWidgets = orderedWidgets.filter((w) => !hidden.has(w.id));
 
+  const renderWidget = (id: WidgetId) => {
+    switch (id) {
+      case 'savings':
+        return <SavingsWidget key={id} />;
+      case 'today':
+        return <TodayWidget key={id} />;
+      case 'tasks':
+        return <TasksWidget key={id} />;
+      case 'lists':
+        return <ListsWidget key={id} />;
+      case 'trips':
+        return <TripsWidget key={id} />;
+      case 'habits':
+        return <HabitsWidget key={id} />;
+      case 'contracts':
+        return <ContractsWidget key={id} />;
+    }
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-9 pb-6 lg:gap-11">
       {/* Begrüßung */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="h-display text-[2rem] leading-tight text-ink">
-            Hallo{firstName ? `, ${firstName}` : ''}
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="min-w-0">
+          <h1 className="h-display text-[2.1rem] leading-[1.02] tracking-[-0.025em] text-ink sm:text-[3.25rem]">
+            Hallo{firstName ? ` ${firstName}` : ''}
           </h1>
-          <p className="mt-0.5 text-sm text-ink-3">
+          <p className="mt-2.5 max-w-[520px] text-[0.95rem] leading-[1.6] text-ink-3">
             {format(new Date(), 'EEEE, d. MMMM yyyy', { locale: de })} – dein Tag auf einen Blick.
           </p>
         </div>
         <div className="relative">
           <Btn variant="ghost" size="sm" icon={Settings2} onClick={() => setCustomizeOpen((v) => !v)}>
-            Anpassen
+            Widgets anpassen
           </Btn>
           {customizeOpen && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setCustomizeOpen(false)} aria-hidden />
-              <div className="absolute right-0 top-full z-40 mt-2 w-60 rounded-md border border-line bg-elev p-1.5 shadow-lg animate-fade-in">
+              <div className="absolute right-0 top-full z-40 mt-2 w-60 rounded-md border border-line bg-elev p-1.5 shadow-md animate-o-fade">
                 <p className="px-2.5 pb-1 pt-1.5 text-[0.7rem] font-bold uppercase tracking-wide text-ink-3">
                   Widgets
                 </p>
@@ -122,7 +152,7 @@ export function HomePage() {
                     {hidden.has(w.id) ? (
                       <EyeOff className="h-4 w-4 text-ink-4" />
                     ) : (
-                      <Eye className="h-4 w-4 text-indigo" />
+                      <Eye className="h-4 w-4 text-violet" />
                     )}
                     {w.title}
                   </button>
@@ -133,30 +163,30 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* Widget-Grid */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {visibleWidgets.map((w) => {
-          switch (w.id) {
-            case 'finance':
-              return <FinanceWidget key={w.id} />;
-            case 'today':
-              return <TodayWidget key={w.id} />;
-            case 'tasks':
-              return <TasksWidget key={w.id} />;
-            case 'lists':
-              return <ListsWidget key={w.id} />;
-            case 'trips':
-              return <TripsWidget key={w.id} />;
-            case 'habits':
-              return <HabitsWidget key={w.id} />;
-            case 'contracts':
-              return <ContractsWidget key={w.id} />;
-          }
-        })}
-      </div>
+      <HeroCard />
+
+      <FocusBand />
+
+      {SECTIONS.map((section) => {
+        const widgets = visibleWidgets.filter((w) => w.section === section.id);
+        // Die Budget-Ringe hängen nicht am Widget-Layout: sie sind der
+        // Kern des Geld-Abschnitts, nicht ein Widget unter vielen.
+        const hasContent = widgets.length > 0 || section.id === 'money';
+        if (!hasContent) return null;
+        return (
+          <section key={section.id}>
+            <SectionHead title={section.title} link={section.link} />
+            <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr))]">
+              {section.id === 'money' && <BudgetRings />}
+              {widgets.map((w) => renderWidget(w.id))}
+            </div>
+          </section>
+        );
+      })}
+
       {visibleWidgets.length === 0 && (
         <Card className="py-10 text-center text-sm text-ink-3">
-          Alle Widgets ausgeblendet – über „Anpassen“ kannst du sie wieder aktivieren.
+          Alle Widgets ausgeblendet – über „Widgets anpassen“ kannst du sie wieder aktivieren.
         </Card>
       )}
     </div>
@@ -180,42 +210,58 @@ function WidgetHead({ title, to, icon: Icon }: { title: string; to: string; icon
   );
 }
 
-function FinanceWidget() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => dashboardApi.getData().then((r) => r.data),
+/**
+ * Sparziele: der Balken ist violett, nicht grün – ein halb gefülltes
+ * Sparziel ist kein Warnfall. Nur „erreicht“ ist ein Status.
+ */
+function SavingsWidget() {
+  const { data: goals, isLoading } = useQuery({
+    queryKey: ['savings-goals'],
+    queryFn: () => savingsGoalsApi.getAll().then((r) => r.data),
   });
+
+  const shown = (goals ?? []).slice(0, 3);
 
   return (
     <Card>
-      <WidgetHead title="Finanzen" to="/finance" icon={Wallet} />
+      <WidgetHead title="Sparziele" to="/finance/savings" icon={PiggyBank} />
       {isLoading ? (
         <WidgetSkeleton />
+      ) : shown.length === 0 ? (
+        <WidgetEmpty text="Noch kein Sparziel." action={{ label: 'Ziel anlegen', to: '/finance/savings' }} />
       ) : (
-        <>
-          <div className="tnum h-display text-[2rem] leading-tight text-ink">
-            {formatCurrency(data?.overview.totalBalance ?? 0)}
-          </div>
-          <p className="text-xs text-ink-3">Gesamtsaldo über {data?.accounts.length ?? 0} Konten</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-md bg-soft px-3 py-2">
-              <div className="flex items-center gap-1 text-[0.7rem] font-semibold uppercase text-ink-3">
-                <TrendingUp className="h-3 w-3 text-pos" /> Einnahmen
-              </div>
-              <div className="tnum mt-0.5 text-sm font-bold text-pos">
-                {formatCurrency(data?.overview.monthlyIncome ?? 0)}
-              </div>
-            </div>
-            <div className="rounded-md bg-soft px-3 py-2">
-              <div className="flex items-center gap-1 text-[0.7rem] font-semibold uppercase text-ink-3">
-                <TrendingDown className="h-3 w-3 text-neg" /> Ausgaben
-              </div>
-              <div className="tnum mt-0.5 text-sm font-bold text-neg">
-                {formatCurrency(data?.overview.monthlyExpenses ?? 0)}
-              </div>
-            </div>
-          </div>
-        </>
+        <ul className="space-y-3">
+          {shown.map((goal) => {
+            const done = goal.percentage >= 100;
+            return (
+              <li key={goal.id}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm font-medium text-ink">
+                    {goal.icon} {goal.name}
+                  </span>
+                  <span
+                    className="tnum shrink-0 text-xs font-bold"
+                    style={{ color: done ? 'var(--pos)' : 'var(--violet)' }}
+                  >
+                    {formatPercent(goal.percentage)}
+                  </span>
+                </div>
+                <Progress
+                  value={goal.percentage}
+                  color={done ? 'var(--pos)' : 'var(--violet)'}
+                  className="mt-1.5"
+                  label={`${goal.name}: ${goal.percentage} Prozent erreicht`}
+                />
+                <div className="tnum mt-1 flex justify-between text-[0.7rem] text-ink-3">
+                  <span>
+                    {formatCurrency(goal.currentAmount)} von {formatCurrency(goal.targetAmount)}
+                  </span>
+                  {goal.deadline && <span>bis {format(parseISO(goal.deadline), 'dd.MM.yyyy')}</span>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </Card>
   );
