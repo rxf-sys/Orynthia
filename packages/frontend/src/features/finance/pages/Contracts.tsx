@@ -16,7 +16,8 @@ import { contractsApi } from '@/features/finance/api';
 import { formatCurrency, cn } from '@/lib/utils';
 import type { Contract, CreateContractData, DetectedContract } from '@/features/finance/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, Tag, useConfirm } from '@/components/ui';
+import { daysUntil, dueStatus } from '@/lib/status';
+import { Card, Btn, Field, PageHead, StatusBadge, Tag, useConfirm } from '@/components/ui';
 
 const contractTypeLabels: Record<string, { label: string; icon: string; group: string; color?: string }> = {
   INSURANCE_LIABILITY: { label: 'Haftpflicht', icon: '🛡️', group: 'Versicherungen', color: '#5b8def' },
@@ -391,6 +392,19 @@ export function ContractsPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <h4 className="truncate font-semibold text-ink">{contract.name}</h4>
                             <Tag>{info.label}</Tag>
+                            {/* Kündigungsfrist als Status aus der Restlaufzeit */}
+                            {contract.cancellationDate &&
+                              (() => {
+                                const days = daysUntil(new Date(contract.cancellationDate));
+                                if (days < 0) return null;
+                                return (
+                                  <StatusBadge
+                                    kind={dueStatus(days)}
+                                    size="sm"
+                                    label={`kündbar bis ${new Date(contract.cancellationDate).toLocaleDateString('de-DE')}`}
+                                  />
+                                );
+                              })()}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-3">
                             <span>{contract.provider}</span>

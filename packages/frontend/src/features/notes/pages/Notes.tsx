@@ -303,12 +303,15 @@ function NoteCard({
     <Card
       hover
       className="group flex flex-col gap-2"
-      style={note.color ? { borderTopColor: note.color, borderTopWidth: 3 } : undefined}
+      // Nutzerfarbe als linke Kante (Farbachse 3), nie als Fläche
+      style={note.color ? { borderLeftColor: note.color, borderLeftWidth: 4 } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <button onClick={onOpen} className="min-w-0 flex-1 text-left">
           <h3 className="truncate text-sm font-bold text-ink">
-            {note.title || note.content.slice(0, 40) || 'Ohne Titel'}
+            {note.title || note.content.slice(0, 40) || (
+              <span className="text-ink-3">Ohne Titel</span>
+            )}
           </h3>
         </button>
         <div className="flex shrink-0 gap-0.5">

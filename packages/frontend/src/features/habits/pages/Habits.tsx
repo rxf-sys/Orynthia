@@ -13,7 +13,17 @@ import {
   type HabitFrequency,
 } from '@/features/habits/types';
 import { cn, parseApiError } from '@/lib/utils';
-import { Btn, Card, EmptyState, Field, IconBtn, Modal, PageHead, useConfirm } from '@/components/ui';
+import {
+  Btn,
+  Card,
+  EmptyState,
+  Field,
+  IconBtn,
+  Modal,
+  PageHead,
+  StatusBadge,
+  useConfirm,
+} from '@/components/ui';
 
 /** Die letzten 28 Tage als Datumsschlüssel, älteste zuerst. */
 function last28Days(): string[] {
@@ -311,13 +321,15 @@ function HabitCard({
   onDelete: () => void;
 }) {
   const done = new Set(habit.last30Days);
-  const accent = habit.color ?? 'var(--indigo)';
+  // Nutzerfarbe sitzt auf der Kante, nie auf einer Fläche – so kann sie
+  // nie mit einer Statusfarbe verwechselt werden, auch wenn jemand Rot wählt.
+  const accent = habit.color ?? 'var(--violet)';
 
   return (
     <Card
       hover
       className={cn('group flex flex-col gap-3', habit.isArchived && 'opacity-60')}
-      style={{ borderTopColor: accent, borderTopWidth: 3 }}
+      style={{ borderLeftColor: accent, borderLeftWidth: 4 }}
     >
       <div className="flex items-start gap-3">
         <button
@@ -346,6 +358,7 @@ function HabitCard({
         </button>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {habit.isArchived && <StatusBadge kind="idle" size="sm" label="archiviert" className="mr-1" />}
           {habit.streak > 0 && (
             <span
               className="mr-1 flex items-center gap-1 rounded-pill bg-soft px-2 py-1 text-[0.7rem] font-bold text-ink-2"

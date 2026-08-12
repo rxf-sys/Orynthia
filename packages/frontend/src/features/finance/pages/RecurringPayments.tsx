@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, X, Loader2, Calendar, Repeat } from 'lucide-react';
+import { Plus, Trash2, X, Loader2, Repeat } from 'lucide-react';
 import { recurringPaymentsApi, categoriesApi } from '@/features/finance/api';
+import { dueStatus } from '@/lib/status';
 import { formatCurrency, cn, parseDecimal } from '@/lib/utils';
 import type { RecurringPayment, Category, CreateRecurringPaymentData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
-import { Card, Btn, Field, PageHead, CategoryIcon, Tag, useConfirm } from '@/components/ui';
+import { Card, Btn, Field, PageHead, CategoryIcon, StatusBadge, Tag, useConfirm } from '@/components/ui';
 
 const frequencyLabels: Record<string, string> = {
   WEEKLY: 'Wöchentlich',
@@ -340,15 +341,23 @@ function PaymentRow({
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-3">
           {payment.counterpartName && <span>{payment.counterpartName}</span>}
-          {daysUntil !== null && (
-            <span
-              className="flex items-center gap-1"
-              style={daysUntil <= 7 ? { color: 'var(--warn)' } : undefined}
-            >
-              <Calendar className="h-3 w-3" />
-              {daysUntil < 0 ? `vor ${Math.abs(daysUntil)} T.` : `in ${daysUntil} T.`}
-            </span>
-          )}
+          {daysUntil !== null &&
+            (payment.isActive ? (
+              // Frist aus dem Wert abgeleitet statt aus einer festen Schwelle
+              <StatusBadge
+                kind={dueStatus(daysUntil)}
+                size="sm"
+                label={
+                  daysUntil < 0
+                    ? `vor ${Math.abs(daysUntil)} Tagen`
+                    : daysUntil === 0
+                      ? 'heute fällig'
+                      : `in ${daysUntil} ${daysUntil === 1 ? 'Tag' : 'Tagen'}`
+                }
+              />
+            ) : (
+              <StatusBadge kind="idle" size="sm" label="pausiert" />
+            ))}
         </div>
       </div>
       <div

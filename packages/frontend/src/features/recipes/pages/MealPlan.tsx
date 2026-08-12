@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addDays, addWeeks, eachDayOfInterval, format, isToday, startOfWeek } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { mealPlanApi, recipesApi } from '@/features/recipes/api';
 import { MEAL_SLOTS, type MealPlanEntry, type MealSlot } from '@/features/recipes/types';
 import { listsApi } from '@/features/lists/api';
+import { useMealFlow } from '@/stores/flowStore';
 import { LIST_TYPE_ICON } from '@/features/lists/types';
 import { cn, parseApiError } from '@/lib/utils';
 import { Btn, Card, Field, Modal, PageHead, useConfirm } from '@/components/ui';
@@ -342,6 +343,8 @@ function MealPlanToListModal({
   to: string;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const startFlow = useMealFlow((s) => s.startFromMealPlan);
   const [listId, setListId] = useState('');
   const [newListName, setNewListName] = useState('');
 
@@ -354,24 +357,32 @@ function MealPlanToListModal({
   const addMutation = useMutation({
     mutationFn: async () => {
       let targetId = listId || lists?.find((l) => l.type === 'SHOPPING')?.id || lists?.[0]?.id;
+      let targetName = lists?.find((l) => l.id === targetId)?.name ?? '';
       if (!targetId) {
         const created = await listsApi.create({
           name: newListName.trim() || 'Wocheneinkauf',
           type: 'SHOPPING',
         });
         targetId = created.data.id;
+        targetName = created.data.name;
       }
-      return mealPlanApi.addRangeToList({ listId: targetId, from, to });
+      const res = await mealPlanApi.addRangeToList({ listId: targetId, from, to });
+      return { ...res.data, listId: targetId, listName: targetName };
     },
     onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       queryClient.invalidateQueries({ queryKey: ['list'] });
-      const { added, updated, meals } = r.data;
-      toast.success(
-        `${meals} Mahlzeit${meals === 1 ? '' : 'en'}: ${added} Zutaten übernommen` +
-          (updated > 0 ? `, ${updated} zusammengeführt` : ''),
-      );
+      // Der Fortschritt wird Zustand, kein Toast: die Liste zeigt gleich,
+      // was übernommen wurde, und bietet den nächsten Schritt an.
+      startFlow({
+        listId: r.listId,
+        listName: r.listName,
+        added: r.added,
+        merged: r.updated,
+        meals: r.meals,
+      });
       onClose();
+      navigate(`/lists/${r.listId}`);
     },
     onError: (e) => toast.error(parseApiError(e, 'Übernahme fehlgeschlagen')),
   });

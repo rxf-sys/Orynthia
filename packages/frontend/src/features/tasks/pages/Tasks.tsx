@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isPast, isToday } from 'date-fns';
+import { STATUS_STYLE, type StatusKind } from '@/lib/status';
 import {
   CheckSquare,
   Check,
@@ -309,10 +310,10 @@ export function TasksPage() {
         <div className="space-y-5">
           {statusFilter === 'open' ? (
             <>
-              <TaskGroup title="Überfällig" accent="var(--neg)" tasks={grouped.overdue} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
-              <TaskGroup title="Heute" accent="var(--info)" tasks={grouped.today} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
-              <TaskGroup title="Später" tasks={grouped.later} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
-              <TaskGroup title="Ohne Fälligkeit" tasks={grouped.noDate} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
+              <TaskGroup title="Überfällig" status="crit" tasks={grouped.overdue} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
+              <TaskGroup title="Heute" status="info" tasks={grouped.today} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
+              <TaskGroup title="Später" status="idle" tasks={grouped.later} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
+              <TaskGroup title="Ohne Fälligkeit" status="idle" tasks={grouped.noDate} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
             </>
           ) : (
             <TaskGroup title="Erledigt" tasks={tasks ?? []} onToggle={toggleComplete} onEdit={openEdit} onDelete={(t) => deleteMutation.mutate(t.id)} />
@@ -479,22 +480,33 @@ export function TasksPage() {
 
 interface TaskGroupProps {
   title: string;
-  accent?: string;
+  status?: StatusKind;
   tasks: Task[];
   onToggle: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
 }
 
-function TaskGroup({ title, accent, tasks, onToggle, onEdit, onDelete }: TaskGroupProps) {
+function TaskGroup({ title, status, tasks, onToggle, onEdit, onDelete }: TaskGroupProps) {
   const confirm = useConfirm();
   if (tasks.length === 0) return null;
+  const style = status ? STATUS_STYLE[status] : null;
+  const GroupIcon = style?.icon;
   return (
     <section aria-label={title}>
-      <h2 className="mb-2 flex items-center gap-2 text-[0.78rem] font-bold uppercase tracking-[0.08em] text-ink-3">
-        {accent && <span className="h-2 w-2 rounded-pill" style={{ background: accent }} aria-hidden />}
+      {/* Getönte Kopfzeile mit Icon: der Gruppenstatus hängt nicht allein
+          an einem Farbpunkt. */}
+      <h2
+        className="mb-2 inline-flex items-center gap-2 rounded-pill border px-3 py-1 text-[0.7rem] font-bold uppercase tracking-[0.08em]"
+        style={
+          style
+            ? { background: style.tint, borderColor: style.line, color: style.color }
+            : { borderColor: 'var(--line)', color: 'var(--text-3)' }
+        }
+      >
+        {GroupIcon && <GroupIcon className="h-3.5 w-3.5" aria-hidden />}
         {title}
-        <span className="tnum font-semibold text-ink-4">{tasks.length}</span>
+        <span className="tnum">{tasks.length}</span>
       </h2>
       <Card className="divide-y divide-line p-0">
         {tasks.map((task) => (

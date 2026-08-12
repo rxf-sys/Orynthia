@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { transactionsApi, categoriesApi, accountsApi } from '@/features/finance/api';
+import { useMealFlow } from '@/stores/flowStore';
 import { formatCurrency, formatDate, formatDateRelative, parseDecimal, cn } from '@/lib/utils';
 import type { Transaction, Category, CreateTransactionData, BankAccount } from '@/features/finance/types';
 import toast from 'react-hot-toast';
@@ -30,6 +31,16 @@ import {
 export function TransactionsPage() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const flow = useMealFlow();
+  const flowRowRef = useRef<HTMLDivElement>(null);
+
+  // Zur markierten Buchung scrollen, sonst nützt die Markierung nichts,
+  // wenn sie außerhalb des sichtbaren Bereichs liegt.
+  useEffect(() => {
+    if (flow.transactionId) {
+      flowRowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [flow.transactionId]);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const [page, setPage] = useState(1);
@@ -427,8 +438,20 @@ export function TransactionsPage() {
                     return (
                       <div
                         key={tx.id}
-                        className="group flex items-center gap-4 border-b px-5 py-3 transition-colors last:border-0 hover:bg-soft"
-                        style={{ borderColor: 'var(--line-2)' }}
+                        // Letzter Schritt der Kette: die eben gebuchte Ausgabe
+                        // wird markiert, damit sie in einer langen Liste
+                        // auffindbar ist.
+                        ref={tx.id === flow.transactionId ? flowRowRef : undefined}
+                        className={cn(
+                          'group flex items-center gap-4 border-b px-5 py-3 transition-colors last:border-0 hover:bg-soft',
+                          tx.id === flow.transactionId && 'bg-violet/10',
+                        )}
+                        style={{
+                          borderColor: 'var(--line-2)',
+                          ...(tx.id === flow.transactionId
+                            ? { boxShadow: 'inset 3px 0 0 var(--violet)' }
+                            : {}),
+                        }}
                       >
                         <CategoryIcon cat={tx.category} size={38} />
                         <div className="min-w-0 flex-1">
