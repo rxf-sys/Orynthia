@@ -27,21 +27,23 @@ import { formatCurrency, formatDateRelative } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import type { MonthlyOverview, BankAccount, Transaction } from '@/features/finance/types';
 import { Card, Btn, PageHead, Tag, CategoryIcon, CategoryDot, pickCategoryColor } from '@/components/ui';
+import { CATEGORY_PALETTE, CATEGORY_REST_COLOR } from '@/lib/categoryColors';
+import { monthStatus, statusColor } from '@/lib/status';
 import { ForecastCard } from '@/features/finance/components/ForecastCard';
 
 const CHART_COLORS = {
-  income: 'var(--pos)',
-  expense: 'var(--indigo)',
+  // Einnahmen und Ausgaben sind wertfreie Mengen: sie tragen keine
+  // Statusfarbe mehr, sonst läse man „Ausgaben = schlecht“ mit.
+  income: 'var(--text-2)',
+  expense: 'var(--text-4)',
   grid: 'var(--line)',
   axis: 'var(--text-3)',
   tooltipBg: 'var(--bg-elev)',
   tooltipBorder: 'var(--line)',
 };
 
-const CATEGORY_PALETTE = ['#37415c', '#fda481', '#5b8def', '#1f8a5b', '#b97aff', '#e76b8d', '#3aa3a5', '#d99a2b'];
-
-// Neutrale Farbe für den Sammelposten "Sonstige" im Kategorie-Chart
-const OTHER_CATEGORY_COLOR = 'var(--text-4, #aeb3c4)';
+/** Schraffur für negative Monate – Farbe allein soll nie der einzige Träger sein. */
+const NEGATIVE_HATCH_ID = 'cashflow-hatch-negative';
 
 const TOP_CATEGORIES_LIMIT = 5;
 const RECENT_TX_LIMIT = 6;
@@ -84,7 +86,11 @@ export function DashboardPage() {
       key: item.categoryId || String(i),
       name: item.category?.name || 'Unkategorisiert',
       icon: item.category?.icon,
-      color: item.category?.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
+      // Bewusst NICHT item.category.color: die in der Datenbank
+      // hinterlegten Kategoriefarben enthalten Grün und Rot und würden
+      // im Donut als Bewertung mitgelesen. Die kategoriale Achse ist
+      // wertfrei – sie kommt immer aus der Skala.
+      color: CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
       amount: item.amount,
     }));
     const rest = items.slice(TOP_CATEGORIES_LIMIT);
@@ -93,7 +99,7 @@ export function DashboardPage() {
         key: 'sonstige',
         name: 'Sonstige',
         icon: undefined,
-        color: OTHER_CATEGORY_COLOR,
+        color: CATEGORY_REST_COLOR,
         amount: rest.reduce((sum, item) => sum + item.amount, 0),
       });
     }
@@ -128,11 +134,14 @@ export function DashboardPage() {
   const savingsRate = overview?.savingsRate ?? 0;
   const available = monthlyIncome - monthlyExpenses;
 
+  // Einnahmen und Ausgaben sind neutrale Mengen – gewertet wird nur der
+  // Monatssaldo. Deshalb kommt er als eigene Serie hinzu.
   const chartData =
     monthlyData?.map((m: MonthlyOverview) => ({
       name: MONTH_NAMES[m.month.split('-')[1]] || m.month,
       Einnahmen: m.income,
       Ausgaben: m.expenses,
+      Saldo: m.income - m.expenses,
     })) || [];
 
   const greeting = user?.firstName ? `Hallo ${user.firstName} 👋` : 'Willkommen 👋';
@@ -245,11 +254,27 @@ export function DashboardPage() {
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
               <div className="text-[1.05rem] font-bold text-ink">Cashflow</div>
-              <div className="text-[0.85rem] text-ink-3">Letzte 6 Monate · Einnahmen vs. Ausgaben</div>
+              <div className="text-[0.85rem] text-ink-3">
+                Letzte 6 Monate · gewertet wird nur der Saldo
+              </div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
+              <defs>
+                {/* Negative Monate tragen zusätzlich eine Schraffur, damit der
+                    Befund nicht allein an der Farbe hängt. */}
+                <pattern
+                  id={NEGATIVE_HATCH_ID}
+                  patternUnits="userSpaceOnUse"
+                  width="8"
+                  height="8"
+                  patternTransform="rotate(45)"
+                >
+                  <rect width="8" height="8" fill={statusColor('crit')} />
+                  <rect width="4" height="8" fill="color-mix(in oklab, var(--neg) 55%, #000)" />
+                </pattern>
+              </defs>
               <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 4" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -274,6 +299,20 @@ export function DashboardPage() {
               <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-3)' }} />
               <Bar dataKey="Einnahmen" fill={CHART_COLORS.income} radius={[4, 4, 0, 0]} />
               <Bar dataKey="Ausgaben" fill={CHART_COLORS.expense} radius={[4, 4, 0, 0]} />
+              {/* Einzige farbtragende Serie: der Saldo, gefärbt aus seinem
+                  eigenen Wert – nicht aus dem Index der Serie. */}
+              <Bar dataKey="Saldo" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry) => (
+                  <Cell
+                    key={entry.name}
+                    fill={
+                      entry.Saldo < 0
+                        ? `url(#${NEGATIVE_HATCH_ID})`
+                        : statusColor(monthStatus(entry.Saldo))
+                    }
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>

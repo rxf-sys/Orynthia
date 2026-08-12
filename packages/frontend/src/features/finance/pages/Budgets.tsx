@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, Loader2, Target } from 'lucide-react';
 import { budgetsApi, categoriesApi } from '@/features/finance/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, formatPercent, cn } from '@/lib/utils';
+import { budgetStatus, pace, paceHint, statusColor } from '@/lib/status';
 import type { Budget, Category, CreateBudgetData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
 import {
@@ -11,7 +12,7 @@ import {
   Field,
   PageHead,
   Progress,
-  Tag,
+  StatusBadge,
   CategoryIcon,
   EmptyState,
   useConfirm,
@@ -86,7 +87,13 @@ export function BudgetsPage() {
             Gesamtbudget
           </div>
           <div className="tnum mt-2 text-[1.85rem] font-bold">{formatCurrency(totalBudget)}</div>
-          <Progress value={overallPercent} className="mt-3" />
+          <Progress
+            value={overallPercent}
+            color={statusColor(budgetStatus(overallPercent))}
+            marker={pace()}
+            markerLabel={`Erwartet wären ${pace()} %`}
+            className="mt-3"
+          />
           <div className="mt-1 text-xs text-ink-3 tnum">
             {formatCurrency(totalSpent)} ausgegeben · {overallPercent}%
           </div>
@@ -255,18 +262,11 @@ export function BudgetsPage() {
 function BudgetCard({ budget, onDelete }: { budget: Budget; onDelete: () => void }) {
   const pct = Math.min(budget.percentage, 100);
   const over = budget.percentage > 100;
-  const warn = budget.percentage > 80 && !over;
   const cat = budget.category || { name: 'Kategorie', icon: '📌' };
 
-  let statusVariant: 'pos' | 'warn' | 'neg' = 'pos';
-  let statusLabel = 'Im Plan';
-  if (over) {
-    statusVariant = 'neg';
-    statusLabel = 'Überzogen';
-  } else if (warn) {
-    statusVariant = 'warn';
-    statusLabel = 'Knapp';
-  }
+  // Status kommt aus dem Wert, nicht aus einer Ternary-Kette in der Ansicht.
+  const status = budgetStatus(budget.percentage);
+  const expected = pace();
 
   return (
     <Card className="group flex flex-col gap-3.5">
@@ -279,7 +279,7 @@ function BudgetCard({ budget, onDelete }: { budget: Budget; onDelete: () => void
           </div>
         </div>
         <div className="flex items-start gap-2">
-          <Tag variant={statusVariant}>{statusLabel}</Tag>
+          <StatusBadge kind={status} size="sm" />
           <button
             onClick={onDelete}
             className="opacity-100 transition-opacity hover:text-neg sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100"
@@ -299,19 +299,30 @@ function BudgetCard({ budget, onDelete }: { budget: Budget; onDelete: () => void
         </div>
       </div>
 
+      {/* Der Balken trägt immer die Statusfarbe – die Kategoriefarbe sitzt
+          auf dem Icon. Vorher gewann unter 100 % die Kategoriefarbe und
+          der Status war nicht mehr ablesbar. */}
       <Progress
         value={pct}
-        color={over ? 'var(--neg)' : cat.color || undefined}
+        color={statusColor(status)}
+        hatched={over}
         thick
+        marker={expected}
+        markerLabel={`Erwartet wären ${expected} %`}
+        label={`${budget.percentage} % von ${cat.name} verbraucht`}
       />
 
       <div className="flex items-center justify-between text-xs">
-        <span className="tnum font-semibold text-ink-2">{budget.percentage}%</span>
+        <span className="tnum font-semibold text-ink-2">{formatPercent(budget.percentage)}</span>
         {budget.remaining >= 0 ? (
           <span className="tnum text-ink-3">Noch {formatCurrency(budget.remaining)}</span>
         ) : (
           <span className="tnum text-neg">{formatCurrency(Math.abs(budget.remaining))} drüber</span>
         )}
+      </div>
+      <div className="-mt-2 text-[0.7rem] text-ink-3">
+        Erwartet wären <span className="tnum font-semibold">{formatPercent(expected)}</span> ·{' '}
+        {paceHint(budget.percentage, expected)}
       </div>
     </Card>
   );

@@ -279,7 +279,9 @@ export function AccountsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label="Nettovermögen" value={totalBalance} accent />
         <KpiTile label="Vermögen" value={assets} positive />
-        <KpiTile label="Verbindlichkeiten" value={liabilities} negative />
+        {/* Neutral, nicht rot: ein laufender Kredit ist planmäßig. Rot bleibt
+            Unterdeckung und Budgetüberzug vorbehalten. */}
+        <KpiTile label="Verbindlichkeiten" value={liabilities} hint="planmäßig, keine Wertung" />
         <KpiTile label="Aktive Konten" value={accounts?.length || 0} isNumber />
       </div>
 
@@ -775,6 +777,7 @@ function KpiTile({
   negative,
   accent,
   isNumber,
+  hint,
 }: {
   label: string;
   value: number;
@@ -782,6 +785,7 @@ function KpiTile({
   negative?: boolean;
   accent?: boolean;
   isNumber?: boolean;
+  hint?: string;
 }) {
   let valueColor: string | undefined;
   if (negative) valueColor = 'var(--neg)';
@@ -798,6 +802,7 @@ function KpiTile({
       <div className="tnum mt-2 text-[1.85rem] font-bold leading-none" style={{ color: valueColor }}>
         {isNumber ? value : formatCurrency(value)}
       </div>
+      {hint && <div className="mt-1 text-[0.7rem] text-ink-3">{hint}</div>}
     </Card>
   );
 }
