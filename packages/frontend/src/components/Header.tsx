@@ -1,36 +1,15 @@
 import { useEffect } from 'react';
-import { Menu, Search, HelpCircle, Sun, Moon } from 'lucide-react';
+import { Menu, Search, MessageSquare, Sun, Moon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { cn } from '@/lib/utils';
 import { IconBtn } from './ui/Btn';
+import { Avatar } from './ui/Avatar';
 import { NotificationBell } from './NotificationBell';
 import { CommandPalette } from './CommandPalette';
 import { useCommandPalette } from './useCommandPalette';
-
-const TITLE_MAP: Record<string, string> = {
-  '/': 'Home',
-  '/finance': 'Finanzen',
-  '/finance/transactions': 'Transaktionen',
-  '/finance/accounts': 'Konten',
-  '/finance/budgets': 'Budgets',
-  '/finance/savings': 'Sparziele',
-  '/finance/investments': 'Depot',
-  '/finance/recurring': 'Wiederkehrende Zahlungen',
-  '/finance/contracts': 'Verträge',
-  '/finance/savings-potential': 'Sparpotenzial',
-  '/calendar': 'Kalender',
-  '/tasks': 'Aufgaben',
-  '/recipes': 'Rezepte',
-  '/meal-plan': 'Wochenplan',
-  '/lists': 'Listen',
-  '/notes': 'Notizen',
-  '/trips': 'Reisen',
-  '/documents': 'Dokumente',
-  '/habits': 'Gewohnheiten',
-  '/assistant': 'KI-Assistent',
-  '/settings': 'Einstellungen',
-};
+import { titleForPath } from './navigation';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -41,36 +20,47 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { pathname } = useLocation();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.set);
+  const user = useAuthStore((s) => s.user);
   const { open, openPalette, closePalette } = useCommandPalette();
 
-  const pageTitle = TITLE_MAP[pathname];
+  const pageTitle = titleForPath(pathname);
 
   // Tab-Titel pro Route – hilft bei History, Bookmarks und mehreren Tabs.
   useEffect(() => {
     document.title = pageTitle ? `${pageTitle} – Orynthia` : 'Orynthia';
   }, [pageTitle]);
 
+  const fullName =
+    user?.firstName || user?.lastName
+      ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
+      : (user?.email?.split('@')[0] ?? 'Konto');
+
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-3 border-b border-line px-4 py-3 backdrop-blur md:gap-4 md:px-8 md:py-[18px]"
-      style={{ background: 'color-mix(in oklab, var(--bg-elev) 80%, transparent)' }}
+      className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-line px-4 py-3 backdrop-blur-[10px] md:gap-3 md:px-[22px] md:py-[13px]"
+      style={{ background: 'color-mix(in oklab, var(--bg-elev) 88%, transparent)' }}
     >
       <button
         onClick={onMenuClick}
         aria-label="Menü öffnen"
-        className="grid h-9 w-9 place-items-center rounded-md border border-line bg-elev text-ink-2 lg:hidden"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] border border-line bg-soft text-ink-2 lg:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Befehlspalette: Navigation + Transaktionssuche */}
+      {/* Mobil steht hier der Seitentitel, damit man weiß, wo man ist. */}
+      <span className="truncate text-[0.95rem] font-bold text-ink md:hidden">{pageTitle}</span>
+
+      {/* Befehlspalette: Navigation + modulübergreifende Suche */}
       <button
         onClick={openPalette}
-        className="hidden flex-1 items-center gap-2.5 rounded-pill border border-line bg-soft px-3.5 py-2 text-left text-ink-3 transition-colors hover:border-ink-4 md:flex md:max-w-[420px]"
+        className="hidden min-w-[210px] max-w-[420px] flex-1 items-center gap-2.5 rounded-pill border border-line bg-soft px-3.5 py-[9px] text-left text-ink-3 transition-colors hover:border-ink-4 md:flex"
       >
-        <Search className="h-4 w-4" />
-        <span className="flex-1 text-sm text-ink-4">Suchen oder Seite öffnen…</span>
-        <span className="rounded border border-line px-1.5 py-0.5 text-[0.7rem] text-ink-3">⌘K</span>
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="flex-1 truncate text-[0.84rem] text-ink-4">Suchen oder Seite öffnen…</span>
+        <span className="shrink-0 rounded-md border border-line px-[7px] py-[2px] text-[0.68rem] text-ink-3">
+          ⌘K
+        </span>
       </button>
       <IconBtn
         icon={Search}
@@ -82,8 +72,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       <div className="flex-1 md:flex-none" />
 
-      {/* Theme toggle */}
-      <div className="theme-toggle">
+      <div className="theme-toggle hidden sm:flex">
         <button
           aria-label="Helles Theme"
           title="Hell"
@@ -103,13 +92,21 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <IconBtn
-        icon={HelpCircle}
-        aria-label="Hilfe – KI-Assistent öffnen"
+        icon={MessageSquare}
+        aria-label="KI-Assistent öffnen"
         variant="ghost"
         className="hidden sm:grid"
         onClick={() => navigate('/assistant')}
       />
       <NotificationBell />
+
+      <button
+        onClick={() => navigate('/settings')}
+        aria-label="Konto und Einstellungen"
+        className="shrink-0 rounded-pill"
+      >
+        <Avatar name={fullName} size={38} />
+      </button>
 
       <CommandPalette open={open} onClose={closePalette} />
     </header>

@@ -1,4 +1,4 @@
-import { CloudOff } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '@/platform/offline/useOnlineStatus';
 
 /**
@@ -13,13 +13,11 @@ export function OfflineBanner() {
   return (
     <div
       role="status"
-      className="flex items-center justify-center gap-2 border-b border-line bg-peach px-4 py-2 text-center text-xs font-semibold text-navy"
+      className="status-surface flex items-center justify-center gap-2 border-b px-3 py-[7px] text-center text-[0.78rem] font-semibold"
+      style={{ '--s': 'var(--warn)' } as React.CSSProperties}
     >
-      <CloudOff className="h-4 w-4 shrink-0" />
-      <span>
-        Offline – du siehst den zuletzt geladenen Stand. Änderungen sind erst wieder möglich, wenn
-        die Verbindung steht.
-      </span>
+      <WifiOff className="h-4 w-4 shrink-0" />
+      <span>Offline — zuletzt geladener Stand. Änderungen sind gesperrt.</span>
     </div>
   );
 }

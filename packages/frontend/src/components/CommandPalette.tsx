@@ -4,8 +4,6 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  Home,
-  Wallet,
   Calendar,
   CheckSquare,
   ChefHat,
@@ -13,23 +11,12 @@ import {
   StickyNote,
   Plane,
   FolderLock,
-  Goal,
   Loader2,
-  LayoutDashboard,
-  ArrowLeftRight,
-  Building2,
-  Target,
-  PiggyBank,
-  Repeat,
-  FileText,
-  Sparkles,
-  Bot,
-  LineChart,
-  Settings,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { searchApi, type SearchHit } from '@/platform/api/search';
+import { ALL_MODULES } from './navigation';
 
 interface Command {
   id: string;
@@ -39,30 +26,14 @@ interface Command {
   run: (navigate: ReturnType<typeof useNavigate>) => void;
 }
 
-const NAV_COMMANDS: Command[] = [
-  { id: 'nav-home', label: 'Home', icon: Home, run: (n) => n('/') },
-  { id: 'nav-finance', label: 'Finanzen', icon: Wallet, run: (n) => n('/finance') },
-  { id: 'nav-calendar', label: 'Kalender', icon: Calendar, run: (n) => n('/calendar') },
-  { id: 'nav-tasks', label: 'Aufgaben', icon: CheckSquare, run: (n) => n('/tasks') },
-  { id: 'nav-recipes', label: 'Rezepte', icon: ChefHat, run: (n) => n('/recipes') },
-  { id: 'nav-meal-plan', label: 'Wochenplan', icon: ChefHat, run: (n) => n('/meal-plan') },
-  { id: 'nav-lists', label: 'Listen', icon: ClipboardList, run: (n) => n('/lists') },
-  { id: 'nav-notes', label: 'Notizen', icon: StickyNote, run: (n) => n('/notes') },
-  { id: 'nav-trips', label: 'Reisen', icon: Plane, run: (n) => n('/trips') },
-  { id: 'nav-documents', label: 'Dokumente', icon: FolderLock, run: (n) => n('/documents') },
-  { id: 'nav-habits', label: 'Gewohnheiten', icon: Goal, run: (n) => n('/habits') },
-  { id: 'nav-dashboard', label: 'Finanz-Übersicht', icon: LayoutDashboard, run: (n) => n('/finance') },
-  { id: 'nav-transactions', label: 'Transaktionen', icon: ArrowLeftRight, run: (n) => n('/finance/transactions') },
-  { id: 'nav-accounts', label: 'Konten', icon: Building2, run: (n) => n('/finance/accounts') },
-  { id: 'nav-budgets', label: 'Budgets', icon: Target, run: (n) => n('/finance/budgets') },
-  { id: 'nav-savings', label: 'Sparziele', icon: PiggyBank, run: (n) => n('/finance/savings') },
-  { id: 'nav-investments', label: 'Depot', icon: LineChart, run: (n) => n('/finance/investments') },
-  { id: 'nav-recurring', label: 'Wiederkehrende Zahlungen', icon: Repeat, run: (n) => n('/finance/recurring') },
-  { id: 'nav-contracts', label: 'Verträge', icon: FileText, run: (n) => n('/finance/contracts') },
-  { id: 'nav-savings-potential', label: 'Sparpotenzial', icon: Sparkles, run: (n) => n('/finance/savings-potential') },
-  { id: 'nav-assistant', label: 'KI-Assistent', icon: Bot, run: (n) => n('/assistant') },
-  { id: 'nav-settings', label: 'Einstellungen', icon: Settings, run: (n) => n('/settings') },
-];
+// Navigationsbefehle kommen aus der Registry – so fehlt hier kein Modul,
+// wenn eines dazukommt.
+const NAV_COMMANDS: Command[] = ALL_MODULES.map((mod) => ({
+  id: `nav-${mod.to}`,
+  label: mod.label,
+  icon: mod.icon,
+  run: (n) => n(mod.to),
+}));
 
 const MODULE_ICON: Record<SearchHit['module'], LucideIcon> = {
   tasks: CheckSquare,
@@ -181,8 +152,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh] animate-fade-in"
-      style={{ background: 'rgba(15, 23, 42, 0.45)' }}
+      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh] animate-o-fade"
+      style={{ background: 'rgba(6, 7, 11, 0.66)', backdropFilter: 'blur(3px)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -190,7 +161,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       aria-modal="true"
       aria-label="Befehlspalette"
     >
-      <div className="w-full max-w-lg overflow-hidden rounded-lg border border-line bg-elev shadow-xl">
+      <div className="w-[min(620px,92vw)] overflow-hidden rounded-lg border border-line bg-elev shadow-overlay">
         <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
           <Search className="h-4 w-4 shrink-0 text-ink-3" />
           <input
@@ -204,6 +175,10 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             aria-controls="command-palette-list"
             aria-activedescendant={commands[activeIndex] ? `cmd-${commands[activeIndex].id}` : undefined}
           />
+          {/* Blinkender Cursor als Zeichen, dass die Eingabe aktiv ist */}
+          {query.length === 0 && (
+            <span aria-hidden className="h-4 w-px shrink-0 animate-o-pulse bg-violet" />
+          )}
           {isFetching && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-ink-3" />}
           <kbd className="rounded border border-line px-1.5 py-0.5 text-[0.7rem] text-ink-3">Esc</kbd>
         </div>
