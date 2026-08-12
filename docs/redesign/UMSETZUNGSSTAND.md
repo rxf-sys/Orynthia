@@ -116,12 +116,16 @@ Kalender zusätzlich: heute mit Violett-Tint, Termin-Chips tragen die
 Kalenderfarbe als **Kante** statt als Fläche — sonst konkurriert die
 Nutzerfarbe mit den Statusflächen.
 
+Rezeptkarten ohne Foto zeigen einen bewusst gestalteten Platzhalter
+(diagonale Streifen, Beschriftung „Rezeptfoto") statt einer leeren Fläche —
+so ist erkennbar, dass ein Bild fehlt und nichts kaputt ist.
+
 ## Offen
 
-**Feinschliff der Modulseiten** nach dem Muster aus Abschnitt 5
-(Kennzahlenreihe, Filterpillen, einheitlicher Listencontainer) — das
-Farbsystem sitzt überall, die Maße noch nicht durchgängig. Ebenso die
-Rezept-Bildplatzhalter aus Abschnitt 8.
+**Feinschliff der Maße** auf den Modulseiten nach Abschnitt 5
+(Kennzahlenreihe, Filterpillen, einheitlicher Listencontainer). Das
+Farbsystem und die Zustände sitzen überall; die Abstände und Radien folgen
+noch nicht durchgängig der Skala aus Abschnitt 1.5.
 
 ## Bewusste Abweichungen
 
