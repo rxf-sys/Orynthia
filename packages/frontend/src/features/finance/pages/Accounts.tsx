@@ -19,6 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { accountsApi, bankingApi } from '@/features/finance/api';
+import { daysUntil, STATUS_STYLE } from '@/lib/status';
 import { formatCurrency, cn, parseDecimal, parseApiError } from '@/lib/utils';
 import type { BankAccount, CreateAccountData } from '@/features/finance/types';
 import toast from 'react-hot-toast';
@@ -31,6 +32,7 @@ import {
   Modal,
   EmptyState,
   useConfirm,
+  StatusBadge,
   pickCategoryColor,
 } from '@/components/ui';
 
@@ -274,6 +276,8 @@ export function AccountsPage() {
           </>
         }
       />
+
+      <ConsentBanner />
 
       {/* KPI Strip */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -767,6 +771,48 @@ function EditAccountModal({
         </fieldset>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Warnt, bevor die PSD2-Autorisierung ausläuft. Ohne Hinweis stoppt der
+ * Kontoabgleich stillschweigend – der Nutzer merkt es erst an fehlenden
+ * Buchungen.
+ */
+function ConsentBanner() {
+  const { data } = useQuery({
+    queryKey: ['bank-connections'],
+    queryFn: () => bankingApi.getConnections().then((r) => r.data),
+  });
+
+  type Connection = { expiresAt?: string | null; institutionName?: string };
+  const expiring = ((data ?? []) as Connection[])
+    .filter((c) => c.expiresAt)
+    .map((c) => ({
+      name: c.institutionName ?? 'Bankverbindung',
+      days: daysUntil(new Date(c.expiresAt!)),
+      date: new Date(c.expiresAt!),
+    }))
+    .filter((c) => c.days <= 21)
+    .sort((a, b) => a.days - b.days);
+
+  if (expiring.length === 0) return null;
+  const worst = expiring[0];
+  const kind = worst.days < 0 ? 'crit' : 'warn';
+
+  return (
+    <div
+      role="status"
+      className="status-surface flex flex-wrap items-center gap-3 rounded-md border px-4 py-3"
+      style={{ '--s': STATUS_STYLE[kind].color } as React.CSSProperties}
+    >
+      <StatusBadge kind={kind} size="sm" label={worst.days < 0 ? 'abgelaufen' : 'läuft ab'} />
+      <p className="min-w-0 flex-1 text-[0.82rem] font-medium">
+        {worst.days < 0
+          ? `Die Autorisierung für ${worst.name} ist am ${worst.date.toLocaleDateString('de-DE')} abgelaufen – der Kontoabgleich steht still.`
+          : `Die Autorisierung für ${worst.name} läuft am ${worst.date.toLocaleDateString('de-DE')} ab. Ohne neue Autorisierung stoppt der Kontoabgleich.`}
+      </p>
+    </div>
   );
 }
 

@@ -1053,13 +1053,14 @@ function MonthGrid({ cursor, events, extras, onDayClick, onEventClick }: ViewPro
               className={cn(
                 'flex min-h-[92px] flex-col items-stretch gap-1 border-b border-r border-line p-1.5 text-left align-top transition-colors hover:bg-soft',
                 outside && 'bg-sunken',
+                isToday(day) && 'bg-violet/[0.07]',
               )}
               aria-label={format(day, 'EEEE, d. MMMM', { locale: de })}
             >
               <span
                 className={cn(
                   'grid h-6 w-6 place-items-center rounded-pill text-xs font-semibold tnum',
-                  isToday(day) ? 'bg-indigo text-white' : outside ? 'text-ink-4' : 'text-ink-2',
+                  isToday(day) ? 'bg-violet text-white' : outside ? 'text-ink-4' : 'text-ink-2',
                 )}
               >
                 {format(day, 'd')}
@@ -1080,8 +1081,10 @@ function MonthGrid({ cursor, events, extras, onDayClick, onEventClick }: ViewPro
                         onEventClick(occ);
                       }
                     }}
-                    className="truncate rounded px-1.5 py-0.5 text-[0.7rem] font-medium text-white"
-                    style={{ background: occ.calendarColor ?? 'var(--indigo)' }}
+                    className="truncate rounded bg-soft py-0.5 pl-1.5 pr-1 text-[0.7rem] font-medium text-ink-2"
+                    // Nutzerfarbe als Kante, nicht als Fläche: sonst
+                    // konkurriert sie mit den Statusflächen.
+                    style={{ borderLeft: `3px solid ${occ.calendarColor ?? 'var(--violet)'}` }}
                     title={occ.title}
                   >
                     {!occ.isAllDay && (

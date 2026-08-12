@@ -98,16 +98,30 @@ Sitzung. Ein harter Reload beendet sie — das ist ehrlicher, als einen
 Fortschritt anzuzeigen, dessen Anlass niemand mehr erinnert. In-App-Navigation
 behält ihn.
 
-## Offen
+**9. Rand- und Leerzustände**
 
-**9. Rand- und Leerzustände** aus Abschnitt 6 systematisch durchgehen
-(abgelaufener Banking-Consent, schreibgeschützter ICS-Kalender, Reise ohne
-Verknüpfungen). Ein Teil ist bereits da: leere Liste, Notiz ohne Titel,
-pausierter Vertrag, archivierte Gewohnheit, Offline-Modus.
+| Zustand | Wo |
+|---|---|
+| Abgelaufener Banking-Consent | Warnbanner über der Kontenliste, ab 21 Tagen Restlaufzeit |
+| Negativer Darlehenssaldo | neutral mit „planmäßig, keine Wertung" |
+| Budget über 100 % | Statusfarbe + Schraffur |
+| Leere Liste, Notiz ohne Titel | vorhanden |
+| Reise ohne Verknüpfungen | jetzt mit zwei Aktionen statt nur einer Erklärung |
+| Pausierter Vertrag / Zahlung | `idle` |
+| Archivierte Gewohnheit | `idle`-Pille |
+| Schreibgeschützter ICS-Kalender | Schloss in der Verwaltung, Hinweis im Termin-Dialog, aus der Auswahl gefiltert |
+| Offline-Modus | Banner über der gesamten Breite, Schreibzugriffe gesperrt |
+
+Kalender zusätzlich: heute mit Violett-Tint, Termin-Chips tragen die
+Kalenderfarbe als **Kante** statt als Fläche — sonst konkurriert die
+Nutzerfarbe mit den Statusflächen.
+
+## Offen
 
 **Feinschliff der Modulseiten** nach dem Muster aus Abschnitt 5
 (Kennzahlenreihe, Filterpillen, einheitlicher Listencontainer) — das
-Farbsystem sitzt überall, die Maße noch nicht durchgängig.
+Farbsystem sitzt überall, die Maße noch nicht durchgängig. Ebenso die
+Rezept-Bildplatzhalter aus Abschnitt 8.
 
 ## Bewusste Abweichungen
 
