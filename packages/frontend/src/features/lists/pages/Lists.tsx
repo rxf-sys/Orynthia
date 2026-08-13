@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { listsApi } from '@/features/lists/api';
+import { useMealFlow } from '@/stores/flowStore';
 import { accountsApi, categoriesApi, transactionsApi } from '@/features/finance/api';
 import {
   LIST_TYPE_ICON,
@@ -29,6 +30,8 @@ import { Btn, Card, EmptyState, Field, IconBtn, Modal, PageHead, useConfirm } fr
 export function ListsPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const flow = useMealFlow();
+  const resetFlow = useMealFlow((s) => s.reset);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
@@ -198,6 +201,27 @@ export function ListsPage() {
               Hinzufügen
             </Btn>
           </form>
+
+          {flow.step === 1 && flow.listId === list.id && (
+            <div
+              className="status-surface flex flex-wrap items-center gap-3 rounded-md border px-3.5 py-3"
+              style={{ '--s': 'var(--pos)' } as React.CSSProperties}
+              role="status"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              <p className="min-w-0 flex-1 text-[0.8rem] font-medium">
+                {flow.added} Zutaten aus {flow.meals} Mahlzeit{flow.meals === 1 ? '' : 'en'}{' '}
+                übernommen
+                {flow.merged ? `, ${flow.merged} gleichnamige zusammengeführt` : ''}.
+              </p>
+              <button
+                onClick={() => resetFlow()}
+                className="shrink-0 text-[0.72rem] font-semibold underline"
+              >
+                Ausblenden
+              </button>
+            </div>
+          )}
 
           {/* Umbruchfähig: auf schmalen Displays rutschen die Aktionen in
               die nächste Zeile, statt die Seite breiter zu machen. */}
@@ -511,6 +535,9 @@ function ExpenseFromListModal({
     }
   }, [categories, categoryId]);
 
+  const navigate = useNavigate();
+  const bookedExpense = useMealFlow((st) => st.bookedExpense);
+
   const createMutation = useMutation({
     mutationFn: (value: number) =>
       transactionsApi.create({
@@ -521,12 +548,15 @@ function ExpenseFromListModal({
         purpose: `Einkauf: ${listName}`,
         categoryId: categoryId || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Ausgabe erfasst');
+      // Letzter Schritt der Kette: die gebuchte Ausgabe wird in der
+      // Transaktionsliste hervorgehoben, statt nur kurz aufzublitzen.
+      bookedExpense({ transactionId: r.data.id, amount: Math.abs(Number(r.data.amount)) });
       setAmount('');
       onClose();
+      navigate('/finance/transactions');
     },
     onError: (e) => toast.error(parseApiError(e, 'Fehler beim Erfassen')),
   });

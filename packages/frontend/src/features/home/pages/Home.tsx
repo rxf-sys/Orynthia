@@ -34,6 +34,7 @@ import { Btn, Card, Progress } from '@/components/ui';
 import { HeroCard } from '@/features/home/components/HeroCard';
 import { FocusBand, SectionHead } from '@/features/home/components/FocusBand';
 import { BudgetRings } from '@/features/home/components/BudgetRings';
+import { WeekFlowCard } from '@/features/home/components/WeekFlowCard';
 
 /**
  * Widget-Registry des Home-Dashboards: Jedes Modul steuert genau ein
@@ -49,6 +50,7 @@ const WIDGETS = [
   { id: 'habits', title: 'Gewohnheiten', section: 'day' },
   { id: 'lists', title: 'Listen', section: 'house' },
   { id: 'trips', title: 'Reisen', section: 'house' },
+  { id: 'flow', title: 'Der Fluss der Woche', section: 'house' },
 ] as const;
 
 type WidgetId = (typeof WIDGETS)[number]['id'];
@@ -117,6 +119,8 @@ export function HomePage() {
         return <HabitsWidget key={id} />;
       case 'contracts':
         return <ContractsWidget key={id} />;
+      case 'flow':
+        return <WeekFlowCard key={id} />;
     }
   };
 

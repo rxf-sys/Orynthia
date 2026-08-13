@@ -236,10 +236,29 @@ export function TripDetailPage() {
             <span className="text-xs text-ink-3">{trip.linked.length} Verknüpfungen</span>
           </div>
           {trip.linked.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-3">
-              Noch nichts verknüpft. Häng Termine, deine Packliste oder Notizen an diese Reise –
-              sie bleiben in ihrem Modul und sind hier gebündelt sichtbar.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="max-w-md text-sm text-ink-3">
+                Noch nichts verknüpft. Häng Termine, deine Packliste oder Notizen an diese Reise –
+                sie bleiben in ihrem Modul und sind hier gebündelt sichtbar.
+              </p>
+              {/* Zwei konkrete Wege heraus statt nur einer Erklärung */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {!hasPackingList && (
+                  <Btn
+                    variant="grad"
+                    size="sm"
+                    icon={ClipboardList}
+                    onClick={() => packingListMutation.mutate()}
+                    disabled={packingListMutation.isPending}
+                  >
+                    Packliste anlegen
+                  </Btn>
+                )}
+                <Btn variant="ghost" size="sm" icon={Link2} onClick={() => setLinkOpen(true)}>
+                  Vorhandenes verknüpfen
+                </Btn>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               {Object.entries(grouped).map(([type, links]) => {

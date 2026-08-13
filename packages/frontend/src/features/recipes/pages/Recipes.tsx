@@ -210,11 +210,22 @@ function RecipeCard({ recipe, onToggleFavorite }: { recipe: Recipe; onToggleFavo
             }}
           />
         ) : (
+          // Bewusst gestalteter Platzhalter statt einer leeren Fläche:
+          // diagonale Streifen und eine Beschriftung machen erkennbar,
+          // dass hier ein Foto fehlt und nicht etwa etwas kaputt ist.
           <div
-            className="grid h-36 w-full place-items-center"
-            style={{ background: 'var(--grad-soft)' }}
+            className="relative grid h-36 w-full place-items-center bg-soft"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(45deg, transparent 0 10px, color-mix(in oklab, var(--violet) 7%, transparent) 10px 20px)',
+            }}
           >
-            <ChefHat className="h-9 w-9 text-indigo opacity-40" />
+            <div className="flex flex-col items-center gap-1.5">
+              <ChefHat className="h-8 w-8 text-ink-4" aria-hidden />
+              <span className="text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-ink-4">
+                Rezeptfoto
+              </span>
+            </div>
           </div>
         )}
       </Link>

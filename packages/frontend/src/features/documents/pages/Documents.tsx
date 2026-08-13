@@ -26,7 +26,18 @@ import {
   type Document,
 } from '@/features/documents/types';
 import { cn, parseApiError } from '@/lib/utils';
-import { Btn, Card, EmptyState, Field, IconBtn, Modal, PageHead, useConfirm } from '@/components/ui';
+import { daysUntil, dueStatus, type StatusKind } from '@/lib/status';
+import {
+  Btn,
+  Card,
+  EmptyState,
+  Field,
+  IconBtn,
+  Modal,
+  PageHead,
+  StatusBadge,
+  useConfirm,
+} from '@/components/ui';
 
 function iconFor(mimeType: string): LucideIcon {
   if (mimeType.startsWith('image/')) return FileImage;
@@ -36,13 +47,14 @@ function iconFor(mimeType: string): LucideIcon {
   return FileArchive;
 }
 
-/** Ablauf in den nächsten 30 Tagen wird hervorgehoben (z. B. Ausweis). */
-function expiryState(expiresAt?: string | null): 'none' | 'soon' | 'expired' {
-  if (!expiresAt) return 'none';
-  const diff = parseISO(expiresAt).getTime() - Date.now();
-  if (diff < 0) return 'expired';
-  if (diff < 30 * 86_400_000) return 'soon';
-  return 'none';
+/**
+ * Gültigkeit als Status: abgelaufen ist kritisch, eine nahe Frist warnend.
+ * Die Schwellen kommen aus der gemeinsamen Ableitung, nicht aus einer
+ * eigenen Ternary-Kette in dieser Datei.
+ */
+function expiryStatus(expiresAt: string): StatusKind {
+  const days = daysUntil(parseISO(expiresAt));
+  return days < 0 ? 'crit' : dueStatus(days);
 }
 
 export function DocumentsPage() {
@@ -438,7 +450,6 @@ function DocumentCard({
   onDelete: () => void;
 }) {
   const Icon = iconFor(doc.mimeType);
-  const expiry = expiryState(doc.expiresAt);
 
   return (
     <Card hover className="group flex flex-col gap-2.5">
@@ -491,18 +502,14 @@ function DocumentCard({
             #{tag}
           </span>
         ))}
-        {doc.expiresAt && (
-          <span
-            className={cn(
-              'rounded-pill px-2 py-0.5 text-[0.68rem] font-semibold',
-              expiry === 'expired' && 'bg-neg/10 text-neg',
-              expiry === 'soon' && 'bg-peach text-navy',
-              expiry === 'none' && 'bg-soft text-ink-3',
-            )}
-          >
-            {expiry === 'expired' ? 'abgelaufen' : 'bis'}{' '}
-            {format(parseISO(doc.expiresAt), 'dd.MM.yyyy', { locale: de })}
-          </span>
+        {doc.expiresAt ? (
+          <StatusBadge
+            kind={expiryStatus(doc.expiresAt)}
+            size="sm"
+            label={`${daysUntil(parseISO(doc.expiresAt)) < 0 ? 'abgelaufen' : 'gültig bis'} ${format(parseISO(doc.expiresAt), 'dd.MM.yyyy', { locale: de })}`}
+          />
+        ) : (
+          <StatusBadge kind="idle" size="sm" label="ohne Ablauf" />
         )}
         <span className="ml-auto text-[0.68rem] text-ink-4">
           {format(parseISO(doc.createdAt), 'dd.MM.yyyy', { locale: de })}

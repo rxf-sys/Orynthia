@@ -73,15 +73,59 @@ Die Widget-Anpassung bleibt erhalten und ist den Abschnitten zugeordnet. Das
 frühere „Finanzen"-Widget entfällt: seine Zahlen stehen jetzt im Hero; an seine
 Stelle tritt die im Handoff vorgesehene Sparziele-Karte.
 
+**7. Übrige Modulseiten**
+
+Aufgaben (Gruppen als getönte Statuszeilen), wiederkehrende Zahlungen und
+Verträge (Fristen über `dueStatus`, pausiert als `idle`), Dokumente
+(Gültigkeit als Status statt eigener Ternary-Kette), Gewohnheiten und Notizen
+(Nutzerfarbe auf der **linken Kante** statt oben — Farbachse 3).
+
+Die System-Kategoriefarben lagen als eigentliche Ursache im Backend: sie
+enthielten Grün und Rot. `CategoriesService` nutzt jetzt die wertfreie Skala
+und **zieht bestehende Instanzen beim Start nach** — selbst angelegte
+Kategorien bleiben unangetastet, die gehören dem Nutzer.
+
+**8. Kette Wochenplan → Liste → Ausgabe** — `stores/flowStore.ts`
+
+Der Fortschritt ist Zustand statt Text: der Wochenplan übergibt Liste, Anzahl
+und Mahlzeiten, die Liste zeigt daraus ihr Erfolgsbanner und bietet den
+nächsten Schritt an, die gebuchte Ausgabe wird in der Transaktionsliste
+markiert und angescrollt. Die Fluss-Karte auf Home zeigt, wie weit die Kette
+ist; Schritte dahinter bleiben grau.
+
+Bewusst nicht persistiert: die Kette ist eine Handlung innerhalb einer
+Sitzung. Ein harter Reload beendet sie — das ist ehrlicher, als einen
+Fortschritt anzuzeigen, dessen Anlass niemand mehr erinnert. In-App-Navigation
+behält ihn.
+
+**9. Rand- und Leerzustände**
+
+| Zustand | Wo |
+|---|---|
+| Abgelaufener Banking-Consent | Warnbanner über der Kontenliste, ab 21 Tagen Restlaufzeit |
+| Negativer Darlehenssaldo | neutral mit „planmäßig, keine Wertung" |
+| Budget über 100 % | Statusfarbe + Schraffur |
+| Leere Liste, Notiz ohne Titel | vorhanden |
+| Reise ohne Verknüpfungen | jetzt mit zwei Aktionen statt nur einer Erklärung |
+| Pausierter Vertrag / Zahlung | `idle` |
+| Archivierte Gewohnheit | `idle`-Pille |
+| Schreibgeschützter ICS-Kalender | Schloss in der Verwaltung, Hinweis im Termin-Dialog, aus der Auswahl gefiltert |
+| Offline-Modus | Banner über der gesamten Breite, Schreibzugriffe gesperrt |
+
+Kalender zusätzlich: heute mit Violett-Tint, Termin-Chips tragen die
+Kalenderfarbe als **Kante** statt als Fläche — sonst konkurriert die
+Nutzerfarbe mit den Statusflächen.
+
+Rezeptkarten ohne Foto zeigen einen bewusst gestalteten Platzhalter
+(diagonale Streifen, Beschriftung „Rezeptfoto") statt einer leeren Fläche —
+so ist erkennbar, dass ein Bild fehlt und nichts kaputt ist.
+
 ## Offen
 
-**7. Übrige Modulseiten** nach dem Muster aus 5 — Kennzahlenreihe,
-Filterpillen, Listencontainer. Die Finanzmodule tragen das Farbsystem bereits,
-die Zeit- und Haushaltsmodule noch nicht.
-
-**8. Kette Wochenplan → Liste → Ausgabe** als echter Zustand (HANDOFF 6).
-
-**9. Rand- und Leerzustände** aus 6 durchgehen, Tastaturbedienung der Palette.
+**Feinschliff der Maße** auf den Modulseiten nach Abschnitt 5
+(Kennzahlenreihe, Filterpillen, einheitlicher Listencontainer). Das
+Farbsystem und die Zustände sitzen überall; die Abstände und Radien folgen
+noch nicht durchgängig der Skala aus Abschnitt 1.5.
 
 ## Bewusste Abweichungen
 
@@ -90,9 +134,7 @@ Button stand dort, zeigte auf die alte Finanz-Route und wurde auf
 ausdrücklichen Wunsch entfernt. Als modulabhängige Aktion wäre er sinnvoll —
 das ist aber eine Produktentscheidung und braucht eine Ansage.
 
-**`CategoryIcon`** nutzt weiterhin die in der Datenbank gespeicherte
-Kategoriefarbe. Die System-Kategorien tragen dort Grün und Rot. Für den Donut
-ist das umgangen (siehe oben), auf dem Icon steht die Farbe aber neben einer
-Statuspille. Sauber wäre, die Seed-Farben der System-Kategorien im Backend auf
-die wertfreie Skala umzustellen — das ist eine Datenänderung und gehört in
-denselben Schritt wie die übrigen Modulseiten.
+**Der Kategorie-Donut** nimmt weiterhin die Skala statt der gespeicherten
+Farbe. Die System-Farben sind zwar jetzt wertfrei, eine selbst angelegte
+Kategorie könnte aber Rot sein — im Donut würde das als Bewertung gelesen.
+Auf dem Icon bleibt die Nutzerfarbe erhalten.
