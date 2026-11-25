@@ -1,5 +1,13 @@
 # Orynthia – Dein Alltag. Eine App.
 
+> **Status:** v1 live · **Remake geplant** · **Stand:** 25.11.2026 · Teil meines [Portfolios](https://portfolio.rxf-sys.de/#projects)
+>
+> Orynthia wird in zwei eigenständige Apps aufgeteilt: **Orynthia Everyday** für den Alltag
+> (Kalender, Aufgaben, Listen, Wochenplan, Rezepte) und **Orynthia Finance** für die Finanzen
+> (in Entwicklung im Repo [finance-app](https://github.com/rxf-sys/finance-app)). Diese Version
+> läuft weiter, bis beide Nachfolger produktiv sind; bis dahin kommen hier nur noch
+> Sicherheitsfixes hinzu.
+
 Eine Self-Hosted Allrounder-App für den digitalen Alltag: Finanzen (Open Banking/PSD2, Budgets, Verträge, Depot), Kalender, Aufgaben und ein modulares Home-Dashboard – alles an einem Ort, alles auf deinem eigenen Server.
 
 **Module:** 🏠 Home · 💰 Finanzen · 📅 Kalender · ✅ Aufgaben · 🍳 Rezepte · 📆 Wochenplan · 🛒 Listen · 📝 Notizen · ✈️ Reisen · 🤖 KI-Assistent — Hintergrund und Roadmap in [docs/ALLROUNDER_PLAN.md](docs/ALLROUNDER_PLAN.md).

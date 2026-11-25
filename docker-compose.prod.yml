@@ -11,6 +11,9 @@ services:
     # bleibt, sonst wären hochgeladene Dateien nach jedem Deploy weg.
     volumes: !reset
       - documents_data:/app/data/documents
+    # No host port in production: nginx reaches the API over the compose
+    # network (backend:3000), so its rate limits cannot be bypassed.
+    ports: !reset []
     restart: always
 
   frontend:
