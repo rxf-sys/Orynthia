@@ -1,7 +1,7 @@
 {
   "name": "Orynthia",
   "short_name": "Orynthia",
-  "description": "Self-Hosted Persönliche Finanzverwaltung mit Open Banking, Verträgen und Budgets.",
+  "description": "Self-Hosted Allrounder für den Alltag: Finanzen mit Open Banking, Kalender, Aufgaben, Rezepte, Listen und mehr.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
